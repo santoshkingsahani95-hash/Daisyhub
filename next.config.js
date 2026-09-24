@@ -16,6 +16,18 @@ const nextConfig = {
       }
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/admin',
+        destination: '/ace_garment',
+      },
+      {
+        source: '/admin/:path*',
+        destination: '/ace_garment/:path*',
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
