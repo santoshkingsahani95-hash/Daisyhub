@@ -4,11 +4,11 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
-import { useStore } from '@/lib/store';
+import { useStore, getProductStock } from '@/lib/store';
 import { db } from '@/lib/db';
 
 export const MiniCart: React.FC = () => {
-  const { isMiniCartOpen, closeMiniCart, cart, updateQuantity, removeFromCart, getCartTotal } = useStore();
+  const { isMiniCartOpen, closeMiniCart, cart, updateQuantity, removeFromCart, getCartTotal, clearDirectCheckoutItem } = useStore();
 
   if (!isMiniCartOpen) return null;
 
@@ -210,7 +210,10 @@ export const MiniCart: React.FC = () => {
 
                   <Link
                     href="/checkout"
-                    onClick={closeMiniCart}
+                    onClick={() => {
+                      clearDirectCheckoutItem();
+                      closeMiniCart();
+                    }}
                     className="py-3 px-4 bg-brand-dark text-white text-center text-xs font-semibold uppercase tracking-wider hover:bg-brand-dark/90 transition-colors flex items-center justify-center gap-1"
                   >
                     <span>CHECKOUT</span>

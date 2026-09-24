@@ -8,18 +8,21 @@ import { ShieldCheck, Truck, Lock, Tag, QrCode, RefreshCw, CheckCircle2, AlertCi
 import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
-import { useStore } from '@/lib/store';
+import { useStore, getProductStock } from '@/lib/store';
 import { db } from '@/lib/db';
 import { PaymentMethod, Order, FonepaySettings } from '@/types';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, getCartTotal, clearCart, user } = useStore();
+  const { cart, clearCart, user, directCheckoutItem, clearDirectCheckoutItem } = useStore();
+
+  // Active checkout items: Use directCheckoutItem for "Buy It Now", otherwise use bag cart items
+  const checkoutItems = directCheckoutItem ? [directCheckoutItem] : cart;
 
   const [formData, setFormData] = useState({
-    fullName: user ? user.name : 'Aayusha Karki',
-    email: user ? user.email : 'aayusha.k@example.com',
-    mobile: user ? user.mobile || '9841234567' : '9841234567',
+    fullName: user ? user.name : '',
+    email: user ? user.email : '',
+    mobile: user ? user.mobile || '' : '',
     province: 'Bagmati Province',
     district: 'Kathmandu',
     city: 'Kathmandu',
@@ -34,15 +37,6 @@ export default function CheckoutPage() {
 
   // Dynamic Fonepay Settings State (Synced Live from DB & Admin Panel)
   const [fonepaySettings, setFonepaySettings] = useState<FonepaySettings>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('ace_db_fonepay_settings');
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (parsed && parsed.qrImageUrl) return parsed;
-        } catch (e) {}
-      }
-    }
     const cms = db.getCMS();
     return (
       cms.fonepaySettings || {
@@ -69,26 +63,26 @@ export default function CheckoutPage() {
   const [wsSocket, setWsSocket] = useState<WebSocket | null>(null);
   const [deliveryZone, setDeliveryZone] = useState<'inside' | 'outside'>('inside');
 
-  const subtotal = getCartTotal();
+  const subtotal = checkoutItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = couponStatus?.valid ? couponStatus.discountAmount : 0;
 
   // Dynamic delivery fee calculation (Inside Valley vs Outside Valley vs Free Delivery)
   const allProdsForShipping = db.getProducts();
-  const isFreeDeliveryEligible = cart.length > 0 && cart.some((item) => {
+  const isFreeDeliveryEligible = checkoutItems.length > 0 && checkoutItems.some((item) => {
     const p = allProdsForShipping.find((prod) => prod.id === item.productId || prod.slug === item.productSlug);
     return p?.isFreeDelivery;
   });
 
   const calculatedShipping = isFreeDeliveryEligible
     ? 0
-    : cart.reduce((max, item) => {
-        const p = allProdsForShipping.find((prod) => prod.id === item.productId || prod.slug === item.productSlug);
-        if (p?.isFreeDelivery) return max;
-        const fee = deliveryZone === 'inside'
-          ? (p?.insideValleyFee !== undefined ? p.insideValleyFee : 100)
-          : (p?.outsideValleyFee !== undefined ? p.outsideValleyFee : 200);
-        return Math.max(max, fee);
-      }, deliveryZone === 'inside' ? 100 : 200);
+    : checkoutItems.reduce((max, item) => {
+      const p = allProdsForShipping.find((prod) => prod.id === item.productId || prod.slug === item.productSlug);
+      if (p?.isFreeDelivery) return max;
+      const fee = deliveryZone === 'inside'
+        ? (p?.insideValleyFee !== undefined ? p.insideValleyFee : 100)
+        : (p?.outsideValleyFee !== undefined ? p.outsideValleyFee : 200);
+      return Math.max(max, fee);
+    }, deliveryZone === 'inside' ? 100 : 200);
 
   const shipping = calculatedShipping;
   const total = Math.max(0, subtotal - discount + shipping);
@@ -116,7 +110,7 @@ export default function CheckoutPage() {
               setFonepaySettings(parsed);
               return;
             }
-          } catch (e) {}
+          } catch (e) { }
         }
       }
       const cms = db.getCMS();
@@ -139,16 +133,18 @@ export default function CheckoutPage() {
     order.items.forEach((c) => {
       const prod = allProds.find((p) => p.id === c.productId || p.name === c.productName);
       if (prod) {
-        const sizeObj = prod.sizes.find((s) => s.size === c.size);
-        if (sizeObj) {
-          const newStock = Math.max(0, sizeObj.stock - c.quantity);
-          db.updateInventory(prod.id, c.size, newStock);
-        }
+        const currentStock = getProductStock(prod, c.colorName);
+        const newStock = Math.max(0, currentStock - c.quantity);
+        db.updateInventory(prod.id, c.size, newStock);
       }
     });
 
     db.createOrder(order);
-    clearCart();
+    if (directCheckoutItem) {
+      clearDirectCheckoutItem();
+    } else {
+      clearCart();
+    }
     setIsProcessing(false);
     setShowFonepayModal(false);
     if (wsSocket) wsSocket.close();
@@ -168,7 +164,15 @@ export default function CheckoutPage() {
       const res = await fetch('/api/fonepay/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prn: prn || `PRN-${Date.now()}` }),
+        body: JSON.stringify({
+          prn: prn || `PRN-${Date.now()}`,
+          credentials: {
+            apiUsername: fonepaySettings.apiUsername,
+            apiPassword: fonepaySettings.apiPassword,
+            merchantCode: fonepaySettings.merchantCode,
+            apiKey: fonepaySettings.apiKey,
+          },
+        }),
       });
       const data = await res.json();
 
@@ -178,7 +182,9 @@ export default function CheckoutPage() {
           finalizeOrderSuccess(orderToFinalize);
         }, 1000);
       } else {
-        setFonepayError('❌ Payment not yet verified! Please scan the Fonepay QR code and complete payment first before proceeding.');
+        setFonepayError(
+          data.message ? `❌ ${data.message}` : '❌ Payment not yet verified! Please scan the Fonepay QR code and complete payment first before proceeding.'
+        );
         setFonepayStatusMsg('Payment pending verification');
       }
     } catch (e) {
@@ -191,7 +197,7 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cart.length === 0) return;
+    if (cart.length === 0 && !directCheckoutItem) return;
 
     setIsProcessing(true);
 
@@ -203,7 +209,7 @@ export default function CheckoutPage() {
         try {
           const parsed = JSON.parse(storedFonepay);
           if (parsed && parsed.qrImageUrl) activeSettings = parsed;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     if (!activeSettings.qrImageUrl && db.getCMS().fonepaySettings) {
@@ -213,15 +219,14 @@ export default function CheckoutPage() {
 
     // Validate live inventory before starting order creation
     const allProds = db.getProducts();
-    for (const item of cart) {
-      const prod = allProds.find((p) => p.id === item.productId || p.slug === item.productSlug);
+    for (const item of checkoutItems) {
+      const prod = allProds.find((p) => p.id === item.productId || p.slug === item.productSlug || p.name === item.productName);
       if (prod) {
-        const sizeObj = prod.sizes.find((s) => s.size === item.size);
-        const currentStock = sizeObj ? sizeObj.stock : 0;
+        const currentStock = getProductStock(prod, item.colorName);
         if (item.quantity > currentStock) {
           setIsProcessing(false);
           alert(
-            `Cannot complete order! "${item.productName}" (${item.size}) only has ${currentStock} units remaining in stock. Please update your cart.`
+            `Cannot complete order! "${item.productName}" only has ${currentStock} units remaining in stock. Please update your cart.`
           );
           return;
         }
@@ -235,7 +240,7 @@ export default function CheckoutPage() {
       id: orderId,
       orderNumber: orderNum,
       createdAt: new Date().toISOString(),
-      items: cart.map((c) => ({
+      items: checkoutItems.map((c) => ({
         productId: c.productId,
         productName: c.productName,
         colorName: c.colorName,
@@ -273,10 +278,19 @@ export default function CheckoutPage() {
     if (paymentMethod === 'fonepay') {
       if (activeSettings.qrMode === 'dynamic') {
         try {
+          const productNames = checkoutItems.map((c) => c.productName).join(', ');
           const qrRes = await fetch('/api/fonepay/generate-qr', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount: total }),
+            body: JSON.stringify({
+              amount: total,
+              remarks1: productNames, // Product name first so it appears directly in mobile banking app Remarks
+              remarks2: activeSettings.merchantName || 'Ace Garment',
+              apiUsername: activeSettings.apiUsername,
+              apiPassword: activeSettings.apiPassword,
+              merchantCode: activeSettings.merchantCode,
+              apiKey: activeSettings.apiKey,
+            }),
           });
           const qrData = await qrRes.json();
 
@@ -311,9 +325,9 @@ export default function CheckoutPage() {
                     setFonepayError('❌ Fonepay WebSocket reported payment failed.');
                     ws.close();
                   }
-                } catch (err) {}
+                } catch (err) { }
               };
-            } catch (err) {}
+            } catch (err) { }
           }
         } catch (err) {
           setFonepayQrData(activeSettings.qrImageUrl);
@@ -340,13 +354,13 @@ export default function CheckoutPage() {
     }
   };
 
-  if (cart.length === 0) {
+  if (checkoutItems.length === 0) {
     return (
       <div className="min-h-screen flex flex-col bg-white">
         <AnnouncementBar />
         <Header />
         <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-          <h2 className="font-serif-title text-2xl font-bold text-brand-dark mb-4">Your bag is empty</h2>
+          <h2 className="font-serif-title text-2xl font-bold text-brand-dark mb-4">Your checkout bag is empty</h2>
           <Link href="/shop" className="px-6 py-3 bg-brand-dark text-white text-xs font-semibold uppercase tracking-widest">
             RETURN TO SHOP
           </Link>
@@ -515,11 +529,10 @@ export default function CheckoutPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label
                       onClick={() => setDeliveryZone('inside')}
-                      className={`p-3.5 rounded-lg border-2 cursor-pointer flex items-center justify-between transition-all ${
-                        deliveryZone === 'inside'
-                          ? 'border-brand-dark bg-brand-cream/50 shadow-xs'
-                          : 'border-brand-border bg-white hover:border-brand-dark'
-                      }`}
+                      className={`p-3.5 rounded-lg border-2 cursor-pointer flex items-center justify-between transition-all ${deliveryZone === 'inside'
+                        ? 'border-brand-dark bg-brand-cream/50 shadow-xs'
+                        : 'border-brand-border bg-white hover:border-brand-dark'
+                        }`}
                     >
                       <div className="flex items-center gap-2.5">
                         <input
@@ -548,11 +561,10 @@ export default function CheckoutPage() {
 
                     <label
                       onClick={() => setDeliveryZone('outside')}
-                      className={`p-3.5 rounded-lg border-2 cursor-pointer flex items-center justify-between transition-all ${
-                        deliveryZone === 'outside'
-                          ? 'border-brand-dark bg-brand-cream/50 shadow-xs'
-                          : 'border-brand-border bg-white hover:border-brand-dark'
-                      }`}
+                      className={`p-3.5 rounded-lg border-2 cursor-pointer flex items-center justify-between transition-all ${deliveryZone === 'outside'
+                        ? 'border-brand-dark bg-brand-cream/50 shadow-xs'
+                        : 'border-brand-border bg-white hover:border-brand-dark'
+                        }`}
                     >
                       <div className="flex items-center gap-2.5">
                         <input
@@ -601,9 +613,8 @@ export default function CheckoutPage() {
                 ].map((pm) => (
                   <label
                     key={pm.id}
-                    className={`flex items-center justify-between p-4 rounded border cursor-pointer transition-all ${
-                      paymentMethod === pm.id ? 'border-brand-dark bg-brand-cream/40 font-bold' : 'border-brand-border hover:border-brand-dark'
-                    }`}
+                    className={`flex items-center justify-between p-4 rounded border cursor-pointer transition-all ${paymentMethod === pm.id ? 'border-brand-dark bg-brand-cream/40 font-bold' : 'border-brand-border hover:border-brand-dark'
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <input
@@ -616,7 +627,7 @@ export default function CheckoutPage() {
                       />
                       <span className="text-xs text-brand-dark font-medium">{pm.label}</span>
                     </div>
-                    <span className="text-[10px] bg-brand-dark/10 text-brand-dark px-2 py-0.5 rounded font-mono font-semibold">
+                    <span suppressHydrationWarning className="text-[10px] bg-brand-dark/10 text-brand-dark px-2 py-0.5 rounded font-mono font-semibold">
                       {pm.badge}
                     </span>
                   </label>
@@ -629,12 +640,12 @@ export default function CheckoutPage() {
           <div className="lg:col-span-5 space-y-6">
             <div className="bg-white p-6 rounded-lg border border-brand-border shadow-sm space-y-6 sticky top-28">
               <h2 className="font-serif-title text-lg font-bold text-brand-dark uppercase tracking-wider">
-                ORDER SUMMARY ({cart.reduce((a, b) => a + b.quantity, 0)} ITEMS)
+                ORDER SUMMARY ({checkoutItems.reduce((a, b) => a + b.quantity, 0)} ITEMS)
               </h2>
 
               {/* Items List */}
               <div className="divide-y divide-brand-border max-h-64 overflow-y-auto pr-1">
-                {cart.map((item) => (
+                {checkoutItems.map((item) => (
                   <div key={item.id} className="py-3 flex items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-3">
                       <div className="relative w-12 aspect-[3/4] bg-brand-cream rounded overflow-hidden shrink-0">
@@ -767,9 +778,32 @@ export default function CheckoutPage() {
                 </span>
               </div>
               <div className="text-right">
-                <span className="text-[10px] text-brand-muted block">MERCHANT ACCT</span>
-                <span className="font-mono text-xs font-bold text-brand-dark">{fonepaySettings.accountNumber}</span>
+                <span className="text-[10px] text-brand-muted block">OFFICIAL MERCHANT</span>
+                <span className="font-mono text-xs font-bold text-brand-dark block">
+                  {fonepaySettings.merchantName}
+                </span>
+                <span className="font-mono text-[11px] text-brand-gold font-bold block">Code: {fonepaySettings.merchantCode}</span>
               </div>
+            </div>
+
+            {/* Product Name Remarks Display */}
+            <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200/80 text-left space-y-1 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-amber-900 tracking-wider flex items-center gap-1 font-mono">
+                  <Tag size={12} className="text-amber-700" /> REQUIRED PAYMENT REMARKS (PRODUCT NAME):
+                </span>
+                <span className="text-[9px] bg-amber-200/60 text-amber-900 px-1.5 py-0.5 rounded font-mono font-bold">
+                  REMARKS / NOTE
+                </span>
+              </div>
+              <span className="font-mono text-xs font-bold text-brand-dark block truncate">
+                {checkoutItems.map((c) => c.productName).join(', ')}
+              </span>
+              <p className="text-[10px] text-amber-800/90 font-medium">
+                💡 {fonepaySettings.qrMode === 'dynamic'
+                  ? 'Product name is automatically encoded into this Dynamic QR payment remarks!'
+                  : 'Please type the product name above into your Mobile Banking app Remarks/Note field during payment.'}
+              </p>
             </div>
 
             {/* FONEPAY QR CODE IMAGE DISPLAY (DYNAMIC VS STATIC) */}
@@ -813,9 +847,8 @@ export default function CheckoutPage() {
             {/* Live Status Indicator */}
             <div className="p-2.5 bg-slate-900 text-white rounded-lg flex items-center justify-between text-xs font-mono">
               <div className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full animate-ping ${
-                  fonepayStatusMsg.includes('VERIFIED') || fonepayStatusMsg.includes('paid') ? 'bg-emerald-400' : 'bg-amber-400'
-                }`} />
+                <span className={`w-2.5 h-2.5 rounded-full animate-ping ${fonepayStatusMsg.includes('VERIFIED') || fonepayStatusMsg.includes('paid') ? 'bg-emerald-400' : 'bg-amber-400'
+                  }`} />
                 <span className="font-semibold capitalize text-[11px]">{fonepayStatusMsg}</span>
               </div>
               {fonepayVerifying && <RefreshCw size={14} className="animate-spin text-brand-gold" />}

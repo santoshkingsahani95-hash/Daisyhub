@@ -19,6 +19,7 @@ import {
   Copy,
   Check,
   Zap,
+  Download,
 } from 'lucide-react';
 import { db } from '@/lib/db';
 import { Order, OrderStatus } from '@/types';
@@ -60,9 +61,11 @@ export default function AdminOrdersPage() {
     const handleDbUpdate = () => loadOrders();
     window.addEventListener('ace-db-updated', handleDbUpdate);
     window.addEventListener('storage', handleDbUpdate);
+    const interval = setInterval(loadOrders, 3000);
     return () => {
       window.removeEventListener('ace-db-updated', handleDbUpdate);
       window.removeEventListener('storage', handleDbUpdate);
+      clearInterval(interval);
     };
   }, []);
 
@@ -82,7 +85,6 @@ export default function AdminOrdersPage() {
         setSelectedOrder({
           ...selectedOrder,
           orderStatus: newStatus,
-          paymentStatus: newStatus === 'Delivered' ? 'paid' : selectedOrder.paymentStatus,
         });
       }
       setMsg(`Order status successfully updated to "${newStatus}"!`);
@@ -137,6 +139,102 @@ export default function AdminOrdersPage() {
     return true; // 'all'
   });
 
+  // Status priority sorting: Pending at TOP; Out for Delivery & Cancelled at BOTTOM
+  const statusPriority: Record<string, number> = {
+    Pending: 0,
+    'Out for Delivery': 1,
+    Cancelled: 2,
+  };
+
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    const priorityA = statusPriority[a.orderStatus || 'Pending'] ?? 0;
+    const priorityB = statusPriority[b.orderStatus || 'Pending'] ?? 0;
+
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  const handleExportExcel = () => {
+    if (filteredOrders.length === 0) {
+      alert('No orders available in the selected date filter to export.');
+      return;
+    }
+
+    const headers = [
+      'Order Number',
+      'Date & Time',
+      'Customer Name',
+      'Mobile Number',
+      'Email Address',
+      'Street Address',
+      'City',
+      'District',
+      'Province',
+      'Landmark',
+      'Purchased Clothing Items',
+      'Total Amount (NPR)',
+      'Payment Method',
+      'Payment Status',
+      'Order Status',
+    ];
+
+    const rows = sortedOrders.map((ord) => {
+      const itemsFormatted = ord.items
+        .map((i) => `${i.productName} (${i.size}, ${i.colorName}) x${i.quantity}`)
+        .join(' | ');
+
+      const formattedDate = `${new Date(ord.createdAt).toLocaleDateString()} ${new Date(
+        ord.createdAt
+      ).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+      return [
+        ord.orderNumber,
+        formattedDate,
+        ord.customerName,
+        ord.customerMobile,
+        ord.customerEmail || '',
+        ord.shippingAddress?.streetAddress || '',
+        ord.shippingAddress?.city || '',
+        ord.shippingAddress?.district || '',
+        ord.shippingAddress?.province || '',
+        ord.shippingAddress?.landmark || '',
+        itemsFormatted,
+        ord.total,
+        ord.paymentMethod ? ord.paymentMethod.toUpperCase() : '',
+        ord.paymentStatus ? ord.paymentStatus.toUpperCase() : '',
+        ord.orderStatus || 'Pending',
+      ];
+    });
+
+    const escapeCsv = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const csvContent =
+      '\ufeff' +
+      [headers.map(escapeCsv).join(','), ...rows.map((row) => row.map(escapeCsv).join(','))].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    const filterLabel = dateFilter === 'all' ? 'All' : dateFilter.replace('_', '-');
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.setAttribute('download', `AceGarment_Orders_${filterLabel}_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setMsg(`Exported ${sortedOrders.length} order(s) (${dateFilter.replace('_', ' ').toUpperCase()}) to Excel sheet!`);
+    setTimeout(() => setMsg(''), 4000);
+  };
+
   const appScriptCode = `function doPost(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   var data = JSON.parse(e.postData.contents);
@@ -181,11 +279,20 @@ export default function AdminOrdersPage() {
 
         {/* Direct Google Sheet Link Button & Config */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={handleExportExcel}
+            className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider rounded shadow flex items-center gap-2 transition-all cursor-pointer"
+            title="Download Excel Sheet for currently filtered orders"
+          >
+            <Download size={18} />
+            <span>CREATE EXCEL SHEET ({filteredOrders.length})</span>
+          </button>
+
           <a
             href={googleSheetUrl}
             target="_blank"
             rel="noreferrer"
-            className="px-5 py-3 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-wider rounded shadow flex items-center gap-2 transition-all"
+            className="px-4 py-3 bg-brand-dark hover:bg-brand-accent text-white text-xs font-bold uppercase tracking-wider rounded shadow flex items-center gap-2 transition-all"
             title="Open linked Google Sheet in new tab"
           >
             <FileSpreadsheet size={18} />
@@ -296,6 +403,38 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
+      {/* ORDERS SUMMARY STATS CARDS */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs space-y-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-brand-muted block">TOTAL ORDERS</span>
+          <div className="flex items-baseline justify-between">
+            <span className="font-serif-title text-2xl font-bold text-brand-dark">{orders.length}</span>
+            <span className="text-[10px] font-bold text-brand-gold font-mono">({filteredOrders.length} filtered)</span>
+          </div>
+        </div>
+
+        <div className="bg-amber-50/80 p-4 rounded-lg border border-amber-200 shadow-2xs space-y-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">⏳ PENDING</span>
+          <span className="font-serif-title text-2xl font-bold text-amber-900">
+            {orders.filter((o) => o.orderStatus === 'Pending' || !o.orderStatus).length}
+          </span>
+        </div>
+
+        <div className="bg-purple-50/80 p-4 rounded-lg border border-purple-200 shadow-2xs space-y-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-800 block">🚚 OUT FOR DELIVERY</span>
+          <span className="font-serif-title text-2xl font-bold text-purple-900">
+            {orders.filter((o) => o.orderStatus === 'Out for Delivery').length}
+          </span>
+        </div>
+
+        <div className="bg-rose-50/80 p-4 rounded-lg border border-rose-200 shadow-2xs space-y-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-800 block">❌ CANCELLED</span>
+          <span className="font-serif-title text-2xl font-bold text-rose-900">
+            {orders.filter((o) => o.orderStatus === 'Cancelled').length}
+          </span>
+        </div>
+      </div>
+
       {/* DATE FILTERING BAR */}
       <div className="bg-white p-4 rounded-lg border border-brand-border shadow-xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -368,15 +507,25 @@ export default function AdminOrdersPage() {
 
       {/* Orders Table Display */}
       <div className="bg-white rounded-lg border border-brand-border shadow-sm p-6 overflow-x-auto space-y-3">
-        <div className="flex items-center justify-between pb-2 border-b border-brand-border text-xs">
-          <span className="font-bold text-brand-dark uppercase tracking-wider">
-            SHOWING {filteredOrders.length} OF {orders.length} TOTAL ORDERS
-          </span>
-          {dateFilter !== 'all' && (
-            <span className="text-brand-gold font-bold uppercase text-[10px] bg-brand-gold/10 px-2 py-0.5 rounded font-mono">
-              FILTER ACTIVE: {dateFilter.replace('_', ' ').toUpperCase()}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-brand-border text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-brand-dark uppercase tracking-wider">
+              SHOWING {filteredOrders.length} OF {orders.length} TOTAL ORDERS
             </span>
-          )}
+            {dateFilter !== 'all' && (
+              <span className="text-brand-gold font-bold uppercase text-[10px] bg-brand-gold/10 px-2 py-0.5 rounded font-mono">
+                FILTER ACTIVE: {dateFilter.replace('_', ' ').toUpperCase()}
+              </span>
+            )}
+          </div>
+
+          <button
+            onClick={handleExportExcel}
+            className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold uppercase tracking-wider rounded shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Download size={14} />
+            <span>EXPORT {dateFilter.replace('_', ' ').toUpperCase()} TO EXCEL SHEET</span>
+          </button>
         </div>
 
         {filteredOrders.length === 0 ? (
@@ -409,7 +558,7 @@ export default function AdminOrdersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-border">
-              {filteredOrders.map((ord) => (
+              {sortedOrders.map((ord) => (
                 <tr key={ord.id} className="hover:bg-brand-cream/30 transition-colors">
                   <td className="p-3 font-mono font-bold text-brand-dark">{ord.orderNumber}</td>
                   <td className="p-3 text-brand-muted font-sans text-[11px]">
@@ -437,30 +586,41 @@ export default function AdminOrdersPage() {
                   </td>
                   <td className="p-3 font-bold text-sm text-brand-dark">NPR {ord.total.toLocaleString()}</td>
                   <td className="p-3">
-                    <span className="font-mono uppercase font-semibold text-[11px] block text-brand-dark">{ord.paymentMethod}</span>
-                    <span className="text-[10px] text-emerald-600 font-bold uppercase">{ord.paymentStatus}</span>
+                    {ord.paymentMethod === 'fonepay' ? (
+                      <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-800 border border-rose-200 font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
+                        FONEPAY QR
+                      </span>
+                    ) : ord.paymentMethod === 'cod' ? (
+                      <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-200 font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow-2xs">
+                        💵 COD (CASH)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-900 border border-emerald-200 font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow-2xs">
+                        💚 {ord.paymentMethod.toUpperCase()}
+                      </span>
+                    )}
+                    <span className={`block text-[10px] font-bold uppercase mt-1 ${
+                      ord.paymentStatus === 'paid' ? 'text-emerald-700' : 'text-amber-600'
+                    }`}>
+                      {ord.paymentStatus === 'paid' ? '✓ PAID & VERIFIED' : '⏳ PENDING (PAY ON ARRIVAL)'}
+                    </span>
                   </td>
                   <td className="p-3">
                     <select
                       value={ord.orderStatus || 'Pending'}
                       onChange={(e) => handleStatusChange(ord.id, e.target.value as OrderStatus)}
                       className={`px-2 py-1 rounded text-xs font-bold font-mono border focus:outline-none cursor-pointer transition-all shadow-xs ${
-                        ord.orderStatus === 'Delivered'
-                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300 hover:bg-emerald-200'
-                          : ord.orderStatus === 'Pending'
-                          ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                        ord.orderStatus === 'Out for Delivery'
+                          ? 'bg-purple-100 text-purple-900 border-purple-300 hover:bg-purple-200'
                           : ord.orderStatus === 'Cancelled'
                           ? 'bg-rose-100 text-rose-900 border-rose-300 hover:bg-rose-200'
-                          : 'bg-sky-100 text-sky-900 border-sky-300 hover:bg-sky-200'
+                          : 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
                       }`}
                     >
                       <option value="Pending">⏳ Pending</option>
-                      <option value="Delivered">✅ Delivered</option>
+                      <option value="Out for Delivery">🚚 Out for Delivery</option>
                       <option value="Cancelled">❌ Cancelled</option>
-                      <option value="Confirmed">Confirmed</option>
-                      <option value="Processing">Processing</option>
-                      <option value="Shipped">Shipped</option>
-                      <option value="Out for Delivery">Out for Delivery</option>
                     </select>
                   </td>
                   <td className="p-3 text-right">
@@ -601,22 +761,16 @@ export default function AdminOrdersPage() {
                   value={selectedOrder.orderStatus || 'Pending'}
                   onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value as OrderStatus)}
                   className={`px-3 py-1.5 rounded text-xs font-bold font-mono border focus:outline-none cursor-pointer transition-all shadow-xs ${
-                    selectedOrder.orderStatus === 'Delivered'
-                      ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                      : selectedOrder.orderStatus === 'Pending'
-                      ? 'bg-amber-100 text-amber-900 border-amber-300'
+                    selectedOrder.orderStatus === 'Out for Delivery'
+                      ? 'bg-purple-100 text-purple-900 border-purple-300'
                       : selectedOrder.orderStatus === 'Cancelled'
                       ? 'bg-rose-100 text-rose-900 border-rose-300'
-                      : 'bg-sky-100 text-sky-900 border-sky-300'
+                      : 'bg-amber-100 text-amber-900 border-amber-300'
                   }`}
                 >
                   <option value="Pending">⏳ Pending</option>
-                  <option value="Delivered">✅ Delivered</option>
+                  <option value="Out for Delivery">🚚 Out for Delivery</option>
                   <option value="Cancelled">❌ Cancelled</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Processing">Processing</option>
-                  <option value="Shipped">Shipped</option>
-                  <option value="Out for Delivery">Out for Delivery</option>
                 </select>
               </div>
 

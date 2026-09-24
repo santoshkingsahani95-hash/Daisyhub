@@ -15,7 +15,7 @@ import { SearchOverlay } from '@/components/layout/search-overlay';
 import { ProductCard } from '@/components/product/product-card';
 import { db } from '@/lib/db';
 import { Product, ProductReview } from '@/types';
-import { useStore } from '@/lib/store';
+import { useStore, getProductStock, isProductOutOfStock } from '@/lib/store';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -36,7 +36,7 @@ export default function ProductDetailPage() {
   const [reviewComment, setReviewComment] = useState<string>('');
   const [reviewSuccess, setReviewSuccess] = useState<string>('');
 
-  const { addToCart, toggleWishlist, isInWishlist, openSizeGuide, user } = useStore();
+  const { addToCart, buyNowProduct, toggleWishlist, isInWishlist, openSizeGuide, user } = useStore();
 
   const loadProduct = () => {
     const found = db.getProductBySlug(slug);
@@ -85,14 +85,12 @@ export default function ProductDetailPage() {
     (product.salePrice && product.salePrice < product.price ? product.salePrice : product.price);
   const inWishlist = isInWishlist(product.id);
 
-  // Per-color stock level check
-  const totalColorStock = (product.colors || []).reduce((acc, c) => acc + (c.stock !== undefined ? c.stock : 0), 0);
-  const totalSizeStock = (product.sizes || []).reduce((acc, s) => acc + (s.stock || 0), 0);
-  const colorStock = activeColorObj?.stock !== undefined ? activeColorObj.stock : (product.colors && product.colors.length > 0 ? totalColorStock : totalSizeStock);
-  const isProductOutOfStock = product.isOutOfStock === true || colorStock <= 0;
+  // Stock calculation for selected color variant
+  const colorStock = getProductStock(product, selectedColorName);
+  const isOutOfStock = isProductOutOfStock(product, selectedColorName);
 
   const handleIncreaseQuantity = () => {
-    if (isProductOutOfStock) return;
+    if (isOutOfStock) return;
     if (quantity >= colorStock) {
       setIsStockShake(true);
       setTimeout(() => setIsStockShake(false), 200);
@@ -102,17 +100,17 @@ export default function ProductDetailPage() {
   };
 
   const handleAddToCart = () => {
-    if (isProductOutOfStock) return;
+    if (isOutOfStock) return;
     setErrorMsg('');
     const colorToUse = selectedColorName || product.colors[0]?.name || 'Default';
     addToCart(product, colorToUse, 'Free Size', Math.min(quantity, colorStock));
   };
 
   const handleBuyNow = () => {
-    if (isProductOutOfStock) return;
+    if (isOutOfStock) return;
     setErrorMsg('');
     const colorToUse = selectedColorName || product.colors[0]?.name || 'Default';
-    addToCart(product, colorToUse, 'Free Size', Math.min(quantity, colorStock));
+    buyNowProduct(product, colorToUse, 'Free Size', Math.min(quantity, colorStock));
     router.push('/checkout');
   };
 
@@ -264,7 +262,7 @@ export default function ProductDetailPage() {
                 <div className="flex items-center border border-brand-border rounded">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    disabled={isProductOutOfStock}
+                    disabled={isOutOfStock}
                     className="px-3 py-1.5 hover:bg-brand-cream text-brand-dark font-bold text-sm disabled:opacity-40"
                   >
                     -
@@ -276,7 +274,7 @@ export default function ProductDetailPage() {
                   </span>
                   <button
                     onClick={handleIncreaseQuantity}
-                    disabled={isProductOutOfStock}
+                    disabled={isOutOfStock}
                     className="px-3 py-1.5 hover:bg-brand-cream text-brand-dark font-bold text-sm disabled:opacity-40"
                   >
                     +
@@ -285,7 +283,7 @@ export default function ProductDetailPage() {
               </div>
 
               <div>
-                {isProductOutOfStock ? (
+                {isOutOfStock ? (
                   <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2.5 py-1 rounded border border-rose-200 uppercase tracking-wider">
                     OUT OF STOCK
                   </span>
@@ -301,16 +299,16 @@ export default function ProductDetailPage() {
             <div className="space-y-3 pt-2">
               <button
                 onClick={handleAddToCart}
-                disabled={isProductOutOfStock}
+                disabled={isOutOfStock}
                 className="w-full py-4 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ShoppingBag size={18} />
-                <span>{isProductOutOfStock ? 'OUT OF STOCK' : 'ADD TO BAG'}</span>
+                <span>{isOutOfStock ? 'OUT OF STOCK' : 'ADD TO BAG'}</span>
               </button>
 
               <button
                 onClick={handleBuyNow}
-                disabled={isProductOutOfStock}
+                disabled={isOutOfStock}
                 className="w-full py-4 border-2 border-brand-dark text-brand-dark hover:bg-brand-cream text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 BUY IT NOW

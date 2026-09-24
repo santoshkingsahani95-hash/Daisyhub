@@ -13,7 +13,7 @@ import { useStore } from '@/lib/store';
 import { db } from '@/lib/db';
 
 export default function CartPage() {
-  const { cart, updateQuantity, removeFromCart, getCartTotal } = useStore();
+  const { cart, updateQuantity, removeFromCart, getCartTotal, clearDirectCheckoutItem } = useStore();
   const [couponCode, setCouponCode] = useState('');
   const [couponStatus, setCouponStatus] = useState<{ valid: boolean; discountAmount: number; message: string } | null>(null);
 
@@ -220,6 +220,7 @@ export default function CartPage() {
                   return (
                     <Link
                       href="/checkout"
+                      onClick={clearDirectCheckoutItem}
                       className="w-full py-4 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest text-center block hover:bg-brand-dark/90 transition-all shadow-md"
                     >
                       PROCEED TO CHECKOUT →

@@ -13,13 +13,27 @@ import { Order } from '@/types';
 
 export default function OrderConfirmationPage() {
   const params = useParams();
-  const id = params.id as string;
+  const rawId = params?.id as string;
+  const id = rawId ? decodeURIComponent(rawId) : '';
   const [order, setOrder] = useState<Order | null>(null);
 
   const loadOrder = () => {
+    if (!id) return;
     const found = db.getOrderById(id);
     if (found) {
       setOrder(found);
+    } else {
+      // Fallback: check all orders
+      const all = db.getOrders();
+      if (all.length > 0) {
+        const match = all.find(
+          (o) =>
+            o.id.toLowerCase() === id.toLowerCase() ||
+            o.orderNumber.toLowerCase() === id.toLowerCase() ||
+            o.id.toLowerCase().includes(id.toLowerCase())
+        );
+        if (match) setOrder(match);
+      }
     }
   };
 
@@ -97,15 +111,13 @@ export default function OrderConfirmationPage() {
               <div>
                 <span className="text-brand-muted block font-semibold mb-1">Status:</span>
                 <span className={`font-bold font-mono text-xs px-3 py-1 rounded inline-block border ${
-                  order.orderStatus === 'Delivered'
-                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                    : order.orderStatus === 'Pending'
-                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                  order.orderStatus === 'Out for Delivery'
+                    ? 'bg-purple-100 text-purple-900 border-purple-300'
                     : order.orderStatus === 'Cancelled'
                     ? 'bg-rose-100 text-rose-900 border-rose-300'
-                    : 'bg-sky-100 text-sky-900 border-sky-300'
+                    : 'bg-amber-100 text-amber-900 border-amber-300'
                 }`}>
-                  {order.orderStatus === 'Pending' ? '⏳ PENDING' : order.orderStatus === 'Delivered' ? '✅ DELIVERED' : order.orderStatus.toUpperCase()}
+                  {order.orderStatus === 'Pending' ? '⏳ PENDING' : order.orderStatus === 'Out for Delivery' ? '🚚 OUT FOR DELIVERY' : '❌ CANCELLED'}
                 </span>
               </div>
               <div>

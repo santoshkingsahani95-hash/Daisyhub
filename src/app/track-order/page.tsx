@@ -18,7 +18,7 @@ function TrackOrderContent() {
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [searched, setSearched] = useState(false);
 
-  const steps = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
+  const steps = ['Pending', 'Out for Delivery', 'Cancelled'];
 
   const refreshOrder = () => {
     if (orderQuery.trim()) {
@@ -53,9 +53,10 @@ function TrackOrderContent() {
 
   const getStepIndex = (status?: string) => {
     if (!status) return 0;
-    if (status === 'Order Placed' || status === 'Pending') return 0;
-    const idx = steps.indexOf(status);
-    return idx >= 0 ? idx : 0;
+    if (status === 'Pending') return 0;
+    if (status === 'Out for Delivery') return 1;
+    if (status === 'Cancelled') return 2;
+    return 0;
   };
 
   const currentStepIndex = activeOrder ? getStepIndex(activeOrder.orderStatus) : 0;
@@ -110,15 +111,13 @@ function TrackOrderContent() {
               <div>
                 <span className="text-brand-muted uppercase tracking-widest font-semibold block">LIVE STATUS</span>
                 <span className={`text-xs font-bold font-mono px-3 py-1 rounded inline-block mt-0.5 border ${
-                  activeOrder.orderStatus === 'Delivered'
-                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                    : activeOrder.orderStatus === 'Pending'
-                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                  activeOrder.orderStatus === 'Out for Delivery'
+                    ? 'bg-purple-100 text-purple-900 border-purple-300'
                     : activeOrder.orderStatus === 'Cancelled'
                     ? 'bg-rose-100 text-rose-900 border-rose-300'
-                    : 'bg-sky-100 text-sky-900 border-sky-300'
+                    : 'bg-amber-100 text-amber-900 border-amber-300'
                 }`}>
-                  {activeOrder.orderStatus === 'Pending' ? '⏳ PENDING' : activeOrder.orderStatus === 'Delivered' ? '✅ DELIVERED' : activeOrder.orderStatus.toUpperCase()}
+                  {activeOrder.orderStatus === 'Pending' ? '⏳ PENDING' : activeOrder.orderStatus === 'Out for Delivery' ? '🚚 OUT FOR DELIVERY' : '❌ CANCELLED'}
                 </span>
               </div>
               <div>

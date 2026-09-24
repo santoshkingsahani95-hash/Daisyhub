@@ -1,36 +1,57 @@
 import crypto from 'crypto';
+import { db } from '@/lib/db';
+import { FonepaySettings } from '@/types';
 
-const FONEPAY_USERNAME = process.env.FONEPAY_USERNAME || 'demo_username';
-const FONEPAY_PASSWORD = process.env.FONEPAY_PASSWORD || 'demo_password';
-const FONEPAY_MERCHANT_CODE = process.env.FONEPAY_MERCHANT_CODE || 'demo_merchant_code';
-const FONEPAY_API_KEY = process.env.FONEPAY_API_KEY || 'demo_secret_key'; // HMAC signing secret
-
-const FONEPAY_GENERATE_URL =
-  process.env.FONEPAY_GENERATE_URL ||
-  'https://merchantapi.fonepay.com/api/merchant/merchantDetailsForThirdParty/thirdPartyDynamicQrDownload';
-const FONEPAY_CHECK_URL =
-  process.env.FONEPAY_CHECK_URL ||
-  'https://merchantapi.fonepay.com/api/merchant/merchantDetailsForThirdParty/thirdPartyDynamicQrGetStatus';
+export interface FonepayCredentials {
+  apiUsername?: string;
+  apiPassword?: string;
+  merchantCode?: string;
+  apiKey?: string;
+}
 
 export function generatePrn() {
-  return `PRN-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `PRN-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
 
 /**
  * Calculates HMAC-SHA512 signature using secret key & comma-separated message.
  */
 export function signPayload(secret: string, message: string): string {
+  if (!secret) return '';
   return crypto.createHmac('sha512', secret).update(message).digest('hex');
 }
 
-export async function generateDynamicQr(amount: number, customPrn?: string) {
+export async function generateDynamicQr(
+  amount: number,
+  customPrn?: string,
+  credentials?: FonepayCredentials,
+  customRemarks1?: string,
+  customRemarks2?: string
+) {
+  const cms = db.getCMS();
+  const storedSettings: FonepaySettings | undefined = cms.fonepaySettings;
+
+  const username = credentials?.apiUsername || storedSettings?.apiUsername || process.env.FONEPAY_USERNAME || 'demo_username';
+  const password = credentials?.apiPassword || storedSettings?.apiPassword || process.env.FONEPAY_PASSWORD || 'demo_password';
+  const merchantCode = credentials?.merchantCode || storedSettings?.merchantCode || process.env.FONEPAY_MERCHANT_CODE || 'DAISY8849';
+  const apiKey = credentials?.apiKey || storedSettings?.apiKey || process.env.FONEPAY_API_KEY || 'demo_secret_key';
+
   const amountStr = amount.toFixed(2);
   const prn = customPrn || generatePrn();
-  const remarks1 = 'Daisy Hub';
-  const remarks2 = 'Order Payment';
 
-  const message = `${amountStr},${prn},${FONEPAY_MERCHANT_CODE},${remarks1},${remarks2}`;
-  const dataValidation = signPayload(FONEPAY_API_KEY, message);
+  // Clean remarks for Fonepay payload (remove commas/special chars that disrupt HMAC signature)
+  const rawRemarks1 = customRemarks1 || 'Product Purchase';
+  const rawRemarks2 = customRemarks2 || 'Ace Garment';
+
+  const remarks1 = rawRemarks1.replace(/[^a-zA-Z0-9 ]/g, ' ').slice(0, 35).trim() || 'Product Purchase';
+  const remarks2 = rawRemarks2.replace(/[^a-zA-Z0-9 ]/g, ' ').slice(0, 35).trim() || 'Ace Garment';
+
+  const FONEPAY_GENERATE_URL =
+    process.env.FONEPAY_GENERATE_URL ||
+    'https://merchantapi.fonepay.com/api/merchant/merchantDetailsForThirdParty/thirdPartyDynamicQrDownload';
+
+  const message = `${amountStr},${prn},${merchantCode},${remarks1},${remarks2}`;
+  const dataValidation = signPayload(apiKey, message);
 
   try {
     const res = await fetch(FONEPAY_GENERATE_URL, {
@@ -41,22 +62,22 @@ export async function generateDynamicQr(amount: number, customPrn?: string) {
         remarks1,
         remarks2,
         prn,
-        merchantCode: FONEPAY_MERCHANT_CODE,
+        merchantCode,
         dataValidation,
-        username: FONEPAY_USERNAME,
-        password: FONEPAY_PASSWORD,
+        username,
+        password,
       }),
     });
 
     if (!res.ok) {
-      console.warn('Fonepay API response non-200 status, providing sandbox QR fallback.');
-      return getMockDynamicQr(amount, prn);
+      console.warn('Fonepay API returned non-200, returning dynamic QR payload for merchant:', merchantCode);
+      return getMockDynamicQr(amount, prn, merchantCode, remarks1, remarks2);
     }
 
     const data = await res.json();
-    if (!data.qrMessage) {
-      console.warn('Fonepay API returned missing qrMessage, providing sandbox QR fallback.');
-      return getMockDynamicQr(amount, prn);
+    if (!data || !data.qrMessage) {
+      console.warn('Fonepay API missing qrMessage, returning dynamic QR payload for merchant:', merchantCode);
+      return getMockDynamicQr(amount, prn, merchantCode, remarks1, remarks2);
     }
 
     return {
@@ -64,16 +85,31 @@ export async function generateDynamicQr(amount: number, customPrn?: string) {
       dynamicQrData: data.qrMessage,
       websocketUrl: data.thirdpartyQrWebSocketUrl || `wss://merchantapi.fonepay.com/ws/qr/${prn}`,
       prn,
+      merchantCode,
+      remarks1,
+      remarks2,
     };
   } catch (error) {
-    console.warn('Fonepay fetch failed, providing sandbox QR response:', error);
-    return getMockDynamicQr(amount, prn);
+    console.warn('Fonepay REST request failed, generating fallback dynamic QR:', error);
+    return getMockDynamicQr(amount, prn, merchantCode, remarks1, remarks2);
   }
 }
 
-export async function verifyTransaction(prn: string) {
-  const message = `${prn},${FONEPAY_MERCHANT_CODE}`;
-  const dataValidation = signPayload(FONEPAY_API_KEY, message);
+export async function verifyTransaction(prn: string, credentials?: FonepayCredentials) {
+  const cms = db.getCMS();
+  const storedSettings: FonepaySettings | undefined = cms.fonepaySettings;
+
+  const username = credentials?.apiUsername || storedSettings?.apiUsername || process.env.FONEPAY_USERNAME || 'demo_username';
+  const password = credentials?.apiPassword || storedSettings?.apiPassword || process.env.FONEPAY_PASSWORD || 'demo_password';
+  const merchantCode = credentials?.merchantCode || storedSettings?.merchantCode || process.env.FONEPAY_MERCHANT_CODE || 'DAISY8849';
+  const apiKey = credentials?.apiKey || storedSettings?.apiKey || process.env.FONEPAY_API_KEY || 'demo_secret_key';
+
+  const FONEPAY_CHECK_URL =
+    process.env.FONEPAY_CHECK_URL ||
+    'https://merchantapi.fonepay.com/api/merchant/merchantDetailsForThirdParty/thirdPartyDynamicQrGetStatus';
+
+  const message = `${prn},${merchantCode}`;
+  const dataValidation = signPayload(apiKey, message);
 
   try {
     const res = await fetch(FONEPAY_CHECK_URL, {
@@ -81,39 +117,66 @@ export async function verifyTransaction(prn: string) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         prn,
-        merchantCode: FONEPAY_MERCHANT_CODE,
+        merchantCode,
         dataValidation,
-        username: FONEPAY_USERNAME,
-        password: FONEPAY_PASSWORD,
+        username,
+        password,
       }),
     });
 
     if (!res.ok) {
-      // Sandbox fallback verification
-      return { verified: true, status: 'SUCCESS', isDemo: true };
+      return {
+        verified: false,
+        status: 'UNPAID',
+        message: 'Payment not yet received or transaction PRN not found on Fonepay server.',
+        merchantCode,
+      };
     }
 
     const data = await res.json();
-    const status = (data.paymentStatus || data.status || '').toLowerCase();
-    const isSuccess = ['success', 'completed', 'paid', 'true'].includes(status);
+    const paymentStatus = (data.paymentStatus || data.status || data.statusCode || '').toString().toUpperCase();
+    const responseCode = (data.responseCode || data.code || '').toString();
+    const isSuccess = paymentStatus === 'SUCCESS' || paymentStatus === 'PAID' || paymentStatus === 'COMPLETED' || responseCode === '0';
+
+    if (isSuccess) {
+      return {
+        verified: true,
+        status: 'SUCCESS',
+        data,
+        merchantCode,
+      };
+    } else {
+      return {
+        verified: false,
+        status: paymentStatus || 'PENDING',
+        message: data.message || 'Payment is still pending. Please scan QR and complete payment in your mobile banking app.',
+        data,
+        merchantCode,
+      };
+    }
+  } catch (error: any) {
     return {
-      verified: isSuccess,
-      status: data.paymentStatus || (isSuccess ? 'SUCCESS' : 'PENDING'),
-      data,
+      verified: false,
+      status: 'ERROR',
+      message: error?.message || 'Unable to connect to Fonepay payment verification server.',
+      merchantCode,
     };
-  } catch (error) {
-    return { verified: true, status: 'SUCCESS', isDemo: true };
   }
 }
 
-function getMockDynamicQr(amount: number, prn: string) {
+function getMockDynamicQr(amount: number, prn: string, merchantCode: string, remarks1?: string, remarks2?: string) {
   const amountStr = amount.toFixed(2);
-  const mockQrMessage = `fonepay://pay?merchantCode=${FONEPAY_MERCHANT_CODE}&amount=${amountStr}&prn=${prn}&store=ACE_GARMENT`;
+  const remarks1Val = remarks1 || 'Ace Garment';
+  const remarks2Val = remarks2 || 'Order Payment';
+  const mockQrMessage = `fonepay://pay?merchantCode=${encodeURIComponent(merchantCode)}&amount=${amountStr}&prn=${encodeURIComponent(prn)}&remarks1=${encodeURIComponent(remarks1Val)}&remarks2=${encodeURIComponent(remarks2Val)}&store=${encodeURIComponent(remarks1Val)}`;
   return {
     success: true,
     dynamicQrData: mockQrMessage,
     websocketUrl: `wss://merchantapi.fonepay.com/ws/qr-demo/${prn}`,
     prn,
+    merchantCode,
+    remarks1: remarks1Val,
+    remarks2: remarks2Val,
     isMock: true,
   };
 }

@@ -102,25 +102,25 @@ class DataStore {
   private loadFromLocalStorage() {
     if (typeof window === 'undefined') return;
     try {
-      const storedCms = localStorage.getItem('ace_db_cms');
+      const storedCms = localStorage.getItem('ace_db_cms') || sessionStorage.getItem('ace_db_cms');
       if (storedCms) this.cms = JSON.parse(storedCms);
 
-      const storedProds = localStorage.getItem('ace_db_products');
+      const storedProds = localStorage.getItem('ace_db_products') || sessionStorage.getItem('ace_db_products');
       if (storedProds) this.products = JSON.parse(storedProds);
 
-      const storedCats = localStorage.getItem('ace_db_categories');
+      const storedCats = localStorage.getItem('ace_db_categories') || sessionStorage.getItem('ace_db_categories');
       if (storedCats) this.categories = JSON.parse(storedCats);
 
-      const storedOrders = localStorage.getItem('ace_db_orders');
+      const storedOrders = localStorage.getItem('ace_db_orders') || sessionStorage.getItem('ace_db_orders');
       if (storedOrders) this.orders = JSON.parse(storedOrders);
 
-      const storedCoupons = localStorage.getItem('ace_db_coupons');
+      const storedCoupons = localStorage.getItem('ace_db_coupons') || sessionStorage.getItem('ace_db_coupons');
       if (storedCoupons) this.coupons = JSON.parse(storedCoupons);
 
-      const storedUsers = localStorage.getItem('ace_db_users');
+      const storedUsers = localStorage.getItem('ace_db_users') || sessionStorage.getItem('ace_db_users');
       if (storedUsers) this.users = JSON.parse(storedUsers);
     } catch (e) {
-      console.error('Failed to load from localStorage:', e);
+      console.error('Failed to load from storage:', e);
     }
   }
 
@@ -206,14 +206,23 @@ class DataStore {
     if (!prod) return false;
     const cleanStock = isNaN(Number(newStock)) ? 0 : Math.max(0, Math.min(999, Math.floor(Number(newStock))));
     if (prod.sizes && prod.sizes.length > 0) {
-      prod.sizes = prod.sizes.map((s) => ({ ...s, stock: cleanStock }));
+      const existingSize = prod.sizes.find((s) => s.size === size);
+      if (existingSize) {
+        existingSize.stock = cleanStock;
+      } else {
+        prod.sizes = prod.sizes.map((s) => ({ ...s, stock: cleanStock }));
+      }
     } else {
-      prod.sizes = [{ size: 'Free Size', stock: cleanStock }];
+      prod.sizes = [{ size: size || 'Free Size', stock: cleanStock }];
     }
     // Set color stock fallback
     if (prod.colors) {
       prod.colors.forEach((c) => (c.stock = cleanStock));
     }
+    // Automatically toggle isOutOfStock flag based on remaining total stock
+    const totalSizeStock = prod.sizes.reduce((sum, s) => sum + (s.stock || 0), 0);
+    prod.isOutOfStock = totalSizeStock <= 0;
+
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
     return true;
@@ -231,8 +240,9 @@ class DataStore {
       prod.colors[0].stock = cleanStock;
     }
     // Update overall product stock as sum of color stocks
-    const totalColorStock = prod.colors.reduce((acc, c) => acc + (c.stock !== undefined ? c.stock : 10), 0);
+    const totalColorStock = prod.colors.reduce((acc, c) => acc + (c.stock !== undefined ? c.stock : 0), 0);
     prod.sizes = [{ size: 'Free Size', stock: totalColorStock }];
+    prod.isOutOfStock = totalColorStock <= 0;
 
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
@@ -256,7 +266,7 @@ class DataStore {
   // Categories & Collections
   getCategories(): Category[] {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('ace_db_categories');
+      const stored = localStorage.getItem('ace_db_categories') || sessionStorage.getItem('ace_db_categories');
       if (stored) {
         try {
           this.categories = JSON.parse(stored);
@@ -327,7 +337,7 @@ class DataStore {
 
   getCollections(): Collection[] {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('ace_db_collections');
+      const stored = localStorage.getItem('ace_db_collections') || sessionStorage.getItem('ace_db_collections');
       if (stored) {
         try {
           this.collections = JSON.parse(stored);
@@ -410,10 +420,13 @@ class DataStore {
   // Orders
   getOrders(): Order[] {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('ace_db_orders');
+      const stored = localStorage.getItem('ace_db_orders') || sessionStorage.getItem('ace_db_orders');
       if (stored) {
         try {
-          this.orders = JSON.parse(stored);
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.orders = parsed;
+          }
         } catch (e) {}
       }
     }
@@ -421,7 +434,16 @@ class DataStore {
   }
 
   getOrderById(id: string): Order | undefined {
-    return this.getOrders().find((o) => o.id === id || o.orderNumber === id);
+    if (!id) return undefined;
+    const cleanId = decodeURIComponent(id).trim().toLowerCase();
+    const all = this.getOrders();
+    return all.find(
+      (o) =>
+        o.id.toLowerCase() === cleanId ||
+        o.orderNumber.toLowerCase() === cleanId ||
+        o.id.toLowerCase().includes(cleanId) ||
+        o.orderNumber.toLowerCase().includes(cleanId)
+    );
   }
 
   getOrdersByEmail(email: string): Order[] {
@@ -473,9 +495,6 @@ class DataStore {
     const ord = ords.find((o) => o.id === orderId || o.orderNumber === orderId);
     if (ord) {
       ord.orderStatus = status;
-      if (status === 'Delivered') {
-        ord.paymentStatus = 'paid';
-      }
       this.orders = ords;
       this.saveAndBroadcast('ace_db_orders', this.orders);
     }
@@ -485,7 +504,7 @@ class DataStore {
   // Coupons
   getCoupons(): Coupon[] {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('ace_db_coupons');
+      const stored = localStorage.getItem('ace_db_coupons') || sessionStorage.getItem('ace_db_coupons');
       if (stored) {
         try {
           this.coupons = JSON.parse(stored);
@@ -549,7 +568,7 @@ class DataStore {
   // Users
   getUsers(): CustomerUser[] {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('ace_db_users');
+      const stored = localStorage.getItem('ace_db_users') || sessionStorage.getItem('ace_db_users');
       if (stored) {
         try {
           this.users = JSON.parse(stored);

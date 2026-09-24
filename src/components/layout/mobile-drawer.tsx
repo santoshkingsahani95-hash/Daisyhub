@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { X, ChevronDown, User, Heart, Search, ShoppingBag, Shield } from 'lucide-react';
+import { X, ChevronDown, User, Heart, Search, ShoppingBag, Shield, LogOut } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 interface MobileDrawerProps {
@@ -13,7 +13,7 @@ interface MobileDrawerProps {
 export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) => {
   const [clothingExpanded, setClothingExpanded] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
-  const { wishlist, user, openSearch } = useStore();
+  const { wishlist, user, logout, openSearch } = useStore();
 
   useEffect(() => {
     setIsMounted(true);
@@ -131,20 +131,66 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) =
 
         {/* Bottom User Controls */}
         <div className="p-5 border-t border-brand-border bg-brand-cream/50 space-y-3">
+          {isMounted && user ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between pb-2 border-b border-brand-border/60">
+                <div>
+                  <span className="font-bold text-brand-dark text-xs block">{user.name}</span>
+                  <span className="text-[10px] text-brand-muted font-mono">{user.email}</span>
+                </div>
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                  user.role === 'ADMIN' ? 'bg-brand-dark text-white' : 'bg-white text-brand-dark border border-brand-border'
+                }`}>
+                  {user.role}
+                </span>
+              </div>
 
-          <Link
-            href={isMounted && user ? '/account' : '/login'}
-            onClick={onClose}
-            className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-brand-dark py-2 hover:opacity-80"
-          >
-            <User size={18} />
-            <span>{isMounted && user ? `ACCOUNT (${user.name})` : 'LOGIN / REGISTER'}</span>
-          </Link>
+              {user.role === 'ADMIN' && (
+                <Link
+                  href="/ace_garment"
+                  onClick={onClose}
+                  className="flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-brand-gold py-1.5 hover:opacity-80"
+                >
+                  <Shield size={18} />
+                  <span>Admin Control Center</span>
+                </Link>
+              )}
+
+              <Link
+                href="/account"
+                onClick={onClose}
+                className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-brand-dark py-1.5 hover:opacity-80"
+              >
+                <User size={18} />
+                <span>My Account & Orders</span>
+              </Link>
+
+              <button
+                onClick={() => {
+                  logout();
+                  onClose();
+                }}
+                className="w-full flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-rose-600 py-1.5 hover:opacity-80 text-left"
+              >
+                <LogOut size={18} />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              onClick={onClose}
+              className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-brand-dark py-2 hover:opacity-80"
+            >
+              <User size={18} />
+              <span>SIGN IN / REGISTER (OPTIONAL)</span>
+            </Link>
+          )}
 
           <Link
             href="/wishlist"
             onClick={onClose}
-            className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-brand-dark py-2 hover:opacity-80"
+            className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-brand-dark py-2 hover:opacity-80 pt-2 border-t border-brand-border/60"
           >
             <div className="flex items-center gap-3">
               <Heart size={18} />

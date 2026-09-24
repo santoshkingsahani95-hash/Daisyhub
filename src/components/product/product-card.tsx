@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Heart, Eye, ShoppingBag } from 'lucide-react';
 import { Product } from '@/types';
-import { useStore } from '@/lib/store';
+import { useStore, isProductOutOfStock } from '@/lib/store';
 
 interface ProductCardProps {
   product: Product;
@@ -23,11 +23,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const secondImg = currentColor?.images[1] || product.colors[0]?.images[1] || firstImg;
 
   const displayPrice = product.salePrice && product.salePrice < product.price ? product.salePrice : product.price;
-  const currentColorStock = currentColor?.stock !== undefined ? currentColor.stock : undefined;
-  const totalColorStock = (product.colors || []).reduce((acc, c) => acc + (c.stock !== undefined ? c.stock : 0), 0);
-  const totalSizeStock = (product.sizes || []).reduce((acc, s) => acc + (s.stock || 0), 0);
-  const computedStock = currentColorStock !== undefined ? currentColorStock : (product.colors && product.colors.length > 0 ? totalColorStock : totalSizeStock);
-  const isOutOfStock = product.isOutOfStock === true || computedStock <= 0;
+  const isOutOfStock = isProductOutOfStock(product, currentColor?.name);
 
   return (
     <div

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { X, Check, ShoppingBag } from 'lucide-react';
-import { useStore } from '@/lib/store';
+import { useStore, getProductStock, isProductOutOfStock } from '@/lib/store';
 
 export const QuickAddModal: React.FC = () => {
   const { quickAddProduct, closeQuickAdd, addToCart } = useStore();
@@ -27,10 +27,8 @@ export const QuickAddModal: React.FC = () => {
   const activeImage = activeColorObj?.images[0] || quickAddProduct.colors[0]?.images[0] || '';
   const displayPrice = quickAddProduct.salePrice || quickAddProduct.price;
 
-  const totalColorStock = (quickAddProduct.colors || []).reduce((acc, c) => acc + (c.stock !== undefined ? c.stock : 0), 0);
-  const totalSizeStock = (quickAddProduct.sizes || []).reduce((acc, s) => acc + (s.stock || 0), 0);
-  const availableStock = activeColorObj?.stock !== undefined ? activeColorObj.stock : (quickAddProduct.colors && quickAddProduct.colors.length > 0 ? totalColorStock : totalSizeStock);
-  const isOutOfStock = quickAddProduct.isOutOfStock === true || availableStock <= 0;
+  const availableStock = getProductStock(quickAddProduct, selectedColor);
+  const isOutOfStock = isProductOutOfStock(quickAddProduct, selectedColor);
 
   const handleAdd = () => {
     if (isOutOfStock) return;

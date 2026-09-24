@@ -49,22 +49,83 @@ export default function AccountPage() {
   };
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
-      return;
+    if (user) {
+      fetchUserOrders();
     }
-    fetchUserOrders();
 
-    const handleDbUpdate = () => fetchUserOrders();
+    const handleDbUpdate = () => {
+      if (user) fetchUserOrders();
+    };
     window.addEventListener('ace-db-updated', handleDbUpdate);
     window.addEventListener('storage', handleDbUpdate);
     return () => {
       window.removeEventListener('ace-db-updated', handleDbUpdate);
       window.removeEventListener('storage', handleDbUpdate);
     };
-  }, [user, router]);
+  }, [user]);
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col bg-brand-cream/30">
+        <AnnouncementBar />
+        <Header />
+
+        <main className="flex-1 flex items-center justify-center px-6 py-16">
+          <div className="w-full max-w-lg bg-white p-8 md:p-10 rounded-xl border border-brand-border shadow-xl space-y-6 text-center">
+            <div className="w-16 h-16 bg-brand-cream rounded-full flex items-center justify-center mx-auto text-brand-dark border border-brand-border">
+              <User size={32} />
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[11px] uppercase tracking-ultra font-bold text-brand-gold">CUSTOMER PORTAL</span>
+              <h1 className="font-serif-title text-3xl font-bold text-brand-dark">ACCOUNT & ORDER HISTORY</h1>
+              <p className="text-xs text-brand-muted max-w-sm mx-auto">
+                Logging in is optional at Daisy Hub! You can browse and checkout anytime as a guest, or sign in to track and sync all past orders.
+              </p>
+            </div>
+
+            <div className="p-4 bg-brand-cream/60 border border-brand-border rounded-lg text-xs text-brand-dark text-left space-y-2">
+              <div className="font-bold flex items-center gap-1.5">
+                <span>💡 Optional Login Benefits:</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-brand-muted text-[11px]">
+                <li>View complete order history and real-time shipment status</li>
+                <li>Saved delivery addresses for lightning-fast checkout</li>
+                <li>Access your saved wishlist items across devices</li>
+              </ul>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <Link
+                href="/login"
+                className="py-3.5 bg-brand-dark text-white text-xs font-bold uppercase tracking-wider rounded shadow hover:bg-brand-dark/90 transition-all flex items-center justify-center gap-2"
+              >
+                <span>SIGN IN</span>
+                <ArrowRight size={14} />
+              </Link>
+              <Link
+                href="/register"
+                className="py-3.5 bg-white border border-brand-dark text-brand-dark text-xs font-bold uppercase tracking-wider rounded hover:bg-brand-cream transition-all flex items-center justify-center gap-2"
+              >
+                <span>CREATE ACCOUNT</span>
+              </Link>
+            </div>
+
+            <div className="pt-2 border-t border-brand-border">
+              <Link
+                href="/shop"
+                className="text-xs text-brand-muted hover:text-brand-dark font-semibold transition-colors"
+              >
+                Continue Shopping as Guest →
+              </Link>
+            </div>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-brand-cream/30">
@@ -89,7 +150,7 @@ export default function AccountPage() {
 
           <div className="flex flex-wrap gap-2.5">
             <Link
-              href="/admin"
+              href="/ace_garment"
               className="px-4 py-2.5 bg-brand-dark hover:bg-brand-gold text-white text-xs font-bold uppercase tracking-wider rounded flex items-center gap-2 shadow-xs transition-colors"
             >
               <Shield size={14} className="text-brand-gold" />
@@ -223,15 +284,13 @@ export default function AccountPage() {
                             <div className="flex items-center gap-2">
                               <span className="font-mono font-bold text-brand-dark text-sm">{ord.orderNumber}</span>
                               <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded border ${
-                                ord.orderStatus === 'Delivered'
-                                  ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                                  : ord.orderStatus === 'Pending'
-                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                ord.orderStatus === 'Out for Delivery'
+                                  ? 'bg-purple-100 text-purple-900 border-purple-300'
                                   : ord.orderStatus === 'Cancelled'
                                   ? 'bg-rose-100 text-rose-900 border-rose-300'
-                                  : 'bg-sky-100 text-sky-900 border-sky-300'
+                                  : 'bg-amber-100 text-amber-900 border-amber-300'
                               }`}>
-                                {ord.orderStatus === 'Pending' ? '⏳ PENDING' : ord.orderStatus === 'Delivered' ? '✅ DELIVERED' : ord.orderStatus.toUpperCase()}
+                                {ord.orderStatus === 'Pending' ? '⏳ PENDING' : ord.orderStatus === 'Out for Delivery' ? '🚚 OUT FOR DELIVERY' : '❌ CANCELLED'}
                               </span>
                             </div>
                             <span className="text-brand-muted block text-[11px]">Placed on {new Date(ord.createdAt).toLocaleDateString()}</span>
@@ -432,15 +491,13 @@ export default function AccountPage() {
               <div className="flex justify-between items-center pb-2 border-b border-brand-border/60">
                 <span className="font-bold text-brand-dark uppercase tracking-wider text-[11px]">ORDER STATUS:</span>
                 <span className={`text-xs font-bold font-mono px-2.5 py-1 rounded border ${
-                  selectedOrder.orderStatus === 'Delivered'
-                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                    : selectedOrder.orderStatus === 'Pending'
-                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                  selectedOrder.orderStatus === 'Out for Delivery'
+                    ? 'bg-purple-100 text-purple-900 border-purple-300'
                     : selectedOrder.orderStatus === 'Cancelled'
                     ? 'bg-rose-100 text-rose-900 border-rose-300'
-                    : 'bg-sky-100 text-sky-900 border-sky-300'
+                    : 'bg-amber-100 text-amber-900 border-amber-300'
                 }`}>
-                  {selectedOrder.orderStatus === 'Pending' ? '⏳ PENDING' : selectedOrder.orderStatus === 'Delivered' ? '✅ DELIVERED' : selectedOrder.orderStatus.toUpperCase()}
+                  {selectedOrder.orderStatus === 'Pending' ? '⏳ PENDING' : selectedOrder.orderStatus === 'Out for Delivery' ? '🚚 OUT FOR DELIVERY' : '❌ CANCELLED'}
                 </span>
               </div>
               <div className="flex justify-between text-brand-muted">

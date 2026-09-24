@@ -135,7 +135,7 @@ export interface OrderItem {
   image: string;
 }
 
-export type OrderStatus = 'Pending' | 'Delivered' | 'Confirmed' | 'Processing' | 'Shipped' | 'Out for Delivery' | 'Cancelled';
+export type OrderStatus = 'Pending' | 'Out for Delivery' | 'Cancelled';
 
 export interface Order {
   id: string;
@@ -167,17 +167,27 @@ export interface Coupon {
   active: boolean;
 }
 
+export interface FonepayQRItem {
+  id: string;
+  qrImageUrl: string;
+  merchantName: string;
+  merchantCode: string;
+  isPrimary: boolean;
+  createdAt: string;
+}
+
 export interface FonepaySettings {
   qrMode: 'static' | 'dynamic';
   qrImageUrl: string;
   merchantName: string;
   merchantCode: string;
-  accountNumber: string;
+  accountNumber?: string;
   instructions: string;
   autoVerifyEnabled: boolean;
   apiUsername?: string;
   apiPassword?: string;
   apiKey?: string;
+  savedQrs?: FonepayQRItem[];
 }
 
 export interface HomepageCMS {

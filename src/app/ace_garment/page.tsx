@@ -94,7 +94,7 @@ export default function AdminDashboardPage() {
             <h3 className="font-serif-title text-base font-bold text-brand-dark uppercase tracking-wider">
               RECENT ORDERS
             </h3>
-            <Link href="/admin/orders" className="text-xs font-bold text-brand-dark hover:underline">
+            <Link href="/ace_garment/orders" className="text-xs font-bold text-brand-dark hover:underline">
               VIEW ALL →
             </Link>
           </div>
@@ -119,15 +119,13 @@ export default function AdminDashboardPage() {
                     <td className="p-3 font-mono uppercase">{ord.paymentMethod}</td>
                     <td className="p-3">
                       <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded uppercase border ${
-                        ord.orderStatus === 'Delivered'
-                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                          : ord.orderStatus === 'Pending'
-                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                        ord.orderStatus === 'Out for Delivery'
+                          ? 'bg-purple-100 text-purple-900 border-purple-300'
                           : ord.orderStatus === 'Cancelled'
-                          ? 'bg-rose-100 text-rose-800 border-rose-300'
-                          : 'bg-sky-100 text-sky-800 border-sky-300'
+                          ? 'bg-rose-100 text-rose-900 border-rose-300'
+                          : 'bg-amber-100 text-amber-900 border-amber-300'
                       }`}>
-                        {ord.orderStatus}
+                        {ord.orderStatus === 'Pending' ? '⏳ PENDING' : ord.orderStatus === 'Out for Delivery' ? '🚚 OUT FOR DELIVERY' : '❌ CANCELLED'}
                       </span>
                     </td>
                   </tr>
@@ -143,7 +141,7 @@ export default function AdminDashboardPage() {
             <h3 className="font-serif-title text-base font-bold text-brand-dark uppercase tracking-wider">
               LOW STOCK WATCHLIST
             </h3>
-            <Link href="/admin/inventory" className="text-xs font-bold text-brand-dark hover:underline">
+            <Link href="/ace_garment/inventory" className="text-xs font-bold text-brand-dark hover:underline">
               MANAGE
             </Link>
           </div>
