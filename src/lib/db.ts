@@ -1,4 +1,4 @@
-import { Product, Category, Collection, Order, Coupon, HomepageCMS, CustomerUser, ProductReview, ColorOption } from '@/types';
+import { Product, Category, Collection, Order, Coupon, HomepageCMS, CustomerUser, ProductReview, ColorOption, SEOMetadata, AdminCredentials } from '@/types';
 import { seedProducts, initialCategories, initialCollections, initialCMS } from './seed-data';
 
 // In-memory persistent data store for server side & client fallback with localStorage sync
@@ -36,7 +36,7 @@ class DataStore {
       discount: 300,
       shipping: 0,
       total: 3498,
-      paymentMethod: 'esewa',
+      paymentMethod: 'fonepay',
       paymentStatus: 'paid',
       orderStatus: 'Pending',
       customerName: 'Aayusha Karki',
@@ -516,10 +516,21 @@ class DataStore {
 
   validateCoupon(code: string, subtotal: number): { valid: boolean; discountAmount: number; message: string } {
     const coupons = this.getCoupons();
-    const coupon = coupons.find((c) => c.code.toUpperCase() === code.trim().toUpperCase() && c.active);
+    const cleanCode = code.trim().toUpperCase();
+    const coupon = coupons.find((c) => c.code.trim().toUpperCase() === cleanCode && c.active);
+
     if (!coupon) {
-      return { valid: false, discountAmount: 0, message: 'Invalid or expired coupon code.' };
+      return { valid: false, discountAmount: 0, message: 'Invalid or inactive coupon code.' };
     }
+
+    if (coupon.expiryDate) {
+      const expiry = new Date(coupon.expiryDate);
+      expiry.setHours(23, 59, 59, 999);
+      if (new Date() > expiry) {
+        return { valid: false, discountAmount: 0, message: `Coupon '${coupon.code}' expired on ${coupon.expiryDate}.` };
+      }
+    }
+
     if (subtotal < coupon.minOrderValue) {
       return {
         valid: false,
@@ -527,6 +538,7 @@ class DataStore {
         message: `Minimum order value of NPR ${coupon.minOrderValue.toLocaleString()} required for this coupon.`,
       };
     }
+
     let discount = 0;
     if (coupon.discountType === 'percentage') {
       discount = (subtotal * coupon.discountValue) / 100;
@@ -536,6 +548,7 @@ class DataStore {
     } else {
       discount = coupon.discountValue;
     }
+
     return {
       valid: true,
       discountAmount: Math.round(discount),
@@ -545,10 +558,43 @@ class DataStore {
 
   addCoupon(coupon: Coupon): Coupon {
     const coupons = this.getCoupons();
-    coupons.push(coupon);
+    const cleanCode = coupon.code.trim().toUpperCase();
+    const existingIdx = coupons.findIndex((c) => c.code.trim().toUpperCase() === cleanCode);
+    const cleanCoupon: Coupon = { ...coupon, code: cleanCode };
+
+    if (existingIdx >= 0) {
+      coupons[existingIdx] = cleanCoupon;
+    } else {
+      coupons.push(cleanCoupon);
+    }
+
     this.coupons = coupons;
     this.saveAndBroadcast('ace_db_coupons', this.coupons);
-    return coupon;
+    return cleanCoupon;
+  }
+
+  deleteCoupon(code: string): boolean {
+    const coupons = this.getCoupons();
+    const cleanCode = code.trim().toUpperCase();
+    const filtered = coupons.filter((c) => c.code.trim().toUpperCase() !== cleanCode);
+    if (filtered.length !== coupons.length) {
+      this.coupons = filtered;
+      this.saveAndBroadcast('ace_db_coupons', this.coupons);
+      return true;
+    }
+    return false;
+  }
+
+  toggleCouponStatus(code: string): Coupon | undefined {
+    const coupons = this.getCoupons();
+    const cleanCode = code.trim().toUpperCase();
+    const found = coupons.find((c) => c.code.trim().toUpperCase() === cleanCode);
+    if (found) {
+      found.active = !found.active;
+      this.coupons = coupons;
+      this.saveAndBroadcast('ace_db_coupons', this.coupons);
+    }
+    return found;
   }
 
   // Newsletter
@@ -595,6 +641,74 @@ class DataStore {
     if (!email) return undefined;
     const clean = email.trim().toLowerCase();
     return this.getUsers().find((u) => u.email.trim().toLowerCase() === clean);
+  }
+
+  // Admin Credentials Management
+  getAdminCredentials(): AdminCredentials {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('daisyhub_admin_credentials');
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch (e) {}
+      }
+    }
+    return {
+      username: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin',
+      password: process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123',
+    };
+  }
+
+  updateAdminCredentials(username: string, password: string): { success: boolean; message: string } {
+    if (!username.trim() || !password.trim()) {
+      return { success: false, message: 'Username and Password cannot be empty.' };
+    }
+    const creds: AdminCredentials = {
+      username: username.trim(),
+      password: password.trim(),
+      lastUpdated: new Date().toISOString(),
+    };
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('daisyhub_admin_credentials', JSON.stringify(creds));
+      window.dispatchEvent(new Event('ace-db-updated'));
+    }
+    return { success: true, message: 'Admin Credentials updated successfully!' };
+  }
+
+  // SEO Settings Management
+  getGlobalSEO(): SEOMetadata {
+    const cms = this.getCMS();
+    return cms.seo || {
+      metaTitle: "DaisyHubb – Women's Clothing & Ladies Fashion Online in Nepal",
+      metaDescription: "Shop trendy women's clothing online in Nepal at DaisyHubb. Discover stylish ladies wear, dresses, tops, kurtis and more at affordable prices.",
+      keywords: "women's clothing Nepal, ladies clothing Nepal, women's fashion Nepal, ladies fashion Nepal, women's clothes online Nepal, ladies clothes online Nepal, women's wear Nepal, ladies wear Nepal, women's dresses Nepal, women's tops Nepal, women's kurtis Nepal, buy women's clothes online Nepal",
+      canonicalUrl: process.env.NEXT_PUBLIC_SITE_URL || 'https://daisyhubb.com',
+      ogImage: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200&auto=format&fit=crop',
+      h1: "Women's Clothing & Fashion Online in Nepal",
+    };
+  }
+
+  updateGlobalSEO(seoData: SEOMetadata): void {
+    this.updateCMS({ seo: seoData });
+  }
+
+  updateCategorySEO(categorySlug: string, seoData: SEOMetadata): void {
+    const cats = this.getCategories();
+    const cat = cats.find((c) => c.slug === categorySlug);
+    if (cat) {
+      cat.seo = { ...cat.seo, ...seoData };
+      this.categories = cats;
+      this.saveAndBroadcast('ace_db_categories', this.categories);
+    }
+  }
+
+  updateProductSEO(productSlug: string, seoData: SEOMetadata): void {
+    const prods = this.getProducts();
+    const prod = prods.find((p) => p.slug === productSlug);
+    if (prod) {
+      prod.seo = { ...prod.seo, ...seoData };
+      this.saveProduct(prod);
+    }
   }
 }
 

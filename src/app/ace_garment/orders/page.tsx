@@ -587,17 +587,25 @@ export default function AdminOrdersPage() {
                   <td className="p-3 font-bold text-sm text-brand-dark">NPR {ord.total.toLocaleString()}</td>
                   <td className="p-3">
                     {ord.paymentMethod === 'fonepay' ? (
-                      <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-800 border border-rose-200 font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow-2xs">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
-                        FONEPAY QR
+                      <span className="inline-flex items-center gap-1 bg-red-50 text-red-800 border border-red-200 font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                        FONEPAY
                       </span>
                     ) : ord.paymentMethod === 'cod' ? (
                       <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-200 font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow-2xs">
                         💵 COD (CASH)
                       </span>
-                    ) : (
+                    ) : ord.paymentMethod === 'esewa' ? (
                       <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-900 border border-emerald-200 font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow-2xs">
-                        💚 {ord.paymentMethod.toUpperCase()}
+                        💚 ESEWA
+                      </span>
+                    ) : ord.paymentMethod === 'khalti' ? (
+                      <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-900 border border-purple-200 font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow-2xs">
+                        🟣 KHALTI
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-900 border border-blue-200 font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow-2xs">
+                        💳 {ord.paymentMethod ? ord.paymentMethod.toUpperCase() : 'CARD'}
                       </span>
                     )}
                     <span className={`block text-[10px] font-bold uppercase mt-1 ${

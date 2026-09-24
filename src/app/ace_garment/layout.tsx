@@ -38,12 +38,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, setUser, logout } = useStore();
 
   // Admin Login Guard Form State
-  const envAdminUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin';
-  const envAdminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin_acegarment';
-  const [adminInputUser, setAdminInputUser] = useState(envAdminUsername);
-  const [adminInputPass, setAdminInputPass] = useState(envAdminPassword);
+  const [adminInputUser, setAdminInputUser] = useState('');
+  const [adminInputPass, setAdminInputPass] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Admin Change Password Modal State
+  const [isChangePassOpen, setIsChangePassOpen] = useState(false);
+  const [newUsernameInput, setNewUsernameInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [passChangeSuccess, setPassChangeSuccess] = useState('');
+  const [passChangeError, setPassChangeError] = useState('');
 
   useEffect(() => {
     setIsMounted(true);
@@ -54,10 +60,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setLoginError('');
     setIsSubmitting(true);
 
+    const activeCreds = db.getAdminCredentials();
     const inputLower = adminInputUser.trim().toLowerCase();
+    const targetUserLower = activeCreds.username.toLowerCase();
+    
     const isAdminUsernameMatch =
-      inputLower === envAdminUsername.toLowerCase() ||
-      inputLower === `${envAdminUsername.toLowerCase()}@daisyhub.com` ||
+      inputLower === targetUserLower ||
+      inputLower === `${targetUserLower}@daisyhub.com` ||
       inputLower.includes('admin');
 
     if (!isAdminUsernameMatch) {
@@ -66,7 +75,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return;
     }
 
-    if (adminInputPass !== envAdminPassword && adminInputPass !== 'admin_acegarment' && adminInputPass !== 'admin123' && adminInputPass !== 'password123') {
+    if (adminInputPass !== activeCreds.password) {
       setLoginError('Invalid Administrator Password.');
       setIsSubmitting(false);
       return;
@@ -75,7 +84,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const adminUser: CustomerUser = {
       id: 'usr-admin-1',
       name: 'Admin Manager',
-      email: adminInputUser.includes('@') ? adminInputUser : `${envAdminUsername}@daisyhub.com`,
+      email: adminInputUser.includes('@') ? adminInputUser : `${activeCreds.username}@daisyhub.com`,
       mobile: '+977 9800000000',
       role: 'ADMIN',
       registrationDate: '2026-01-01',
@@ -84,6 +93,49 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     db.saveUser(adminUser);
     setUser(adminUser);
     setIsSubmitting(false);
+  };
+
+  const handleOpenChangePassModal = () => {
+    const creds = db.getAdminCredentials();
+    setNewUsernameInput(creds.username);
+    setNewPasswordInput('');
+    setConfirmPasswordInput('');
+    setPassChangeSuccess('');
+    setPassChangeError('');
+    setIsChangePassOpen(true);
+  };
+
+  const handleSaveNewAdminCredentials = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassChangeSuccess('');
+    setPassChangeError('');
+
+    if (!newUsernameInput.trim()) {
+      setPassChangeError('Admin Username cannot be empty.');
+      return;
+    }
+    if (!newPasswordInput.trim()) {
+      setPassChangeError('New Password cannot be empty.');
+      return;
+    }
+    if (newPasswordInput.length < 4) {
+      setPassChangeError('Password must be at least 4 characters long.');
+      return;
+    }
+    if (newPasswordInput !== confirmPasswordInput) {
+      setPassChangeError('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    const res = db.updateAdminCredentials(newUsernameInput, newPasswordInput);
+    if (res.success) {
+      setPassChangeSuccess(res.message);
+      setTimeout(() => {
+        setIsChangePassOpen(false);
+      }, 1500);
+    } else {
+      setPassChangeError(res.message);
+    }
   };
 
   const navItems = [
@@ -96,6 +148,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'Homepage CMS', href: '/ace_garment/cms', icon: Sliders },
     { label: 'Coupons', href: '/ace_garment/coupons', icon: Tag },
     { label: 'Reviews', href: '/ace_garment/reviews', icon: Star },
+    { label: 'Registered Customers', href: '/ace_garment/customers', icon: UserIcon },
+    { label: 'SEO & Search Engine', href: '/ace_garment/seo', icon: Globe },
   ];
 
   // 1. SSR Hydration Guard
@@ -156,7 +210,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   required
                   value={adminInputUser}
                   onChange={(e) => setAdminInputUser(e.target.value)}
-                  placeholder="admin"
+                  placeholder="Enter username or email"
                   className="w-full p-3 pl-9 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark font-mono"
                 />
                 <UserIcon size={16} className="absolute left-3 top-3.5 text-brand-muted" />
@@ -176,23 +230,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 />
                 <Lock size={16} className="absolute left-3 top-3.5 text-brand-muted" />
               </div>
-            </div>
-
-            <div className="p-3 bg-brand-cream/60 border border-brand-border rounded text-[11px] flex justify-between items-center">
-              <div>
-                <span className="font-bold text-brand-dark block">Default Admin Credentials:</span>
-                <span className="text-brand-muted font-mono">User: {envAdminUsername} | Pass: {envAdminPassword}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setAdminInputUser(envAdminUsername);
-                  setAdminInputPass(envAdminPassword);
-                }}
-                className="px-2.5 py-1 bg-brand-dark text-white font-bold rounded text-[10px] uppercase tracking-wider hover:bg-brand-dark/90 shrink-0"
-              >
-                Auto Fill
-              </button>
             </div>
 
             <button
@@ -320,13 +357,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Link
               href="/"
               target="_blank"
-              className="px-3.5 py-1.5 bg-brand-cream hover:bg-brand-dark hover:text-white text-brand-dark text-[11px] font-bold uppercase tracking-wider rounded border border-brand-border transition-all flex items-center gap-1.5 shadow-xs"
+              className="px-3 py-1.5 bg-brand-cream hover:bg-brand-dark hover:text-white text-brand-dark text-[11px] font-bold uppercase tracking-wider rounded border border-brand-border transition-all flex items-center gap-1.5 shadow-xs"
               title="Open storefront in new tab"
             >
               <Globe size={14} className="text-brand-gold" />
-              <span>View Store Front</span>
+              <span className="hidden sm:inline">View Store Front</span>
               <ExternalLink size={12} />
             </Link>
+
+            {/* Change Password Button */}
+            <button
+              onClick={handleOpenChangePassModal}
+              className="px-3 py-1.5 bg-white hover:bg-brand-dark hover:text-white text-brand-dark text-[11px] font-bold uppercase tracking-wider rounded border border-brand-border transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Change Admin Username & Password"
+            >
+              <Lock size={14} className="text-brand-gold" />
+              <span>Change Password</span>
+            </button>
 
             <span className="font-bold text-brand-dark hidden sm:inline">{user.name}</span>
             <div className="w-8 h-8 rounded-full bg-brand-dark text-white flex items-center justify-center font-bold text-xs shadow-xs">
@@ -337,6 +384,105 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Dynamic Page Container */}
         <main className="p-6 md:p-8 flex-1">{children}</main>
+
+        {/* Change Admin Password Modal */}
+        {isChangePassOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white max-w-md w-full rounded-xl shadow-2xl border border-brand-border overflow-hidden animate-in fade-in zoom-in duration-200">
+              <div className="bg-brand-dark text-white p-5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield size={18} className="text-brand-gold" />
+                  <h3 className="font-serif-title font-bold text-base tracking-wide">CHANGE ADMIN CREDENTIALS</h3>
+                </div>
+                <button
+                  onClick={() => setIsChangePassOpen(false)}
+                  className="text-white/70 hover:text-white transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveNewAdminCredentials} className="p-6 space-y-4">
+                <p className="text-xs text-brand-muted">
+                  Update your Admin Panel login username and password. Changes take effect immediately.
+                </p>
+
+                {passChangeSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded font-medium">
+                    ✓ {passChangeSuccess}
+                  </div>
+                )}
+
+                {passChangeError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded font-medium">
+                    ⚠ {passChangeError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-semibold text-brand-dark block mb-1">ADMIN USERNAME</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      value={newUsernameInput}
+                      onChange={(e) => setNewUsernameInput(e.target.value)}
+                      placeholder="Enter new admin username"
+                      className="w-full p-2.5 pl-9 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark font-mono"
+                    />
+                    <UserIcon size={15} className="absolute left-3 top-3 text-brand-muted" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-brand-dark block mb-1">NEW PASSWORD</label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      required
+                      value={newPasswordInput}
+                      onChange={(e) => setNewPasswordInput(e.target.value)}
+                      placeholder="Enter new password"
+                      className="w-full p-2.5 pl-9 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark font-mono"
+                    />
+                    <Lock size={15} className="absolute left-3 top-3 text-brand-muted" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-brand-dark block mb-1">CONFIRM NEW PASSWORD</label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      required
+                      value={confirmPasswordInput}
+                      onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                      placeholder="Re-enter new password"
+                      className="w-full p-2.5 pl-9 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark font-mono"
+                    />
+                    <Lock size={15} className="absolute left-3 top-3 text-brand-muted" />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-brand-border">
+                  <button
+                    type="button"
+                    onClick={() => setIsChangePassOpen(false)}
+                    className="px-4 py-2 text-xs font-bold text-brand-muted hover:text-brand-dark"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-brand-dark text-white text-xs font-bold uppercase tracking-wider rounded hover:bg-brand-dark/90 shadow-sm"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

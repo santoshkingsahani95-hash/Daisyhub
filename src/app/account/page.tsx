@@ -19,21 +19,144 @@ import {
   ShoppingBag,
   Phone,
   Mail,
+  Plus,
 } from 'lucide-react';
 import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
 import { useStore } from '@/lib/store';
 import { db } from '@/lib/db';
-import { Order } from '@/types';
+import { Order, Address } from '@/types';
 
 export default function AccountPage() {
   const router = useRouter();
-  const { user, logout, wishlist, switchRole } = useStore();
+  const { user, setUser, logout, wishlist } = useStore();
   const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'profile' | 'addresses' | 'security'>('orders');
   const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [searchEmail, setSearchEmail] = useState('');
+
+  // Address Management State
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+
+  // Address Form Fields
+  const [addrName, setAddrName] = useState('');
+  const [addrMobile, setAddrMobile] = useState('');
+  const [addrProvince, setAddrProvince] = useState('Bagmati Province');
+  const [addrDistrict, setAddrDistrict] = useState('Kathmandu');
+  const [addrCity, setAddrCity] = useState('Kathmandu');
+  const [addrStreet, setAddrStreet] = useState('');
+  const [addrLandmark, setAddrLandmark] = useState('');
+  const [addrIsDefault, setAddrIsDefault] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      if (user.addresses && user.addresses.length > 0) {
+        setAddresses(user.addresses);
+      } else {
+        const initialAddr: Address = {
+          id: 'addr-default-1',
+          fullName: user.name || 'Simant Shrestha',
+          mobile: user.mobile || '9709103911',
+          email: user.email || 'simantshrestha2001@gmail.com',
+          province: 'Bagmati Province',
+          district: 'Kathmandu',
+          city: 'Kathmandu',
+          streetAddress: 'Baneshwor Height, Ward 10',
+          isDefault: true,
+        };
+        setAddresses([initialAddr]);
+      }
+    }
+  }, [user]);
+
+  const handleSetDefaultAddress = (id: string) => {
+    const updated = addresses.map((addr) => ({
+      ...addr,
+      isDefault: addr.id === id,
+    }));
+    setAddresses(updated);
+    if (user) {
+      const updatedUser = { ...user, addresses: updated };
+      setUser(updatedUser);
+      db.saveUser(updatedUser);
+    }
+  };
+
+  const handleSaveAddress = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addrName.trim() || !addrMobile.trim() || !addrStreet.trim()) return;
+
+    let updated: Address[];
+
+    if (editingAddressId) {
+      updated = addresses.map((addr) => {
+        if (addr.id === editingAddressId) {
+          return {
+            ...addr,
+            fullName: addrName.trim(),
+            mobile: addrMobile.trim(),
+            province: addrProvince,
+            district: addrDistrict,
+            city: addrCity,
+            streetAddress: addrStreet.trim(),
+            landmark: addrLandmark.trim(),
+            isDefault: addrIsDefault,
+          };
+        }
+        return addrIsDefault ? { ...addr, isDefault: false } : addr;
+      });
+    } else {
+      const newAddr: Address = {
+        id: `addr-${Date.now()}`,
+        fullName: addrName.trim(),
+        mobile: addrMobile.trim(),
+        email: user?.email || '',
+        province: addrProvince,
+        district: addrDistrict,
+        city: addrCity,
+        streetAddress: addrStreet.trim(),
+        landmark: addrLandmark.trim(),
+        isDefault: addrIsDefault || addresses.length === 0,
+      };
+
+      if (newAddr.isDefault) {
+        updated = addresses.map((a) => ({ ...a, isDefault: false }));
+        updated.unshift(newAddr);
+      } else {
+        updated = [...addresses, newAddr];
+      }
+    }
+
+    setAddresses(updated);
+    if (user) {
+      const updatedUser = { ...user, addresses: updated };
+      setUser(updatedUser);
+      db.saveUser(updatedUser);
+    }
+
+    setIsAddressModalOpen(false);
+    setEditingAddressId(null);
+  };
+
+  const handleDeleteAddress = (id: string) => {
+    if (addresses.length <= 1) {
+      alert('You must keep at least one saved delivery address.');
+      return;
+    }
+    const filtered = addresses.filter((a) => a.id !== id);
+    if (!filtered.some((a) => a.isDefault) && filtered.length > 0) {
+      filtered[0].isDefault = true;
+    }
+    setAddresses(filtered);
+    if (user) {
+      const updatedUser = { ...user, addresses: filtered };
+      setUser(updatedUser);
+      db.saveUser(updatedUser);
+    }
+  };
 
   const fetchUserOrders = () => {
     const allOrders = db.getOrders();
@@ -149,23 +272,6 @@ export default function AccountPage() {
           </div>
 
           <div className="flex flex-wrap gap-2.5">
-            <Link
-              href="/ace_garment"
-              className="px-4 py-2.5 bg-brand-dark hover:bg-brand-gold text-white text-xs font-bold uppercase tracking-wider rounded flex items-center gap-2 shadow-xs transition-colors"
-            >
-              <Shield size={14} className="text-brand-gold" />
-              <span>ADMIN PANEL</span>
-            </Link>
-
-            <button
-              onClick={() => switchRole(user.role === 'ADMIN' ? 'CUSTOMER' : 'ADMIN')}
-              className="px-3.5 py-2.5 bg-brand-cream hover:bg-brand-border text-brand-dark text-xs font-bold uppercase tracking-wider rounded flex items-center gap-1.5 transition-colors border border-brand-border"
-              title="Toggle role for testing"
-            >
-              <RefreshCw size={14} />
-              <span>{user.role === 'ADMIN' ? 'SWITCH TO CUSTOMER' : 'SWITCH TO ADMIN'}</span>
-            </button>
-
             <button
               onClick={() => {
                 logout();
@@ -356,15 +462,95 @@ export default function AccountPage() {
 
             {activeTab === 'addresses' && (
               <div className="space-y-6">
-                <h2 className="font-serif-title text-xl font-bold text-brand-dark uppercase tracking-wider border-b border-brand-border pb-4">
-                  SAVED ADDRESSES
-                </h2>
-                <div className="p-4 border border-brand-border rounded bg-brand-cream/20 space-y-1 text-xs">
-                  <span className="text-[10px] bg-brand-dark text-white font-bold px-2 py-0.5 rounded uppercase font-mono">DEFAULT</span>
-                  <p className="font-bold text-brand-dark pt-2">{user.name}</p>
-                  <p className="text-brand-muted">Baneshwor Height, Ward 10, Kathmandu</p>
-                  <p className="text-brand-muted">Bagmati Province, Nepal</p>
-                  <p className="text-brand-muted font-mono">Mobile: {user.mobile || '+977 9841234567'}</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-border pb-4">
+                  <h2 className="font-serif-title text-xl font-bold text-brand-dark uppercase tracking-wider">
+                    SAVED ADDRESSES ({addresses.length})
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setEditingAddressId(null);
+                      setAddrName(user?.name || '');
+                      setAddrMobile(user?.mobile || '');
+                      setAddrProvince('Bagmati Province');
+                      setAddrDistrict('Kathmandu');
+                      setAddrCity('Kathmandu');
+                      setAddrStreet('');
+                      setAddrLandmark('');
+                      setAddrIsDefault(addresses.length === 0);
+                      setIsAddressModalOpen(true);
+                    }}
+                    className="px-4 py-2 bg-brand-dark text-white text-xs font-bold uppercase tracking-wider rounded flex items-center justify-center gap-1.5 shadow-xs hover:bg-brand-dark/90 transition-colors"
+                  >
+                    <Plus size={14} />
+                    <span>+ ADD NEW ADDRESS</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {addresses.map((addr) => (
+                    <div
+                      key={addr.id}
+                      className={`p-5 border rounded-lg transition-all space-y-2 relative ${
+                        addr.isDefault
+                          ? 'border-brand-dark bg-white shadow-sm ring-1 ring-brand-dark'
+                          : 'border-brand-border bg-brand-cream/20 hover:border-brand-dark/40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {addr.isDefault ? (
+                            <span className="text-[10px] bg-brand-dark text-white font-bold px-2 py-0.5 rounded uppercase font-mono tracking-wider">
+                              DEFAULT
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleSetDefaultAddress(addr.id!)}
+                              className="text-[10px] bg-brand-cream hover:bg-brand-dark hover:text-white border border-brand-border text-brand-dark font-bold px-2.5 py-1 rounded uppercase font-mono transition-colors cursor-pointer"
+                            >
+                              SET AS DEFAULT
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3 text-xs">
+                          <button
+                            onClick={() => {
+                              setEditingAddressId(addr.id!);
+                              setAddrName(addr.fullName);
+                              setAddrMobile(addr.mobile);
+                              setAddrProvince(addr.province || 'Bagmati Province');
+                              setAddrDistrict(addr.district || 'Kathmandu');
+                              setAddrCity(addr.city || 'Kathmandu');
+                              setAddrStreet(addr.streetAddress);
+                              setAddrLandmark(addr.landmark || '');
+                              setAddrIsDefault(!!addr.isDefault);
+                              setIsAddressModalOpen(true);
+                            }}
+                            className="text-brand-dark hover:text-brand-gold font-bold underline cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAddress(addr.id!)}
+                            className="text-rose-600 hover:text-rose-800 font-bold underline cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+
+                      <p className="font-bold text-brand-dark pt-1 text-sm">{addr.fullName}</p>
+                      <p className="text-xs text-brand-muted leading-relaxed">
+                        {addr.streetAddress}{addr.landmark ? `, ${addr.landmark}` : ''}
+                      </p>
+                      <p className="text-xs text-brand-muted">
+                        {addr.city}, {addr.province}, Nepal
+                      </p>
+                      <p className="text-xs text-brand-muted font-mono pt-1">
+                        Mobile: <strong className="text-brand-dark">{addr.mobile}</strong>
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -526,6 +712,134 @@ export default function AccountPage() {
                 CLOSE
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD / EDIT ADDRESS MODAL */}
+      {isAddressModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white max-w-lg w-full rounded-xl shadow-2xl border border-brand-border overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-brand-dark text-white p-5 flex items-center justify-between">
+              <h3 className="font-serif-title font-bold text-base tracking-wide uppercase">
+                {editingAddressId ? 'EDIT DELIVERY ADDRESS' : 'ADD NEW DELIVERY ADDRESS'}
+              </h3>
+              <button
+                onClick={() => setIsAddressModalOpen(false)}
+                className="text-white/70 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAddress} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="font-semibold text-brand-dark block mb-1">FULL NAME *</label>
+                <input
+                  type="text"
+                  required
+                  value={addrName}
+                  onChange={(e) => setAddrName(e.target.value)}
+                  placeholder="e.g. Simant Shrestha"
+                  className="w-full p-3 border border-brand-border rounded focus:outline-none focus:border-brand-dark"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-brand-dark block mb-1">MOBILE NUMBER *</label>
+                <input
+                  type="text"
+                  required
+                  value={addrMobile}
+                  onChange={(e) => setAddrMobile(e.target.value)}
+                  placeholder="e.g. 9841234567"
+                  className="w-full p-3 border border-brand-border rounded font-mono focus:outline-none focus:border-brand-dark"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-brand-dark block mb-1">PROVINCE *</label>
+                  <select
+                    value={addrProvince}
+                    onChange={(e) => setAddrProvince(e.target.value)}
+                    className="w-full p-3 border border-brand-border rounded bg-white focus:outline-none focus:border-brand-dark"
+                  >
+                    <option value="Bagmati Province">Bagmati Province</option>
+                    <option value="Koshi Province">Koshi Province</option>
+                    <option value="Madhesh Province">Madhesh Province</option>
+                    <option value="Gandaki Province">Gandaki Province</option>
+                    <option value="Lumbini Province">Lumbini Province</option>
+                    <option value="Karnali Province">Karnali Province</option>
+                    <option value="Sudurpashchim Province">Sudurpashchim Province</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-brand-dark block mb-1">CITY / DISTRICT *</label>
+                  <input
+                    type="text"
+                    required
+                    value={addrCity}
+                    onChange={(e) => setAddrCity(e.target.value)}
+                    placeholder="e.g. Kathmandu / Lalitpur"
+                    className="w-full p-3 border border-brand-border rounded focus:outline-none focus:border-brand-dark"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-brand-dark block mb-1">STREET ADDRESS / TOLE *</label>
+                <input
+                  type="text"
+                  required
+                  value={addrStreet}
+                  onChange={(e) => setAddrStreet(e.target.value)}
+                  placeholder="e.g. Baneshwor Height, Ward 10"
+                  className="w-full p-3 border border-brand-border rounded focus:outline-none focus:border-brand-dark"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-brand-dark block mb-1">LANDMARK / HOUSE NO. (OPTIONAL)</label>
+                <input
+                  type="text"
+                  value={addrLandmark}
+                  onChange={(e) => setAddrLandmark(e.target.value)}
+                  placeholder="e.g. Near Standard Chartered Bank"
+                  className="w-full p-3 border border-brand-border rounded focus:outline-none focus:border-brand-dark"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="isDefaultAddr"
+                  checked={addrIsDefault}
+                  onChange={(e) => setAddrIsDefault(e.target.checked)}
+                  className="accent-brand-dark w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="isDefaultAddr" className="text-xs text-brand-dark font-semibold cursor-pointer">
+                  Set as default delivery address
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-brand-border">
+                <button
+                  type="button"
+                  onClick={() => setIsAddressModalOpen(false)}
+                  className="px-4 py-2.5 text-xs font-bold text-brand-muted hover:text-brand-dark"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-brand-dark text-white text-xs font-bold uppercase tracking-wider rounded hover:bg-brand-dark/90 shadow-sm"
+                >
+                  {editingAddressId ? 'Update Address' : 'Save Address'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

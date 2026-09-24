@@ -109,15 +109,12 @@ export const Header: React.FC = () => {
             {/* Account & Panel Menu */}
             <div className="relative group hidden md:block">
               <Link
-                href={isMounted && user ? (user.role === 'ADMIN' ? '/ace_garment' : '/account') : '/login'}
+                href={isMounted && user ? '/account' : '/login'}
                 className="p-1.5 flex items-center gap-1 hover:text-brand-gold transition-colors"
                 aria-label="Account"
                 title={isMounted && user ? `Account (${user.name})` : 'Sign In'}
               >
                 <User size={20} />
-                {isMounted && user?.role === 'ADMIN' && (
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                )}
               </Link>
 
               {/* Hover Dropdown Menu */}
@@ -129,24 +126,9 @@ export const Header: React.FC = () => {
                         <div className="pb-2 border-b border-brand-border">
                           <span className="font-bold text-brand-dark block truncate">{user.name}</span>
                           <span className="text-[10px] text-brand-muted block truncate font-mono">{user.email}</span>
-                          <span className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase font-mono ${
-                            user.role === 'ADMIN' ? 'bg-brand-dark text-white' : 'bg-brand-cream text-brand-dark'
-                          }`}>
-                            {user.role} MODE
-                          </span>
                         </div>
 
                         <div className="space-y-1 pt-1">
-                          {user.role === 'ADMIN' && (
-                            <Link
-                              href="/ace_garment"
-                              className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-brand-cream font-semibold text-brand-dark"
-                            >
-                              <Shield size={14} className="text-brand-gold" />
-                              <span>Admin Control Panel</span>
-                            </Link>
-                          )}
-
                           <Link
                             href="/account"
                             className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-brand-cream text-brand-dark font-medium"

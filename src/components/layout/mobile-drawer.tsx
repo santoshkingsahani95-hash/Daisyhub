@@ -133,28 +133,10 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) =
         <div className="p-5 border-t border-brand-border bg-brand-cream/50 space-y-3">
           {isMounted && user ? (
             <div className="space-y-2">
-              <div className="flex items-center justify-between pb-2 border-b border-brand-border/60">
-                <div>
-                  <span className="font-bold text-brand-dark text-xs block">{user.name}</span>
-                  <span className="text-[10px] text-brand-muted font-mono">{user.email}</span>
-                </div>
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
-                  user.role === 'ADMIN' ? 'bg-brand-dark text-white' : 'bg-white text-brand-dark border border-brand-border'
-                }`}>
-                  {user.role}
-                </span>
+              <div className="pb-2 border-b border-brand-border/60">
+                <span className="font-bold text-brand-dark text-xs block">{user.name}</span>
+                <span className="text-[10px] text-brand-muted font-mono">{user.email}</span>
               </div>
-
-              {user.role === 'ADMIN' && (
-                <Link
-                  href="/ace_garment"
-                  onClick={onClose}
-                  className="flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-brand-gold py-1.5 hover:opacity-80"
-                >
-                  <Shield size={18} />
-                  <span>Admin Control Center</span>
-                </Link>
-              )}
 
               <Link
                 href="/account"

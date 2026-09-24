@@ -3,7 +3,7 @@
 import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Lock, Mail, ArrowRight, Chrome, Shield } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Chrome, Shield, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
@@ -15,10 +15,9 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTarget = searchParams?.get('redirect') || null;
+  const isRegisteredSuccess = searchParams?.get('registered') === '1';
 
   const { setUser } = useStore();
-  const envAdminUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin';
-  const envAdminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin_acegarment';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,36 +28,23 @@ function LoginForm() {
     e.preventDefault();
     setLoginError('');
 
-    const inputLower = email.trim().toLowerCase();
-    const isAdminUser =
-      inputLower === envAdminUsername.toLowerCase() ||
-      inputLower === `${envAdminUsername.toLowerCase()}@daisyhub.com` ||
-      inputLower.includes('admin');
-
-    if (isAdminUser) {
-      if (password !== envAdminPassword && password !== 'admin_acegarment' && password !== 'admin123' && password !== 'password123') {
-        setLoginError(`Invalid Admin password. Please check your admin credentials.`);
+    // Customer Login Check
+    const existing = db.findUserByEmail(email);
+    if (existing) {
+      if (existing.password && existing.password !== password) {
+        setLoginError('Invalid password. Please check your credentials.');
         return;
       }
-
-      const adminUser: CustomerUser = {
-        id: 'usr-admin-1',
-        name: 'Admin Manager',
-        email: email.includes('@') ? email : `${envAdminUsername}@daisyhub.com`,
-        mobile: '+977 9800000000',
-        role: 'ADMIN',
-        registrationDate: '2026-01-01',
-      };
-      db.saveUser(adminUser);
-      setUser(adminUser);
-      router.push(redirectTarget || '/ace_garment');
+      setUser(existing);
+      router.push(redirectTarget || '/account');
     } else {
-      const existing = db.findUserByEmail(email);
-      const custUser: CustomerUser = existing || {
+      // Create new customer session if first time
+      const custUser: CustomerUser = {
         id: `usr-${Date.now()}`,
         name: email ? email.split('@')[0] : 'Daisy Customer',
-        email: email || 'customer@example.com',
+        email: email.trim(),
         mobile: '+977 9841234567',
+        password: password,
         role: 'CUSTOMER',
         registrationDate: new Date().toISOString().split('T')[0],
       };
@@ -66,6 +52,11 @@ function LoginForm() {
       setUser(custUser);
       router.push(redirectTarget || '/account');
     }
+  };
+
+  const handleGoogleAuth = () => {
+    const target = redirectTarget ? encodeURIComponent(redirectTarget) : '/account';
+    window.location.href = `/api/auth/google?redirect=${target}`;
   };
 
   return (
@@ -76,26 +67,29 @@ function LoginForm() {
         <p className="text-xs text-brand-muted">Sign in to your account or access the Admin Control Center.</p>
       </div>
 
-      <div className="p-3 bg-brand-cream/60 border border-brand-border rounded text-[11px] text-brand-dark space-y-1">
-        <p>💡 <strong>User Panel:</strong> Login is <em>optional</em>. You can browse & checkout anytime without logging in.</p>
-        <p>🛡️ <strong>Admin Panel:</strong> Administrator login credentials are <em>required</em> to access `/ace_garment`.</p>
-      </div>
+      {isRegisteredSuccess && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded font-medium flex items-center gap-2">
+          <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
+          <span>Registration successful! Please sign in with your email and password.</span>
+        </div>
+      )}
 
       {loginError && (
-        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded font-medium">
-          {loginError}
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded font-medium flex items-center gap-2">
+          <AlertCircle size={16} className="shrink-0 text-rose-600" />
+          <span>{loginError}</span>
         </div>
       )}
 
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
-          <label className="text-xs font-semibold text-brand-dark block mb-1">EMAIL OR ADMIN USERNAME</label>
+          <label className="text-xs font-semibold text-brand-dark block mb-1">EMAIL ADDRESS</label>
           <input
             type="text"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter customer email or admin username"
+            placeholder="Enter your email address"
             className="w-full p-3 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark"
           />
         </div>
@@ -113,23 +107,6 @@ function LoginForm() {
             placeholder="Enter password"
             className="w-full p-3 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark"
           />
-        </div>
-
-        <div className="p-3 bg-brand-cream/60 border border-brand-border rounded text-[11px] flex justify-between items-center">
-          <div>
-            <span className="font-bold text-brand-dark block">Admin Test Credentials:</span>
-            <span className="text-brand-muted font-mono">User: {envAdminUsername} | Pass: {envAdminPassword}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail(envAdminUsername);
-              setPassword(envAdminPassword);
-            }}
-            className="px-2.5 py-1 bg-brand-dark text-white font-bold rounded text-[10px] uppercase tracking-wider hover:bg-brand-dark/90 shrink-0"
-          >
-            Auto Fill
-          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -160,17 +137,18 @@ function LoginForm() {
       </div>
 
       <button
-        onClick={handleLogin}
-        className="w-full py-3 border border-brand-border rounded text-xs font-semibold text-brand-dark hover:bg-brand-cream transition-colors flex items-center justify-center gap-2"
+        type="button"
+        onClick={handleGoogleAuth}
+        className="w-full py-3 border border-brand-border rounded text-xs font-semibold text-brand-dark hover:bg-brand-cream transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
       >
-        <Chrome size={16} />
+        <Chrome size={16} className="text-rose-500" />
         <span>Continue with Google</span>
       </button>
 
       <p className="text-xs text-brand-muted text-center pt-2">
         Don&apos;t have an account?{' '}
         <Link href="/register" className="font-bold text-brand-dark hover:underline">
-          Create Account (Optional)
+          Create Account
         </Link>
       </p>
     </div>
@@ -195,4 +173,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

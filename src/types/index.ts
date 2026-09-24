@@ -65,6 +65,7 @@ export interface Product {
   insideValleyFee?: number;
   outsideValleyFee?: number;
   isFreeDelivery?: boolean;
+  seo?: SEOMetadata;
 }
 
 export interface Category {
@@ -74,6 +75,7 @@ export interface Category {
   description: string;
   image: string;
   subcategories: string[];
+  seo?: SEOMetadata;
 }
 
 export interface Collection {
@@ -82,6 +84,7 @@ export interface Collection {
   name: string;
   description: string;
   image: string;
+  seo?: SEOMetadata;
 }
 
 export interface CartItem {
@@ -112,6 +115,7 @@ export interface WishlistItem {
 }
 
 export interface Address {
+  id?: string;
   fullName: string;
   mobile: string;
   email: string;
@@ -190,6 +194,19 @@ export interface FonepaySettings {
   savedQrs?: FonepayQRItem[];
 }
 
+export interface SEOMetadata {
+  metaTitle?: string;
+  metaDescription?: string;
+  canonicalUrl?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
+  keywords?: string;
+  noIndex?: boolean;
+  h1?: string;
+  categoryDescription?: string;
+}
+
 export interface HomepageCMS {
   announcementBar: {
     enabled: boolean;
@@ -218,6 +235,7 @@ export interface HomepageCMS {
     postUrl: string;
   }[];
   fonepaySettings?: FonepaySettings;
+  seo?: SEOMetadata;
 }
 
 export interface CustomerUser {
@@ -225,7 +243,15 @@ export interface CustomerUser {
   name: string;
   email: string;
   mobile?: string;
+  password?: string;
   role: 'CUSTOMER' | 'ADMIN' | 'MANAGER';
   registrationDate: string;
   isBlocked?: boolean;
+  addresses?: Address[];
+}
+
+export interface AdminCredentials {
+  username: string;
+  password: string;
+  lastUpdated?: string;
 }
