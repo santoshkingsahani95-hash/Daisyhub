@@ -14,6 +14,10 @@ const safeLocalStorage = {
       return null;
     }
   },
+
+
+
+
   setItem: (name: string, value: string): void => {
     if (typeof window === 'undefined') return;
     try {
@@ -306,8 +310,8 @@ export const useStore = create<StoreState>()(
           set({
             user: {
               id: `user-${Date.now()}`,
-              name: role === 'ADMIN' ? 'Admin Manager' : 'Aayusha Karki',
-              email: role === 'ADMIN' ? 'admin@acegarment.com' : 'customer@example.com',
+              name: role === 'ADMIN' ? 'Admin Manager' : 'Customer',
+              email: role === 'ADMIN' ? 'admin@daisyhub.com' : 'customer@daisyhub.com',
               role,
               registrationDate: new Date().toISOString(),
             },

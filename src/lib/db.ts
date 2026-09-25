@@ -23,55 +23,7 @@ class DataStore {
   private categories: Category[] = [...initialCategories];
   private collections: Collection[] = [...initialCollections];
   private cms: HomepageCMS = { ...initialCMS };
-  private orders: Order[] = [
-    {
-      id: 'ord-1001',
-      orderNumber: 'ACE-884910',
-      createdAt: '2026-03-18T14:30:00.000Z',
-      items: [
-        {
-          productId: 'prod-1',
-          productName: 'Ribbed Contour Crop Top',
-          colorName: 'Black',
-          size: 'M',
-          quantity: 1,
-          price: 1299,
-          image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=1000&auto=format&fit=crop',
-        },
-        {
-          productId: 'prod-13',
-          productName: 'High-Waist Wide Leg Trousers',
-          colorName: 'Beige',
-          size: 'S',
-          quantity: 1,
-          price: 2499,
-          image: 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?q=80&w=1000&auto=format&fit=crop',
-        },
-      ],
-      subtotal: 3798,
-      discount: 300,
-      shipping: 0,
-      total: 3498,
-      paymentMethod: 'fonepay',
-      paymentStatus: 'paid',
-      orderStatus: 'Pending',
-      customerName: 'Aayusha Karki',
-      customerEmail: 'aayusha.k@example.com',
-      customerMobile: '+977 9841234567',
-      shippingAddress: {
-        fullName: 'Aayusha Karki',
-        mobile: '9841234567',
-        email: 'aayusha.k@example.com',
-        province: 'Bagmati Province',
-        district: 'Kathmandu',
-        city: 'Kathmandu',
-        streetAddress: 'Baneshwor Height, Ward 10',
-        landmark: 'Near Standard Chartered Bank',
-      },
-      estimatedDelivery: '2026-03-22',
-      trackingNumber: 'ACE-TRK-9921',
-    },
-  ];
+  private orders: Order[] = [];
   private coupons: Coupon[] = [
     {
       code: 'WELCOME10',
@@ -100,14 +52,6 @@ class DataStore {
       mobile: '+977 9800000000',
       role: 'ADMIN',
       registrationDate: '2026-01-01',
-    },
-    {
-      id: 'usr-cust-1',
-      name: 'Aayusha Karki',
-      email: 'aayusha.k@example.com',
-      mobile: '+977 9841234567',
-      role: 'CUSTOMER',
-      registrationDate: '2026-02-15',
     },
   ];
 

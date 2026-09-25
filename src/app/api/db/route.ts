@@ -69,6 +69,34 @@ export async function POST(request: Request) {
         }
         break;
       }
+      case 'deleteCollection': {
+        const { id } = body;
+        if (id) {
+          serverDb.deleteCollection(id);
+        }
+        break;
+      }
+      case 'deleteCoupon': {
+        const { code } = body;
+        if (code) {
+          serverDb.deleteCoupon(code);
+        }
+        break;
+      }
+      case 'deleteOrder': {
+        const { id } = body;
+        if (id) {
+          serverDb.deleteOrder(id);
+        }
+        break;
+      }
+      case 'deleteReview': {
+        const { productId, reviewId } = body;
+        if (productId && reviewId) {
+          serverDb.deleteReview(productId, reviewId);
+        }
+        break;
+      }
       case 'updateCMS': {
         const { cms } = body;
         if (cms) {

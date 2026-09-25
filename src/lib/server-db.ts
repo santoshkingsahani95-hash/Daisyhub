@@ -33,46 +33,8 @@ class ServerDataStore {
     categories: [...initialCategories],
     collections: [...initialCollections],
     cms: { ...initialCMS },
-    orders: [
-      {
-        id: 'ord-1001',
-        orderNumber: 'ACE-884910',
-        createdAt: '2026-03-18T14:30:00.000Z',
-        items: [
-          {
-            productId: 'prod-1',
-            productName: 'Ribbed Contour Crop Top',
-            colorName: 'Black',
-            size: 'M',
-            quantity: 1,
-            price: 1299,
-            image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=1000&auto=format&fit=crop',
-          },
-        ],
-        subtotal: 3798,
-        discount: 300,
-        shipping: 0,
-        total: 3498,
-        paymentMethod: 'fonepay',
-        paymentStatus: 'paid',
-        orderStatus: 'Pending',
-        customerName: 'Aayusha Karki',
-        customerEmail: 'aayusha.k@example.com',
-        customerMobile: '+977 9841234567',
-        shippingAddress: {
-          fullName: 'Aayusha Karki',
-          mobile: '9841234567',
-          email: 'aayusha.k@example.com',
-          province: 'Bagmati Province',
-          district: 'Kathmandu',
-          city: 'Kathmandu',
-          streetAddress: 'Baneshwor Height, Ward 10',
-          landmark: 'Near Standard Chartered Bank',
-        },
-        estimatedDelivery: '2026-03-22',
-        trackingNumber: 'ACE-TRK-9921',
-      },
-    ],
+    orders: [],
+
     coupons: [
       {
         code: 'WELCOME10',
@@ -344,6 +306,66 @@ class ServerDataStore {
       this.saveToDisk();
       CategoryModel.deleteOne({ id }).catch(() => {});
       return true;
+    }
+    return false;
+  }
+
+  deleteCollection(id: string): boolean {
+    const data = this.getData();
+    const initialLen = data.collections.length;
+    data.collections = data.collections.filter((c) => c.id !== id && c.slug !== id);
+    if (data.collections.length < initialLen) {
+      this.saveToDisk();
+      CollectionModel.deleteOne({ id }).catch(() => {});
+      return true;
+    }
+    return false;
+  }
+
+  deleteCoupon(code: string): boolean {
+    const data = this.getData();
+    const cleanCode = code.trim().toUpperCase();
+    const initialLen = data.coupons.length;
+    data.coupons = data.coupons.filter((c) => c.code.trim().toUpperCase() !== cleanCode);
+    if (data.coupons.length < initialLen) {
+      this.saveToDisk();
+      CouponModel.deleteOne({ code: cleanCode }).catch(() => {});
+      return true;
+    }
+    return false;
+  }
+
+  deleteOrder(id: string): boolean {
+    const data = this.getData();
+    const initialLen = data.orders.length;
+    data.orders = data.orders.filter((o) => o.id !== id && o.orderNumber !== id);
+    if (data.orders.length < initialLen) {
+      this.saveToDisk();
+      OrderModel.deleteOne({ $or: [{ id }, { orderNumber: id }] }).catch(() => {});
+      return true;
+    }
+    return false;
+  }
+
+  deleteReview(productId: string, reviewId: string): boolean {
+    const data = this.getData();
+    const prod = data.products.find((p) => p.id === productId || p.slug === productId);
+    if (prod && prod.reviews) {
+      const initialLen = prod.reviews.length;
+      prod.reviews = prod.reviews.filter((r) => r.id !== reviewId);
+      if (prod.reviews.length < initialLen) {
+        prod.reviewCount = prod.reviews.length;
+        if (prod.reviewCount > 0) {
+          prod.rating = Number(
+            (prod.reviews.reduce((sum, r) => sum + r.rating, 0) / prod.reviewCount).toFixed(1)
+          );
+        } else {
+          prod.rating = 5.0;
+        }
+        this.saveToDisk();
+        ProductModel.findOneAndUpdate({ id: prod.id }, prod, { upsert: true }).catch(() => {});
+        return true;
+      }
     }
     return false;
   }
