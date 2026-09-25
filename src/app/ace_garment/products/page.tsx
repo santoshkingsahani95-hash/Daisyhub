@@ -4,11 +4,12 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Plus, Edit2, Trash2, Search, X, Check, Image as ImageIcon, Upload, Palette } from 'lucide-react';
 import { db } from '@/lib/db';
-import { Product, ColorOption } from '@/types';
+import { Product, ColorOption, Category } from '@/types';
 import { ProductVariantInspector } from '@/components/admin/product-variant-inspector';
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -52,6 +53,14 @@ export default function AdminProductsPage() {
 
   useEffect(() => {
     setProducts(db.getProducts());
+    setCategories(db.getCategories());
+
+    const handleDbUpdate = () => {
+      setProducts(db.getProducts());
+      setCategories(db.getCategories());
+    };
+    window.addEventListener('ace-db-updated', handleDbUpdate);
+    return () => window.removeEventListener('ace-db-updated', handleDbUpdate);
   }, []);
 
   const filtered = products.filter(
@@ -62,12 +71,14 @@ export default function AdminProductsPage() {
   );
 
   const handleOpenAdd = () => {
+    const cats = db.getCategories();
+    setCategories(cats);
     setEditingProduct(null);
     setFormData({
       name: '',
       slug: '',
       sku: `DAISY-PROD-${Math.floor(100 + Math.random() * 900)}`,
-      category: 'tops',
+      category: cats[0]?.slug || 'tops',
       price: 1999,
       salePrice: 1599,
       description: 'Elegant women’s fashion piece designed for effortless confidence.',
@@ -279,7 +290,9 @@ export default function AdminProductsPage() {
                       </div>
                     </td>
                     <td className="p-3 font-mono text-[11px] font-semibold">{p.sku}</td>
-                    <td className="p-3 uppercase font-medium text-brand-muted">{p.category}</td>
+                    <td className="p-3 uppercase font-medium text-brand-muted">
+                      {categories.find((c) => c.slug === p.category)?.name || p.category}
+                    </td>
                     <td className="p-3">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1.5">
@@ -380,12 +393,16 @@ export default function AdminProductsPage() {
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full p-2.5 border border-brand-border rounded bg-white"
+                    className="w-full p-2.5 border border-brand-border rounded bg-white font-medium"
                   >
-                    <option value="tops">Tops & Blouses</option>
-                    <option value="dresses">Dresses</option>
-                    <option value="bottoms">Bottoms & Jeans</option>
-                    <option value="sets">Co-ord Sets</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id || cat.slug} value={cat.slug}>
+                        {cat.name}
+                      </option>
+                    ))}
+                    {formData.category && !categories.some((c) => c.slug === formData.category) && (
+                      <option value={formData.category}>{formData.category}</option>
+                    )}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-3">

@@ -4,13 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShieldCheck, Truck, Lock, Tag, QrCode, RefreshCw, CheckCircle2, AlertCircle, X, Image as ImageIcon } from 'lucide-react';
+import { ShieldCheck, Truck, Lock, Tag, QrCode, RefreshCw, CheckCircle2, AlertCircle, X, Image as ImageIcon, MapPin, Store, Building2 } from 'lucide-react';
 import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
 import { useStore, getProductStock } from '@/lib/store';
 import { db } from '@/lib/db';
-import { PaymentMethod, Order, FonepaySettings } from '@/types';
+import { PaymentMethod, Order, FonepaySettings, DistrictDeliveryRate } from '@/types';
+import { NEPAL_PROVINCES, generateDefaultDeliveryRates } from '@/lib/nepal-locations';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -18,6 +19,8 @@ export default function CheckoutPage() {
 
   // Active checkout items: Use directCheckoutItem for "Buy It Now", otherwise use bag cart items
   const checkoutItems = directCheckoutItem ? [directCheckoutItem] : cart;
+
+  const [deliveryRates, setDeliveryRates] = useState<DistrictDeliveryRate[]>([]);
 
   const [formData, setFormData] = useState({
     fullName: user ? user.name : '',
@@ -34,6 +37,37 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponStatus, setCouponStatus] = useState<{ valid: boolean; discountAmount: number; message: string } | null>(null);
+
+  // Sync delivery rates dynamically from DB
+  useEffect(() => {
+    const loaded = db.getDeliveryRates();
+    setDeliveryRates(loaded && loaded.length > 0 ? loaded : generateDefaultDeliveryRates());
+
+    const handleDbSync = () => {
+      const fresh = db.getDeliveryRates();
+      if (fresh && fresh.length > 0) setDeliveryRates(fresh);
+    };
+    window.addEventListener('ace-db-updated', handleDbSync);
+    window.addEventListener('storage', handleDbSync);
+    return () => {
+      window.removeEventListener('ace-db-updated', handleDbSync);
+      window.removeEventListener('storage', handleDbSync);
+    };
+  }, []);
+
+  // Cascading Province -> Available Districts list
+  const activeProvinceObj = NEPAL_PROVINCES.find((p) => p.name === formData.province) || NEPAL_PROVINCES[0];
+  const availableDistricts = activeProvinceObj.districts;
+
+  // Selected district delivery rate lookup
+  const currentDistrictRate = deliveryRates.find(
+    (r) => r.district.toLowerCase() === formData.district.toLowerCase()
+  ) || {
+    district: formData.district,
+    province: formData.province,
+    deliveryFee: 150,
+    enabled: true,
+  };
 
   // Dynamic Fonepay Settings State (Synced Live from DB & Admin Panel)
   const [fonepaySettings, setFonepaySettings] = useState<FonepaySettings>(() => {
@@ -61,34 +95,36 @@ export default function CheckoutPage() {
   const [fonepayError, setFonepayError] = useState('');
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [wsSocket, setWsSocket] = useState<WebSocket | null>(null);
-  const [deliveryZone, setDeliveryZone] = useState<'inside' | 'outside'>('inside');
 
   const subtotal = checkoutItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = couponStatus?.valid ? couponStatus.discountAmount : 0;
 
-  // Dynamic delivery fee calculation (Inside Valley vs Outside Valley vs Free Delivery)
+  // Dynamic delivery fee calculation based on District
   const allProdsForShipping = db.getProducts();
   const isFreeDeliveryEligible = checkoutItems.length > 0 && checkoutItems.some((item) => {
     const p = allProdsForShipping.find((prod) => prod.id === item.productId || prod.slug === item.productSlug);
     return p?.isFreeDelivery;
   });
 
-  const calculatedShipping = isFreeDeliveryEligible
-    ? 0
-    : checkoutItems.reduce((max, item) => {
-      const p = allProdsForShipping.find((prod) => prod.id === item.productId || prod.slug === item.productSlug);
-      if (p?.isFreeDelivery) return max;
-      const fee = deliveryZone === 'inside'
-        ? (p?.insideValleyFee !== undefined ? p.insideValleyFee : 100)
-        : (p?.outsideValleyFee !== undefined ? p.outsideValleyFee : 200);
-      return Math.max(max, fee);
-    }, deliveryZone === 'inside' ? 100 : 200);
+  const baseDistrictFee = currentDistrictRate.deliveryFee !== undefined
+    ? currentDistrictRate.deliveryFee
+    : (currentDistrictRate.homeDeliveryFee || 150);
 
-  const shipping = calculatedShipping;
+  const shipping = isFreeDeliveryEligible ? 0 : baseDistrictFee;
   const total = Math.max(0, subtotal - discount + shipping);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    if (name === 'province') {
+      const newProv = NEPAL_PROVINCES.find((p) => p.name === value) || NEPAL_PROVINCES[0];
+      setFormData({
+        ...formData,
+        province: value,
+        district: newProv.districts[0],
+      });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
   };
 
   const handleApplyCoupon = (e: React.FormEvent) => {
@@ -188,7 +224,7 @@ export default function CheckoutPage() {
         setFonepayStatusMsg('Payment pending verification');
       }
     } catch (e) {
-      setFonepayError('❌ Failed to connect to Fonepay server. Please complete payment and click verify again.');
+      setFonepayError('❌ Failed. Please complete payment and click verify again.');
       setFonepayStatusMsg('Verification attempt failed');
     } finally {
       setFonepayVerifying(false);
@@ -259,6 +295,7 @@ export default function CheckoutPage() {
       customerName: formData.fullName,
       customerEmail: formData.email,
       customerMobile: formData.mobile,
+      deliveryType: 'home',
       shippingAddress: {
         fullName: formData.fullName,
         mobile: formData.mobile,
@@ -268,6 +305,7 @@ export default function CheckoutPage() {
         city: formData.city,
         streetAddress: formData.streetAddress,
         landmark: formData.landmark,
+        deliveryType: 'home',
       },
       estimatedDelivery: '3-5 Business Days',
       trackingNumber: `ACE-TRK-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -454,64 +492,90 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Shipping Address */}
-            <div className="bg-white p-6 rounded-lg border border-brand-border shadow-sm space-y-4">
-              <h2 className="font-serif-title text-lg font-bold text-brand-dark uppercase tracking-wider">
-                2. SHIPPING ADDRESS (NEPAL)
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Shipping Address & Nepal District Delivery Selector */}
+            <div className="bg-white p-6 rounded-lg border border-brand-border shadow-sm space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-brand-border gap-2">
+                <h2 className="font-serif-title text-lg font-bold text-brand-dark uppercase tracking-wider flex items-center gap-2">
+                  <MapPin size={20} className="text-brand-gold" />
+                  <span>2. SHIPPING ADDRESS & NEPAL DISTRICT SELECTION</span>
+                </h2>
+              </div>
+
+              {/* Delivery Option Warning if Admin disabled */}
+              {currentDistrictRate.enabled === false && (
+                <p className="text-xs font-bold text-rose-700 bg-rose-50 p-2.5 rounded border border-rose-200 flex items-center gap-1.5">
+                  <AlertCircle size={14} /> Delivery is currently disabled for {formData.district}.
+                </p>
+              )}
+
+              {/* Province & District Dynamic Inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                 <div>
                   <label className="text-xs font-semibold text-brand-dark block mb-1">PROVINCE *</label>
                   <select
                     name="province"
                     value={formData.province}
                     onChange={handleInputChange}
-                    className="w-full p-3 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark bg-white"
+                    className="w-full p-3 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark bg-white font-medium"
                   >
-                    <option value="Koshi Province">Koshi Province</option>
-                    <option value="Madhesh Province">Madhesh Province</option>
-                    <option value="Bagmati Province">Bagmati Province</option>
-                    <option value="Gandaki Province">Gandaki Province</option>
-                    <option value="Lumbini Province">Lumbini Province</option>
-                    <option value="Karnali Province">Karnali Province</option>
-                    <option value="Sudurpashchim Province">Sudurpashchim Province</option>
+                    {NEPAL_PROVINCES.map((p) => (
+                      <option key={p.name} value={p.name}>
+                        {p.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
+
                 <div>
-                  <label className="text-xs font-semibold text-brand-dark block mb-1">DISTRICT *</label>
-                  <input
-                    type="text"
+                  <label className="text-xs font-semibold text-brand-dark block mb-1">
+                    DISTRICT ({availableDistricts.length} AVAILABLE) *
+                  </label>
+                  <select
                     name="district"
-                    required
                     value={formData.district}
                     onChange={handleInputChange}
-                    className="w-full p-3 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark"
-                  />
+                    className="w-full p-3 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark bg-white font-bold text-brand-dark"
+                  >
+                    {availableDistricts.map((dName) => {
+                      const rateObj = deliveryRates.find((r) => r.district === dName);
+                      const isDisabled = rateObj && rateObj.enabled === false;
+                      return (
+                        <option key={dName} value={dName}>
+                          {dName}{isDisabled ? ' (Delivery Unavailable)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
+
                 <div>
-                  <label className="text-xs font-semibold text-brand-dark block mb-1">CITY / TOWN *</label>
+                  <label className="text-xs font-semibold text-brand-dark block mb-1">CITY / MUNICIPALITY / AREA *</label>
                   <input
                     type="text"
                     name="city"
                     required
                     value={formData.city}
                     onChange={handleInputChange}
+                    placeholder="e.g. Pokhara Ward 8 or Baneshwor"
                     className="w-full p-3 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark"
                   />
                 </div>
+
                 <div>
-                  <label className="text-xs font-semibold text-brand-dark block mb-1">STREET ADDRESS *</label>
+                  <label className="text-xs font-semibold text-brand-dark block mb-1">STREET ADDRESS / TOLE *</label>
                   <input
                     type="text"
                     name="streetAddress"
                     required
                     value={formData.streetAddress}
                     onChange={handleInputChange}
+                    placeholder="e.g. New Baneshwor Height, House 42"
                     className="w-full p-3 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark"
                   />
                 </div>
+
                 <div className="md:col-span-2">
-                  <label className="text-xs font-semibold text-brand-dark block mb-1">LANDMARK / INSTRUCTIONS (OPTIONAL)</label>
+                  <label className="text-xs font-semibold text-brand-dark block mb-1">LANDMARK / DELIVERY INSTRUCTIONS (OPTIONAL)</label>
                   <input
                     type="text"
                     name="landmark"
@@ -521,77 +585,14 @@ export default function CheckoutPage() {
                     className="w-full p-3 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark"
                   />
                 </div>
+              </div>
 
-                <div className="md:col-span-2 pt-2 border-t border-brand-border">
-                  <label className="text-xs font-bold uppercase tracking-wider text-brand-dark block mb-2">
-                    🚚 DELIVERY ZONE & RATES *
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label
-                      onClick={() => setDeliveryZone('inside')}
-                      className={`p-3.5 rounded-lg border-2 cursor-pointer flex items-center justify-between transition-all ${deliveryZone === 'inside'
-                        ? 'border-brand-dark bg-brand-cream/50 shadow-xs'
-                        : 'border-brand-border bg-white hover:border-brand-dark'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <input
-                          type="radio"
-                          name="deliveryZone"
-                          checked={deliveryZone === 'inside'}
-                          onChange={() => setDeliveryZone('inside')}
-                          className="accent-brand-dark cursor-pointer"
-                        />
-                        <div>
-                          <span className="text-xs font-bold text-brand-dark block">Inside Kathmandu Valley</span>
-                          <span className="text-[10px] text-brand-muted">Kathmandu • Lalitpur • Bhaktapur</span>
-                        </div>
-                      </div>
-                      <span className="text-xs font-bold text-brand-dark">
-                        {isFreeDeliveryEligible ? (
-                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-mono">FREE</span>
-                        ) : (
-                          `NPR ${cart.reduce((max, item) => {
-                            const p = allProdsForShipping.find((prod) => prod.id === item.productId || prod.slug === item.productSlug);
-                            return Math.max(max, p?.insideValleyFee !== undefined ? p.insideValleyFee : 100);
-                          }, 100)}`
-                        )}
-                      </span>
-                    </label>
-
-                    <label
-                      onClick={() => setDeliveryZone('outside')}
-                      className={`p-3.5 rounded-lg border-2 cursor-pointer flex items-center justify-between transition-all ${deliveryZone === 'outside'
-                        ? 'border-brand-dark bg-brand-cream/50 shadow-xs'
-                        : 'border-brand-border bg-white hover:border-brand-dark'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <input
-                          type="radio"
-                          name="deliveryZone"
-                          checked={deliveryZone === 'outside'}
-                          onChange={() => setDeliveryZone('outside')}
-                          className="accent-brand-dark cursor-pointer"
-                        />
-                        <div>
-                          <span className="text-xs font-bold text-brand-dark block">Outside Kathmandu Valley</span>
-                          <span className="text-[10px] text-brand-muted font-light">All 77 Districts Across Nepal</span>
-                        </div>
-                      </div>
-                      <span className="text-xs font-bold text-brand-dark">
-                        {isFreeDeliveryEligible ? (
-                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-mono">FREE</span>
-                        ) : (
-                          `NPR ${cart.reduce((max, item) => {
-                            const p = allProdsForShipping.find((prod) => prod.id === item.productId || prod.slug === item.productSlug);
-                            return Math.max(max, p?.outsideValleyFee !== undefined ? p.outsideValleyFee : 200);
-                          }, 200)}`
-                        )}
-                      </span>
-                    </label>
-                  </div>
-                </div>
+              {/* Selected Location Summary Info Banner */}
+              <div className="p-3 bg-brand-cream/60 rounded-lg border border-brand-border flex items-center gap-2 text-xs">
+                <Truck size={16} className="text-brand-dark shrink-0" />
+                <span className="font-medium text-brand-dark">
+                  Shipping Destination: <strong className="font-bold">{formData.district}, {formData.province}</strong>
+                </span>
               </div>
             </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Filter, X, ChevronDown, SlidersHorizontal, RotateCcw } from 'lucide-react';
@@ -13,7 +13,7 @@ import { SizeGuideModal } from '@/components/product/size-guide-modal';
 import { MiniCart } from '@/components/cart/mini-cart';
 import { SearchOverlay } from '@/components/layout/search-overlay';
 import { db } from '@/lib/db';
-import { Product } from '@/types';
+import { Product, Category } from '@/types';
 
 function ShopContent() {
   const searchParams = useSearchParams();
@@ -28,8 +28,36 @@ function ShopContent() {
   const [maxPrice, setMaxPrice] = useState<number>(5000);
   const [sortBy, setSortBy] = useState<string>('featured');
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState<boolean>(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
 
-  const allProducts = db.getProducts();
+  useEffect(() => {
+    setCategories(db.getCategories());
+    setAllProducts(db.getProducts());
+
+    const handleDbUpdate = () => {
+      setCategories(db.getCategories());
+      setAllProducts(db.getProducts());
+    };
+    window.addEventListener('ace-db-updated', handleDbUpdate);
+    window.addEventListener('storage', handleDbUpdate);
+    return () => {
+      window.removeEventListener('ace-db-updated', handleDbUpdate);
+    };
+  }, []);
+
+  const categoriesList = useMemo(() => {
+    const systemCats = [
+      { name: 'All Clothing', id: 'all' },
+      { name: 'New Arrivals', id: 'new-arrivals' },
+    ];
+    const dbCats = categories.length > 0 ? categories : db.getCategories();
+    const dynamicCats = dbCats.map((c) => ({ name: c.name, id: c.slug }));
+    const endCats = [{ name: 'Sale Edit', id: 'sale' }];
+    const existingIds = new Set(systemCats.map((c) => c.id));
+    const uniqueDynamic = dynamicCats.filter((c) => !existingIds.has(c.id));
+    return [...systemCats, ...uniqueDynamic, ...endCats];
+  }, [categories]);
 
   const availableColors = [
     { name: 'Black', code: '#111111' },
@@ -180,15 +208,7 @@ function ShopContent() {
             <div className="pt-2">
               <h3 className="text-xs uppercase tracking-widest font-bold text-brand-dark mb-4">CATEGORIES</h3>
               <ul className="space-y-2.5 text-xs text-brand-muted">
-                {[
-                  { name: 'All Clothing', id: 'all' },
-                  { name: 'New Arrivals', id: 'new-arrivals' },
-                  { name: 'Tops & Blouses', id: 'tops' },
-                  { name: 'Dresses', id: 'dresses' },
-                  { name: 'Bottoms & Jeans', id: 'bottoms' },
-                  { name: 'Co-ord Sets', id: 'sets' },
-                  { name: 'Sale Edit', id: 'sale' },
-                ].map((item) => (
+                {categoriesList.map((item) => (
                   <li key={item.id}>
                     <button
                       onClick={() => setSelectedCategory(item.id)}
@@ -322,13 +342,11 @@ function ShopContent() {
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   className="w-full bg-brand-cream border border-brand-border p-2 text-xs font-medium rounded"
                 >
-                  <option value="all">All Clothing</option>
-                  <option value="new-arrivals">New Arrivals</option>
-                  <option value="tops">Tops & Blouses</option>
-                  <option value="dresses">Dresses</option>
-                  <option value="bottoms">Bottoms & Jeans</option>
-                  <option value="sets">Co-ord Sets</option>
-                  <option value="sale">Sale Edit</option>
+                  {categoriesList.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Boxes, Plus, Save, X, CheckCircle2, Image as ImageIcon, Camera, Edit3, Upload, Trash2, Palette } from 'lucide-react';
 import { db } from '@/lib/db';
-import { Product, ColorOption } from '@/types';
+import { Product, ColorOption, Category } from '@/types';
 
 interface KeypadStockInputProps {
   currentStock: number;
@@ -118,8 +118,18 @@ export default function AdminInventoryPage() {
     },
   ]);
 
+  const [categories, setCategories] = useState<Category[]>([]);
+
   useEffect(() => {
     setProducts(db.getProducts());
+    setCategories(db.getCategories());
+
+    const handleDbUpdate = () => {
+      setProducts(db.getProducts());
+      setCategories(db.getCategories());
+    };
+    window.addEventListener('ace-db-updated', handleDbUpdate);
+    return () => window.removeEventListener('ace-db-updated', handleDbUpdate);
   }, []);
 
   const handleStockChange = (productId: string, size: string, newStock: number) => {
@@ -201,9 +211,11 @@ export default function AdminInventoryPage() {
   };
 
   const handleOpenAddModal = () => {
+    const cats = db.getCategories();
+    setCategories(cats);
     setNewItemData({
       name: '',
-      category: 'tops',
+      category: cats[0]?.slug || 'tops',
       sku: `ACE-INV-${Math.floor(1000 + Math.random() * 9000)}`,
       price: 2499,
       salePrice: 1999,
@@ -772,12 +784,16 @@ export default function AdminInventoryPage() {
                   <select
                     value={newItemData.category}
                     onChange={(e) => setNewItemData({ ...newItemData, category: e.target.value })}
-                    className="w-full p-2.5 border border-brand-border rounded bg-white"
+                    className="w-full p-2.5 border border-brand-border rounded bg-white font-medium"
                   >
-                    <option value="tops">Tops & Blouses</option>
-                    <option value="dresses">Dresses</option>
-                    <option value="bottoms">Bottoms & Jeans</option>
-                    <option value="sets">Co-ord Sets</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id || cat.slug} value={cat.slug}>
+                        {cat.name}
+                      </option>
+                    ))}
+                    {newItemData.category && !categories.some((c) => c.slug === newItemData.category) && (
+                      <option value={newItemData.category}>{newItemData.category}</option>
+                    )}
                   </select>
                 </div>
 

@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { X, ChevronDown, User, Heart, Search, ShoppingBag, Shield, LogOut } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { db } from '@/lib/db';
+import { Category } from '@/types';
 
 interface MobileDrawerProps {
   isOpen: boolean;
@@ -13,10 +15,17 @@ interface MobileDrawerProps {
 export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) => {
   const [clothingExpanded, setClothingExpanded] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const { wishlist, user, logout, openSearch } = useStore();
 
   useEffect(() => {
     setIsMounted(true);
+    setCategories(db.getCategories());
+    const handleDbUpdate = () => {
+      setCategories(db.getCategories());
+    };
+    window.addEventListener('ace-db-updated', handleDbUpdate);
+    return () => window.removeEventListener('ace-db-updated', handleDbUpdate);
   }, []);
 
   if (!isOpen) return null;
@@ -79,18 +88,16 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) =
               </button>
               {clothingExpanded && (
                 <div className="pl-4 pt-2 pb-1 space-y-2.5 text-xs text-brand-muted font-normal lowercase capitalize border-l border-brand-border ml-1 my-1">
-                  <Link href="/category/tops" onClick={onClose} className="block hover:text-brand-dark">
-                    Tops & Blouses
-                  </Link>
-                  <Link href="/category/dresses" onClick={onClose} className="block hover:text-brand-dark">
-                    Dresses
-                  </Link>
-                  <Link href="/category/bottoms" onClick={onClose} className="block hover:text-brand-dark">
-                    Bottoms & Jeans
-                  </Link>
-                  <Link href="/category/sets" onClick={onClose} className="block hover:text-brand-dark">
-                    Co-ord Sets
-                  </Link>
+                  {categories.map((cat) => (
+                    <Link
+                      key={cat.id || cat.slug}
+                      href={`/category/${cat.slug}`}
+                      onClick={onClose}
+                      className="block hover:text-brand-dark"
+                    >
+                      {cat.name}
+                    </Link>
+                  ))}
                 </div>
               )}
             </div>

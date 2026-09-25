@@ -24,7 +24,7 @@ import {
   Lock,
   ArrowRight,
   AlertCircle,
-  KeyRound,
+  Truck,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { db } from '@/lib/db';
@@ -61,13 +61,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setIsSubmitting(true);
 
     const activeCreds = db.getAdminCredentials();
-    const inputLower = adminInputUser.trim().toLowerCase();
-    const targetUserLower = activeCreds.username.toLowerCase();
+    const inputClean = adminInputUser.trim().toLowerCase();
+    const targetUserClean = activeCreds.username.trim().toLowerCase();
     
     const isAdminUsernameMatch =
-      inputLower === targetUserLower ||
-      inputLower === `${targetUserLower}@daisyhub.com` ||
-      inputLower.includes('admin');
+      inputClean === targetUserClean ||
+      inputClean === `${targetUserClean}@daisyhub.com`;
 
     if (!isAdminUsernameMatch) {
       setLoginError('Invalid Administrator Username or Email.');
@@ -144,6 +143,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'Products', href: '/ace_garment/products', icon: Package },
     { label: 'Inventory', href: '/ace_garment/inventory', icon: Boxes },
     { label: 'Orders', href: '/ace_garment/orders', icon: ShoppingBag },
+    { label: 'Nepal Delivery Rates', href: '/ace_garment/delivery', icon: Truck },
     { label: 'Fonepay QR Settings', href: '/ace_garment/fonepay', icon: QrCode },
     { label: 'Homepage CMS', href: '/ace_garment/cms', icon: Sliders },
     { label: 'Coupons', href: '/ace_garment/coupons', icon: Tag },
@@ -256,6 +256,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  const handleAdminLogout = () => {
+    logout();
+    router.push('/ace_garment');
+  };
+
   // 3. Authenticated Admin Interface
   return (
     <div className="min-h-screen flex bg-brand-cream/40 font-sans">
@@ -322,14 +327,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
 
           <button
-            onClick={() => {
-              logout();
-              router.push('/login');
-            }}
-            className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+            onClick={handleAdminLogout}
+            className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-rose-300 hover:text-white bg-rose-950/60 hover:bg-rose-900/80 rounded border border-rose-800/50 transition-all cursor-pointer"
           >
             <LogOut size={16} />
-            <span>Sign Out Admin</span>
+            <span className="font-bold uppercase tracking-wider">LOGOUT ADMIN</span>
           </button>
         </div>
       </aside>
@@ -373,6 +375,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               <Lock size={14} className="text-brand-gold" />
               <span>Change Password</span>
+            </button>
+
+            {/* Admin Logout Button */}
+            <button
+              onClick={handleAdminLogout}
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-700 text-[11px] font-bold uppercase tracking-wider rounded border border-rose-200 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Logout from Admin Panel"
+            >
+              <LogOut size={14} />
+              <span>LOGOUT</span>
             </button>
 
             <span className="font-bold text-brand-dark hidden sm:inline">{user.name}</span>

@@ -584,7 +584,13 @@ export default function AdminOrdersPage() {
                       ))}
                     </div>
                   </td>
-                  <td className="p-3 font-bold text-sm text-brand-dark">NPR {ord.total.toLocaleString()}</td>
+                  <td className="p-3 font-bold text-sm text-brand-dark">
+                    <span>NPR {ord.total.toLocaleString()}</span>
+                    <span className="block text-[10px] text-brand-muted font-normal">
+                      Items: NPR {(ord.subtotal || 0).toLocaleString()} + Delivery: NPR {ord.shipping || 0}
+                      {ord.discount ? ` - Disc: NPR ${ord.discount}` : ''}
+                    </span>
+                  </td>
                   <td className="p-3">
                     {ord.paymentMethod === 'fonepay' ? (
                       <span className="inline-flex items-center gap-1 bg-red-50 text-red-800 border border-red-200 font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow-2xs">
@@ -611,7 +617,7 @@ export default function AdminOrdersPage() {
                     <span className={`block text-[10px] font-bold uppercase mt-1 ${
                       ord.paymentStatus === 'paid' ? 'text-emerald-700' : 'text-amber-600'
                     }`}>
-                      {ord.paymentStatus === 'paid' ? '✓ PAID & VERIFIED' : '⏳ PENDING (PAY ON ARRIVAL)'}
+                      {ord.paymentStatus === 'paid' ? `✓ PAID: NPR ${ord.total.toLocaleString()}` : `⏳ COD DUE: NPR ${ord.total.toLocaleString()}`}
                     </span>
                   </td>
                   <td className="p-3">
@@ -697,20 +703,34 @@ export default function AdminOrdersPage() {
 
               <div className="space-y-1.5">
                 <span className="font-bold text-brand-dark uppercase tracking-wider block text-[10px] text-brand-gold">
-                  DELIVERY ADDRESS
+                  DELIVERY LOCATION & METHOD
                 </span>
                 <p className="font-bold text-brand-dark flex items-center gap-1.5">
                   <MapPin size={14} className="text-brand-muted shrink-0" />
                   <span>{selectedOrder.shippingAddress?.streetAddress || 'Address Provided'}</span>
                 </p>
-                <p className="text-brand-muted pl-5">
-                  {selectedOrder.shippingAddress?.city || 'Kathmandu'}, {selectedOrder.shippingAddress?.province || 'Bagmati'}
+                <p className="text-brand-muted pl-5 font-semibold">
+                  District: <strong className="text-brand-dark">{selectedOrder.shippingAddress?.district || 'Kathmandu'}</strong> ({selectedOrder.shippingAddress?.province || 'Bagmati Province'})
+                </p>
+                <p className="text-brand-muted pl-5 text-[11px]">
+                  City/Tole: {selectedOrder.shippingAddress?.city || 'Kathmandu'}
                 </p>
                 {selectedOrder.shippingAddress?.landmark && (
                   <p className="text-brand-muted pl-5 text-[11px] italic">
                     Landmark: {selectedOrder.shippingAddress.landmark}
                   </p>
                 )}
+                <div className="pl-5 pt-1">
+                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
+                    selectedOrder.deliveryType === 'branch' || selectedOrder.shippingAddress?.deliveryType === 'branch'
+                      ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  }`}>
+                    {selectedOrder.deliveryType === 'branch' || selectedOrder.shippingAddress?.deliveryType === 'branch'
+                      ? '🏬 BRANCH / COUNTER PICKUP'
+                      : '🚚 HOME DELIVERY'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -784,19 +804,55 @@ export default function AdminOrdersPage() {
 
               <div className="flex justify-between text-brand-muted">
                 <span>Payment Method</span>
-                <span className="font-mono uppercase font-bold text-brand-dark">{selectedOrder.paymentMethod}</span>
+                <span className="font-mono uppercase font-bold text-brand-dark bg-brand-cream/80 px-2 py-0.5 rounded border border-brand-border/60">
+                  {selectedOrder.paymentMethod === 'fonepay'
+                    ? '🔴 FONEPAY QR / MOBILE BANKING'
+                    : selectedOrder.paymentMethod === 'cod'
+                    ? '💵 CASH ON DELIVERY (COD)'
+                    : (selectedOrder.paymentMethod || 'ONLINE').toUpperCase()}
+                </span>
               </div>
+
               <div className="flex justify-between text-brand-muted">
                 <span>Payment Status</span>
-                <span className="font-mono uppercase font-bold text-emerald-700">{selectedOrder.paymentStatus}</span>
+                <span className={`font-mono uppercase font-bold px-2 py-0.5 rounded ${
+                  selectedOrder.paymentStatus === 'paid'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    : 'bg-amber-100 text-amber-900 border border-amber-200'
+                }`}>
+                  {selectedOrder.paymentStatus === 'paid' ? '✓ PAID & CONFIRMED' : '⏳ PENDING / DUE ON ARRIVAL'}
+                </span>
               </div>
+
               <div className="flex justify-between text-brand-muted">
-                <span>Order Date</span>
-                <span>{new Date(selectedOrder.createdAt).toLocaleString()}</span>
+                <span>Order Date & Time</span>
+                <span className="font-mono text-brand-dark">{new Date(selectedOrder.createdAt).toLocaleString()}</span>
               </div>
-              <div className="pt-2 border-t border-brand-border flex justify-between font-bold text-brand-dark text-sm">
-                <span>TOTAL AMOUNT PAID</span>
-                <span>NPR {selectedOrder.total.toLocaleString()}</span>
+
+              <div className="pt-2 border-t border-brand-border space-y-1.5">
+                <div className="flex justify-between text-brand-muted">
+                  <span>Items Subtotal</span>
+                  <span className="font-mono font-semibold text-brand-dark">NPR {(selectedOrder.subtotal || 0).toLocaleString()}</span>
+                </div>
+
+                {Boolean(selectedOrder.discount) && (
+                  <div className="flex justify-between text-emerald-700 font-medium">
+                    <span>Coupon Discount</span>
+                    <span className="font-mono font-semibold">- NPR {(selectedOrder.discount || 0).toLocaleString()}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-brand-muted">
+                  <span>Delivery Charge ({selectedOrder.shippingAddress?.district || 'District'})</span>
+                  <span className="font-mono font-semibold text-brand-dark">
+                    {selectedOrder.shipping === 0 ? 'FREE' : `NPR ${(selectedOrder.shipping || 0).toLocaleString()}`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-brand-dark flex justify-between font-bold text-brand-dark text-base bg-brand-cream/50 p-3 rounded">
+                <span>TOTAL PAID / PAYABLE AMOUNT:</span>
+                <span className="font-mono text-lg text-emerald-800">NPR {selectedOrder.total.toLocaleString()}</span>
               </div>
             </div>
 

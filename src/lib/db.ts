@@ -1,7 +1,23 @@
-import { Product, Category, Collection, Order, Coupon, HomepageCMS, CustomerUser, ProductReview, ColorOption, SEOMetadata, AdminCredentials } from '@/types';
+import { Product, Category, Collection, Order, Coupon, HomepageCMS, CustomerUser, ProductReview, ColorOption, SEOMetadata, AdminCredentials, DistrictDeliveryRate } from '@/types';
 import { seedProducts, initialCategories, initialCollections, initialCMS } from './seed-data';
+import { generateDefaultDeliveryRates } from './nepal-locations';
 
-// In-memory persistent data store for server side & client fallback with localStorage sync
+// Helper to push client-side mutations to the server API asynchronously
+async function postApiAction(action: string, payload: Record<string, any> = {}) {
+  if (typeof window === 'undefined') return;
+  try {
+    await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...payload }),
+      cache: 'no-store',
+    });
+  } catch (e) {
+    console.warn('[DataStore] Failed to send mutation to server API:', e);
+  }
+}
+
+// In-memory persistent data store with server API sync & localStorage fallback
 class DataStore {
   private products: Product[] = [...seedProducts];
   private categories: Category[] = [...initialCategories];
@@ -95,8 +111,94 @@ class DataStore {
     },
   ];
 
+  private isSyncing = false;
+
   constructor() {
     this.loadFromLocalStorage();
+    if (typeof window !== 'undefined') {
+      // Perform immediate sync with server API
+      this.syncWithServer();
+
+      // Poll server every 4 seconds so multi-device updates reflect automatically
+      setInterval(() => {
+        if (!document.hidden) {
+          this.syncWithServer();
+        }
+      }, 4000);
+
+      // Also sync when tab regains focus or becomes visible
+      window.addEventListener('focus', () => this.syncWithServer());
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) this.syncWithServer();
+      });
+    }
+  }
+
+  public async syncWithServer() {
+    if (typeof window === 'undefined' || this.isSyncing) return;
+    try {
+      this.isSyncing = true;
+      const res = await fetch('/api/db', { cache: 'no-store' });
+      if (!res.ok) return;
+      const result = await res.json();
+      if (result.success && result.data) {
+        const sData = result.data;
+        let changed = false;
+
+        if (sData.products && Array.isArray(sData.products)) {
+          const newProdsStr = JSON.stringify(sData.products);
+          if (JSON.stringify(this.products) !== newProdsStr) {
+            this.products = sData.products;
+            localStorage.setItem('ace_db_products', newProdsStr);
+            changed = true;
+          }
+        }
+
+        if (sData.categories && Array.isArray(sData.categories)) {
+          const newCatsStr = JSON.stringify(sData.categories);
+          if (JSON.stringify(this.categories) !== newCatsStr) {
+            this.categories = sData.categories;
+            localStorage.setItem('ace_db_categories', newCatsStr);
+            changed = true;
+          }
+        }
+
+        if (sData.cms) {
+          const newCmsStr = JSON.stringify(sData.cms);
+          if (JSON.stringify(this.cms) !== newCmsStr) {
+            this.cms = sData.cms;
+            localStorage.setItem('ace_db_cms', newCmsStr);
+            changed = true;
+          }
+        }
+
+        if (sData.orders && Array.isArray(sData.orders)) {
+          const newOrdsStr = JSON.stringify(sData.orders);
+          if (JSON.stringify(this.orders) !== newOrdsStr) {
+            this.orders = sData.orders;
+            localStorage.setItem('ace_db_orders', newOrdsStr);
+            changed = true;
+          }
+        }
+
+        if (sData.coupons && Array.isArray(sData.coupons)) {
+          const newCoupStr = JSON.stringify(sData.coupons);
+          if (JSON.stringify(this.coupons) !== newCoupStr) {
+            this.coupons = sData.coupons;
+            localStorage.setItem('ace_db_coupons', newCoupStr);
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          window.dispatchEvent(new CustomEvent('ace-db-updated', { detail: { key: 'all' } }));
+        }
+      }
+    } catch (e) {
+      // Ignore network failures gracefully
+    } finally {
+      this.isSyncing = false;
+    }
   }
 
   private loadFromLocalStorage() {
@@ -130,11 +232,7 @@ class DataStore {
       localStorage.setItem(key, JSON.stringify(data));
       window.dispatchEvent(new CustomEvent('ace-db-updated', { detail: { key } }));
     } catch (e) {
-      console.error('Failed to save to localStorage, using sessionStorage fallback:', e);
-      try {
-        sessionStorage.setItem(key, JSON.stringify(data));
-        window.dispatchEvent(new CustomEvent('ace-db-updated', { detail: { key } }));
-      } catch (err) {}
+      console.error('Failed to save to localStorage:', e);
     }
   }
 
@@ -189,6 +287,7 @@ class DataStore {
     }
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
+    postApiAction('saveProduct', { product });
     return product;
   }
 
@@ -197,6 +296,7 @@ class DataStore {
     const initialLen = prods.length;
     this.products = prods.filter((p) => p.id !== id);
     this.saveAndBroadcast('ace_db_products', this.products);
+    postApiAction('deleteProduct', { id });
     return this.products.length < initialLen;
   }
 
@@ -215,16 +315,17 @@ class DataStore {
     } else {
       prod.sizes = [{ size: size || 'Free Size', stock: cleanStock }];
     }
-    // Set color stock fallback
+
     if (prod.colors) {
       prod.colors.forEach((c) => (c.stock = cleanStock));
     }
-    // Automatically toggle isOutOfStock flag based on remaining total stock
+
     const totalSizeStock = prod.sizes.reduce((sum, s) => sum + (s.stock || 0), 0);
     prod.isOutOfStock = totalSizeStock <= 0;
 
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
+    postApiAction('updateInventory', { productId, size, newStock: cleanStock });
     return true;
   }
 
@@ -239,13 +340,14 @@ class DataStore {
     } else if (prod.colors.length > 0) {
       prod.colors[0].stock = cleanStock;
     }
-    // Update overall product stock as sum of color stocks
+
     const totalColorStock = prod.colors.reduce((acc, c) => acc + (c.stock !== undefined ? c.stock : 0), 0);
     prod.sizes = [{ size: 'Free Size', stock: totalColorStock }];
     prod.isOutOfStock = totalColorStock <= 0;
 
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
+    postApiAction('updateColorStock', { productId, colorName, newStock: cleanStock });
     return true;
   }
 
@@ -260,6 +362,7 @@ class DataStore {
     prod.rating = Number((totalRating / prod.reviewCount).toFixed(1));
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
+    postApiAction('saveProduct', { product: prod });
     return true;
   }
 
@@ -286,6 +389,7 @@ class DataStore {
     }
     this.categories = cats;
     this.saveAndBroadcast('ace_db_categories', this.categories);
+    postApiAction('saveCategory', { category });
     return category;
   }
 
@@ -294,6 +398,7 @@ class DataStore {
     const initialLen = cats.length;
     this.categories = cats.filter((c) => c.id !== id && c.slug !== id);
     this.saveAndBroadcast('ace_db_categories', this.categories);
+    postApiAction('deleteCategory', { id });
     return this.categories.length < initialLen;
   }
 
@@ -307,6 +412,7 @@ class DataStore {
       if (updatedFields.subcategories) cat.subcategories = updatedFields.subcategories;
       this.categories = cats;
       this.saveAndBroadcast('ace_db_categories', this.categories);
+      postApiAction('saveCategory', { category: cat });
     }
     return cat;
   }
@@ -322,6 +428,7 @@ class DataStore {
     }
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
+    postApiAction('saveProduct', { product: prod });
     return true;
   }
 
@@ -332,6 +439,7 @@ class DataStore {
     prod.colors = colors;
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
+    postApiAction('saveProduct', { product: prod });
     return true;
   }
 
@@ -379,6 +487,7 @@ class DataStore {
     }
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
+    postApiAction('saveProduct', { product: prod });
     return true;
   }
 
@@ -398,6 +507,9 @@ class DataStore {
         } catch (e) {}
       }
     }
+    if (!this.cms.deliveryRates || this.cms.deliveryRates.length === 0) {
+      this.cms.deliveryRates = generateDefaultDeliveryRates();
+    }
     return this.cms;
   }
 
@@ -407,14 +519,26 @@ class DataStore {
     if (newCms.fonepaySettings) {
       try {
         localStorage.setItem('ace_db_fonepay_settings', JSON.stringify(newCms.fonepaySettings));
-      } catch (e) {
-        try {
-          sessionStorage.setItem('ace_db_fonepay_settings', JSON.stringify(newCms.fonepaySettings));
-        } catch (err) {}
-      }
+      } catch (e) {}
     }
     this.saveAndBroadcast('ace_db_cms', this.cms);
+    postApiAction('updateCMS', { cms: this.cms });
     return this.cms;
+  }
+
+  getDeliveryRates(): DistrictDeliveryRate[] {
+    const cms = this.getCMS();
+    if (cms.deliveryRates && cms.deliveryRates.length > 0) {
+      return cms.deliveryRates;
+    }
+    const defaults = generateDefaultDeliveryRates();
+    this.updateCMS({ deliveryRates: defaults });
+    return defaults;
+  }
+
+  updateDeliveryRates(rates: DistrictDeliveryRate[]): DistrictDeliveryRate[] {
+    this.updateCMS({ deliveryRates: rates });
+    return rates;
   }
 
   // Orders
@@ -461,8 +585,8 @@ class DataStore {
     ords.unshift(order);
     this.orders = ords;
     this.saveAndBroadcast('ace_db_orders', this.orders);
+    postApiAction('createOrder', { order });
 
-    // Auto-sync to Google Sheet Webhook if configured in localStorage
     if (typeof window !== 'undefined') {
       try {
         const webhookUrl = localStorage.getItem('ace_google_sheet_webhook');
@@ -497,6 +621,7 @@ class DataStore {
       ord.orderStatus = status;
       this.orders = ords;
       this.saveAndBroadcast('ace_db_orders', this.orders);
+      postApiAction('updateOrderStatus', { orderId, status });
     }
     return ord;
   }
@@ -699,6 +824,7 @@ class DataStore {
       cat.seo = { ...cat.seo, ...seoData };
       this.categories = cats;
       this.saveAndBroadcast('ace_db_categories', this.categories);
+      postApiAction('saveCategory', { category: cat });
     }
   }
 

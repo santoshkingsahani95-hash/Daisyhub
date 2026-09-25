@@ -124,6 +124,7 @@ export interface Address {
   city: string;
   streetAddress: string;
   landmark?: string;
+  deliveryType?: 'home' | 'branch';
   isDefault?: boolean;
 }
 
@@ -157,6 +158,7 @@ export interface Order {
   customerEmail: string;
   customerMobile: string;
   shippingAddress: Address;
+  deliveryType?: 'home' | 'branch';
   estimatedDelivery: string;
   trackingNumber?: string;
 }
@@ -169,6 +171,17 @@ export interface Coupon {
   maxDiscount?: number;
   expiryDate: string;
   active: boolean;
+}
+
+export interface DistrictDeliveryRate {
+  district: string;
+  province: string;
+  deliveryFee: number;
+  enabled: boolean;
+  homeDeliveryFee?: number;
+  branchDeliveryFee?: number;
+  homeDeliveryEnabled?: boolean;
+  branchDeliveryEnabled?: boolean;
 }
 
 export interface FonepayQRItem {
@@ -235,6 +248,7 @@ export interface HomepageCMS {
     postUrl: string;
   }[];
   fonepaySettings?: FonepaySettings;
+  deliveryRates?: DistrictDeliveryRate[];
   seo?: SEOMetadata;
 }
 
