@@ -19,31 +19,13 @@ async function postApiAction(action: string, payload: Record<string, any> = {}) 
 
 // In-memory persistent data store with server API sync & localStorage fallback
 class DataStore {
-  private products: Product[] = [...seedProducts];
-  private categories: Category[] = [...initialCategories];
-  private collections: Collection[] = [...initialCollections];
+  private products: Product[] = [];
+  private categories: Category[] = [];
+  private collections: Collection[] = [];
   private cms: HomepageCMS = { ...initialCMS };
   private orders: Order[] = [];
-  private coupons: Coupon[] = [
-    {
-      code: 'WELCOME10',
-      discountType: 'percentage',
-      discountValue: 10,
-      minOrderValue: 1500,
-      maxDiscount: 500,
-      expiryDate: '2026-12-31',
-      active: true,
-    },
-    {
-      code: 'ACE500',
-      discountType: 'fixed',
-      discountValue: 500,
-      minOrderValue: 3000,
-      expiryDate: '2026-12-31',
-      active: true,
-    },
-  ];
-  private newsletterSubscribers: string[] = ['vip@daisyhub.com'];
+  private coupons: Coupon[] = [];
+  private newsletterSubscribers: string[] = [];
   private users: CustomerUser[] = [
     {
       id: 'usr-admin-1',
@@ -107,6 +89,15 @@ class DataStore {
           }
         }
 
+        if (sData.collections && Array.isArray(sData.collections)) {
+          const newColsStr = JSON.stringify(sData.collections);
+          if (JSON.stringify(this.collections) !== newColsStr) {
+            this.collections = sData.collections;
+            localStorage.setItem('ace_db_collections', newColsStr);
+            changed = true;
+          }
+        }
+
         if (sData.cms) {
           const newCmsStr = JSON.stringify(sData.cms);
           if (JSON.stringify(this.cms) !== newCmsStr) {
@@ -134,6 +125,15 @@ class DataStore {
           }
         }
 
+        if (sData.users && Array.isArray(sData.users)) {
+          const newUsersStr = JSON.stringify(sData.users);
+          if (JSON.stringify(this.users) !== newUsersStr) {
+            this.users = sData.users;
+            localStorage.setItem('ace_db_users', newUsersStr);
+            changed = true;
+          }
+        }
+
         if (changed) {
           window.dispatchEvent(new CustomEvent('ace-db-updated', { detail: { key: 'all' } }));
         }
@@ -156,6 +156,9 @@ class DataStore {
 
       const storedCats = localStorage.getItem('ace_db_categories') || sessionStorage.getItem('ace_db_categories');
       if (storedCats) this.categories = JSON.parse(storedCats);
+
+      const storedCols = localStorage.getItem('ace_db_collections') || sessionStorage.getItem('ace_db_collections');
+      if (storedCols) this.collections = JSON.parse(storedCols);
 
       const storedOrders = localStorage.getItem('ace_db_orders') || sessionStorage.getItem('ace_db_orders');
       if (storedOrders) this.orders = JSON.parse(storedOrders);
@@ -189,10 +192,7 @@ class DataStore {
           const parsed: Product[] = JSON.parse(stored);
           this.products = parsed.map((p) => ({
             ...p,
-            sizes: (p.sizes || []).map((s) => ({
-              ...s,
-              stock: isNaN(Number(s.stock)) || Number(s.stock) > 999 ? 15 : Math.max(0, Math.min(999, Math.floor(Number(s.stock)))),
-            })),
+            createdAt: p.createdAt || new Date().toISOString(),
           }));
         } catch (e) {}
       }
@@ -409,6 +409,7 @@ class DataStore {
     }
     this.collections = cols;
     this.saveAndBroadcast('ace_db_collections', this.collections);
+    postApiAction('saveCollection', { collection });
     return collection;
   }
 
@@ -417,6 +418,7 @@ class DataStore {
     const initialLen = cols.length;
     this.collections = cols.filter((c) => c.id !== id && c.slug !== id);
     this.saveAndBroadcast('ace_db_collections', this.collections);
+    postApiAction('deleteCollection', { id });
     return this.collections.length < initialLen;
   }
 
@@ -492,7 +494,7 @@ class DataStore {
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             this.orders = parsed;
           }
         } catch (e) {}
@@ -570,6 +572,15 @@ class DataStore {
     return ord;
   }
 
+  deleteOrder(id: string): boolean {
+    const ords = this.getOrders();
+    const initialLen = ords.length;
+    this.orders = ords.filter((o) => o.id !== id && o.orderNumber !== id);
+    this.saveAndBroadcast('ace_db_orders', this.orders);
+    postApiAction('deleteOrder', { id });
+    return this.orders.length < initialLen;
+  }
+
   // Coupons
   getCoupons(): Coupon[] {
     if (typeof window !== 'undefined') {
@@ -639,6 +650,7 @@ class DataStore {
 
     this.coupons = coupons;
     this.saveAndBroadcast('ace_db_coupons', this.coupons);
+    postApiAction('saveCoupon', { coupon: cleanCoupon });
     return cleanCoupon;
   }
 
@@ -649,6 +661,7 @@ class DataStore {
     if (filtered.length !== coupons.length) {
       this.coupons = filtered;
       this.saveAndBroadcast('ace_db_coupons', this.coupons);
+      postApiAction('deleteCoupon', { code: cleanCode });
       return true;
     }
     return false;
@@ -662,6 +675,7 @@ class DataStore {
       found.active = !found.active;
       this.coupons = coupons;
       this.saveAndBroadcast('ace_db_coupons', this.coupons);
+      postApiAction('saveCoupon', { coupon: found });
     }
     return found;
   }
@@ -703,7 +717,17 @@ class DataStore {
     }
     this.users = usersList;
     this.saveAndBroadcast('ace_db_users', this.users);
+    postApiAction('saveUser', { user });
     return user;
+  }
+
+  deleteUser(id: string): boolean {
+    const usersList = this.getUsers();
+    const initialLen = usersList.length;
+    this.users = usersList.filter((u) => u.id !== id && u.email.toLowerCase() !== id.toLowerCase());
+    this.saveAndBroadcast('ace_db_users', this.users);
+    postApiAction('deleteUser', { id });
+    return this.users.length < initialLen;
   }
 
   findUserByEmail(email: string): CustomerUser | undefined {
@@ -752,7 +776,7 @@ class DataStore {
       metaDescription: "Shop trendy women's clothing online in Nepal at DaisyHubb. Discover stylish ladies wear, dresses, tops, kurtis and more at affordable prices.",
       keywords: "women's clothing Nepal, ladies clothing Nepal, women's fashion Nepal, ladies fashion Nepal, women's clothes online Nepal, ladies clothes online Nepal, women's wear Nepal, ladies wear Nepal, women's dresses Nepal, women's tops Nepal, women's kurtis Nepal, buy women's clothes online Nepal",
       canonicalUrl: process.env.NEXT_PUBLIC_SITE_URL || 'https://daisyhubb.com',
-      ogImage: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200&auto=format&fit=crop',
+      ogImage: '',
       h1: "Women's Clothing & Fashion Online in Nepal",
     };
   }

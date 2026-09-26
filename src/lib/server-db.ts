@@ -29,31 +29,12 @@ interface DatabaseSchema {
 
 class ServerDataStore {
   private data: DatabaseSchema = {
-    products: [...seedProducts],
-    categories: [...initialCategories],
-    collections: [...initialCollections],
+    products: [],
+    categories: [],
+    collections: [],
     cms: { ...initialCMS },
     orders: [],
-
-    coupons: [
-      {
-        code: 'WELCOME10',
-        discountType: 'percentage',
-        discountValue: 10,
-        minOrderValue: 1500,
-        maxDiscount: 500,
-        expiryDate: '2026-12-31',
-        active: true,
-      },
-      {
-        code: 'ACE500',
-        discountType: 'fixed',
-        discountValue: 500,
-        minOrderValue: 3000,
-        expiryDate: '2026-12-31',
-        active: true,
-      },
-    ],
+    coupons: [],
     users: [
       {
         id: 'usr-admin-1',
@@ -82,39 +63,28 @@ class ServerDataStore {
 
       this.isMongoConnected = true;
 
-      // Seed & Load Products
-      const prodCount = await ProductModel.countDocuments();
-      if (prodCount === 0) {
-        console.log('[MongoDB Seeding] Populating products collection...');
-        await ProductModel.insertMany(this.data.products);
-      } else {
-        const dbProds = await ProductModel.find().lean();
-        this.data.products = dbProds.map((p: any) => {
-          const { _id, __v, ...rest } = p;
-          return rest as Product;
-        });
-      }
+      // Load Products from MongoDB
+      const dbProds = await ProductModel.find().lean();
+      this.data.products = dbProds.map((p: any) => {
+        const { _id, __v, ...rest } = p;
+        return rest as Product;
+      });
 
-      // Seed & Load Categories
-      const catCount = await CategoryModel.countDocuments();
-      if (catCount === 0) {
-        console.log('[MongoDB Seeding] Populating categories collection...');
-        await CategoryModel.insertMany(this.data.categories);
-      } else {
-        const dbCats = await CategoryModel.find().lean();
-        this.data.categories = dbCats.map((c: any) => {
-          const { _id, __v, ...rest } = c;
-          return rest as Category;
-        });
-      }
+      // Load Categories from MongoDB
+      const dbCats = await CategoryModel.find().lean();
+      this.data.categories = dbCats.map((c: any) => {
+        const { _id, __v, ...rest } = c;
+        return rest as Category;
+      });
 
-      // Seed & Load Collections
-      const colCount = await CollectionModel.countDocuments();
-      if (colCount === 0) {
-        await CollectionModel.insertMany(this.data.collections);
-      }
+      // Load Collections from MongoDB
+      const dbCols = await CollectionModel.find().lean();
+      this.data.collections = dbCols.map((c: any) => {
+        const { _id, __v, ...rest } = c;
+        return rest as Collection;
+      });
 
-      // Seed & Load CMS
+      // Load CMS from MongoDB
       const cmsDoc = await CMSModel.findOne({ key: 'homepage' }).lean();
       if (!cmsDoc) {
         await CMSModel.create({ key: 'homepage', ...this.data.cms });
@@ -123,32 +93,33 @@ class ServerDataStore {
         this.data.cms = { ...this.data.cms, ...rest };
       }
 
-      // Seed & Load Orders
-      const ordCount = await OrderModel.countDocuments();
-      if (ordCount === 0) {
-        await OrderModel.insertMany(this.data.orders);
-      } else {
-        const dbOrds = await OrderModel.find().lean();
-        this.data.orders = dbOrds.map((o: any) => {
-          const { _id, __v, ...rest } = o;
-          return rest as Order;
-        });
-      }
+      // Load Orders from MongoDB
+      const dbOrds = await OrderModel.find().lean();
+      this.data.orders = dbOrds.map((o: any) => {
+        const { _id, __v, ...rest } = o;
+        return rest as Order;
+      });
 
-      // Seed & Load Coupons
-      const coupCount = await CouponModel.countDocuments();
-      if (coupCount === 0) {
-        await CouponModel.insertMany(this.data.coupons);
-      } else {
-        const dbCoups = await CouponModel.find().lean();
-        this.data.coupons = dbCoups.map((cp: any) => {
-          const { _id, __v, ...rest } = cp;
-          return rest as Coupon;
+      // Load Coupons from MongoDB
+      const dbCoups = await CouponModel.find().lean();
+      this.data.coupons = dbCoups.map((cp: any) => {
+        const { _id, __v, ...rest } = cp;
+        return rest as Coupon;
+      });
+
+      // Load Users from MongoDB
+      const dbUsers = await UserModel.find().lean();
+      if (dbUsers.length > 0) {
+        this.data.users = dbUsers.map((u: any) => {
+          const { _id, __v, ...rest } = u;
+          return rest as CustomerUser;
         });
+      } else {
+        await UserModel.insertMany(this.data.users);
       }
 
       this.saveToDisk();
-      console.log('🎉 [MongoDB Atlas Sync] Fully initialized and synchronized database collections!');
+      console.log('🎉 [MongoDB Atlas Sync] Fully synchronized database collections with MongoDB Atlas!');
     } catch (err) {
       console.error('[ServerDataStore MongoDB Init Error]', err);
     }
@@ -217,12 +188,9 @@ class ServerDataStore {
     const data = this.getData();
     const initialLen = data.products.length;
     data.products = data.products.filter((p) => p.id !== id);
-    if (data.products.length < initialLen) {
-      this.saveToDisk();
-      ProductModel.deleteOne({ id }).catch(() => {});
-      return true;
-    }
-    return false;
+    this.saveToDisk();
+    ProductModel.deleteOne({ id }).catch(() => {});
+    return data.products.length < initialLen;
   }
 
   updateInventory(productId: string, size: string, newStock: number): boolean {
@@ -302,24 +270,52 @@ class ServerDataStore {
     const data = this.getData();
     const initialLen = data.categories.length;
     data.categories = data.categories.filter((c) => c.id !== id && c.slug !== id);
-    if (data.categories.length < initialLen) {
-      this.saveToDisk();
-      CategoryModel.deleteOne({ id }).catch(() => {});
-      return true;
+    this.saveToDisk();
+    CategoryModel.deleteOne({ $or: [{ id }, { slug: id }] }).catch(() => {});
+    return data.categories.length < initialLen;
+  }
+
+  saveCollection(collection: Collection): Collection {
+    const data = this.getData();
+    const existingIndex = data.collections.findIndex((c) => c.id === collection.id || c.slug === collection.slug);
+    if (existingIndex >= 0) {
+      data.collections[existingIndex] = collection;
+    } else {
+      data.collections.push(collection);
     }
-    return false;
+    this.saveToDisk();
+
+    // MongoDB Sync
+    CollectionModel.findOneAndUpdate({ id: collection.id }, collection, { upsert: true }).catch(() => {});
+
+    return collection;
   }
 
   deleteCollection(id: string): boolean {
     const data = this.getData();
     const initialLen = data.collections.length;
     data.collections = data.collections.filter((c) => c.id !== id && c.slug !== id);
-    if (data.collections.length < initialLen) {
-      this.saveToDisk();
-      CollectionModel.deleteOne({ id }).catch(() => {});
-      return true;
+    this.saveToDisk();
+    CollectionModel.deleteOne({ $or: [{ id }, { slug: id }] }).catch(() => {});
+    return data.collections.length < initialLen;
+  }
+
+  saveCoupon(coupon: Coupon): Coupon {
+    const data = this.getData();
+    const cleanCode = coupon.code.trim().toUpperCase();
+    const cleanCoupon = { ...coupon, code: cleanCode };
+    const existingIndex = data.coupons.findIndex((c) => c.code.trim().toUpperCase() === cleanCode);
+    if (existingIndex >= 0) {
+      data.coupons[existingIndex] = cleanCoupon;
+    } else {
+      data.coupons.push(cleanCoupon);
     }
-    return false;
+    this.saveToDisk();
+
+    // MongoDB Sync
+    CouponModel.findOneAndUpdate({ code: cleanCode }, cleanCoupon, { upsert: true }).catch(() => {});
+
+    return cleanCoupon;
   }
 
   deleteCoupon(code: string): boolean {
@@ -327,24 +323,43 @@ class ServerDataStore {
     const cleanCode = code.trim().toUpperCase();
     const initialLen = data.coupons.length;
     data.coupons = data.coupons.filter((c) => c.code.trim().toUpperCase() !== cleanCode);
-    if (data.coupons.length < initialLen) {
-      this.saveToDisk();
-      CouponModel.deleteOne({ code: cleanCode }).catch(() => {});
-      return true;
+    this.saveToDisk();
+    CouponModel.deleteOne({ code: cleanCode }).catch(() => {});
+    return data.coupons.length < initialLen;
+  }
+
+  saveUser(user: CustomerUser): CustomerUser {
+    const data = this.getData();
+    const existingIndex = data.users.findIndex((u) => u.id === user.id || u.email === user.email);
+    if (existingIndex >= 0) {
+      data.users[existingIndex] = user;
+    } else {
+      data.users.push(user);
     }
-    return false;
+    this.saveToDisk();
+
+    // MongoDB Sync
+    UserModel.findOneAndUpdate({ id: user.id }, user, { upsert: true }).catch(() => {});
+
+    return user;
+  }
+
+  deleteUser(id: string): boolean {
+    const data = this.getData();
+    const initialLen = data.users.length;
+    data.users = data.users.filter((u) => u.id !== id && u.email !== id);
+    this.saveToDisk();
+    UserModel.deleteOne({ $or: [{ id }, { email: id }] }).catch(() => {});
+    return data.users.length < initialLen;
   }
 
   deleteOrder(id: string): boolean {
     const data = this.getData();
     const initialLen = data.orders.length;
     data.orders = data.orders.filter((o) => o.id !== id && o.orderNumber !== id);
-    if (data.orders.length < initialLen) {
-      this.saveToDisk();
-      OrderModel.deleteOne({ $or: [{ id }, { orderNumber: id }] }).catch(() => {});
-      return true;
-    }
-    return false;
+    this.saveToDisk();
+    OrderModel.deleteOne({ $or: [{ id }, { orderNumber: id }] }).catch(() => {});
+    return data.orders.length < initialLen;
   }
 
   deleteReview(productId: string, reviewId: string): boolean {
@@ -412,6 +427,9 @@ class ServerDataStore {
     if (fullData.categories && Array.isArray(fullData.categories)) {
       this.data.categories = fullData.categories;
     }
+    if (fullData.collections && Array.isArray(fullData.collections)) {
+      this.data.collections = fullData.collections;
+    }
     if (fullData.cms) {
       this.data.cms = fullData.cms;
     }
@@ -420,6 +438,9 @@ class ServerDataStore {
     }
     if (fullData.coupons && Array.isArray(fullData.coupons)) {
       this.data.coupons = fullData.coupons;
+    }
+    if (fullData.users && Array.isArray(fullData.users)) {
+      this.data.users = fullData.users;
     }
     this.saveToDisk();
     return this.data;

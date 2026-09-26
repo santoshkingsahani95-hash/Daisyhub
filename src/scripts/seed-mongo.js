@@ -34,19 +34,23 @@ async function seedDatabase() {
     }
 
     // 2. Seed Categories
+    const catCol = db.collection('categories');
+    await catCol.deleteMany({});
     if (data.categories && data.categories.length > 0) {
-      const catCol = db.collection('categories');
-      await catCol.deleteMany({});
       await catCol.insertMany(data.categories);
       console.log(`✓ Seeded ${data.categories.length} Categories into MongoDB Atlas!`);
+    } else {
+      console.log('✓ Cleared all Categories from MongoDB Atlas!');
     }
 
     // 3. Seed Collections
+    const colCol = db.collection('collections');
+    await colCol.deleteMany({});
     if (data.collections && data.collections.length > 0) {
-      const colCol = db.collection('collections');
-      await colCol.deleteMany({});
       await colCol.insertMany(data.collections);
       console.log(`✓ Seeded ${data.collections.length} Collections into MongoDB Atlas!`);
+    } else {
+      console.log('✓ Cleared all Collections from MongoDB Atlas!');
     }
 
     // 4. Seed CMS & Delivery Rates
@@ -68,11 +72,13 @@ async function seedDatabase() {
     }
 
     // 6. Seed Coupons
+    const coupCol = db.collection('coupons');
+    await coupCol.deleteMany({});
     if (data.coupons && data.coupons.length > 0) {
-      const coupCol = db.collection('coupons');
-      await coupCol.deleteMany({});
       await coupCol.insertMany(data.coupons);
       console.log(`✓ Seeded ${data.coupons.length} Coupons into MongoDB Atlas!`);
+    } else {
+      console.log('✓ Cleared all Coupons from MongoDB Atlas!');
     }
 
     // 7. Seed Users

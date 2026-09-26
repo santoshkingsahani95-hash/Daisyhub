@@ -69,6 +69,13 @@ export async function POST(request: Request) {
         }
         break;
       }
+      case 'saveCollection': {
+        const { collection } = body;
+        if (collection) {
+          serverDb.saveCollection(collection);
+        }
+        break;
+      }
       case 'deleteCollection': {
         const { id } = body;
         if (id) {
@@ -76,10 +83,31 @@ export async function POST(request: Request) {
         }
         break;
       }
+      case 'saveCoupon': {
+        const { coupon } = body;
+        if (coupon) {
+          serverDb.saveCoupon(coupon);
+        }
+        break;
+      }
       case 'deleteCoupon': {
         const { code } = body;
         if (code) {
           serverDb.deleteCoupon(code);
+        }
+        break;
+      }
+      case 'saveUser': {
+        const { user } = body;
+        if (user) {
+          serverDb.saveUser(user);
+        }
+        break;
+      }
+      case 'deleteUser': {
+        const { id } = body;
+        if (id) {
+          serverDb.deleteUser(id);
         }
         break;
       }
