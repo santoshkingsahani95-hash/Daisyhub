@@ -56,70 +56,67 @@ class ServerDataStore {
   }
 
   public async initMongoDB() {
+    await this.getFreshData();
+  }
+
+  public async getFreshData(): Promise<DatabaseSchema> {
+    if (!this.isLoaded) this.loadFromDisk();
     try {
       const dbConn = await connectToDatabase();
-      if (!dbConn) return;
+      if (dbConn) {
+        const [dbProds, dbCats, dbCols, cmsDoc, dbOrds, dbCoups, dbUsers] = await Promise.all([
+          ProductModel.find().lean(),
+          CategoryModel.find().lean(),
+          CollectionModel.find().lean(),
+          CMSModel.findOne({ key: 'homepage' }).lean(),
+          OrderModel.find().lean(),
+          CouponModel.find().lean(),
+          UserModel.find().lean(),
+        ]);
 
-      // Load Products from MongoDB Atlas
-      const dbProds = await ProductModel.find().lean();
-      this.data.products = dbProds.map((p: any) => {
-        const { _id, __v, ...rest } = p;
-        return rest as Product;
-      });
-
-      // Load Categories from MongoDB Atlas
-      const dbCats = await CategoryModel.find().lean();
-      this.data.categories = dbCats.map((c: any) => {
-        const { _id, __v, ...rest } = c;
-        return rest as Category;
-      });
-
-      // Load Collections from MongoDB Atlas
-      const dbCols = await CollectionModel.find().lean();
-      this.data.collections = dbCols.map((c: any) => {
-        const { _id, __v, ...rest } = c;
-        return rest as Collection;
-      });
-
-      // Load CMS from MongoDB Atlas
-      const cmsDoc = await CMSModel.findOne({ key: 'homepage' }).lean();
-      if (!cmsDoc) {
-        await CMSModel.create({ key: 'homepage', ...this.data.cms });
-      } else {
-        const { _id, __v, key, ...rest } = cmsDoc as any;
-        this.data.cms = { ...this.data.cms, ...rest };
-      }
-
-      // Load Orders from MongoDB Atlas
-      const dbOrds = await OrderModel.find().lean();
-      this.data.orders = dbOrds.map((o: any) => {
-        const { _id, __v, ...rest } = o;
-        return rest as Order;
-      });
-
-      // Load Coupons from MongoDB Atlas
-      const dbCoups = await CouponModel.find().lean();
-      this.data.coupons = dbCoups.map((cp: any) => {
-        const { _id, __v, ...rest } = cp;
-        return rest as Coupon;
-      });
-
-      // Load Users from MongoDB Atlas
-      const dbUsers = await UserModel.find().lean();
-      if (dbUsers.length > 0) {
-        this.data.users = dbUsers.map((u: any) => {
-          const { _id, __v, ...rest } = u;
-          return rest as CustomerUser;
+        this.data.products = dbProds.map((p: any) => {
+          const { _id, __v, ...rest } = p;
+          return rest as Product;
         });
-      } else {
-        await UserModel.insertMany(this.data.users);
-      }
 
-      this.saveToDisk();
-      console.log('🎉 [MongoDB Atlas Sync] Fully synchronized database collections with MongoDB Atlas!');
+        this.data.categories = dbCats.map((c: any) => {
+          const { _id, __v, ...rest } = c;
+          return rest as Category;
+        });
+
+        this.data.collections = dbCols.map((c: any) => {
+          const { _id, __v, ...rest } = c;
+          return rest as Collection;
+        });
+
+        if (cmsDoc) {
+          const { _id, __v, key, ...rest } = cmsDoc as any;
+          this.data.cms = { ...this.data.cms, ...rest };
+        }
+
+        this.data.orders = dbOrds.map((o: any) => {
+          const { _id, __v, ...rest } = o;
+          return rest as Order;
+        });
+
+        this.data.coupons = dbCoups.map((cp: any) => {
+          const { _id, __v, ...rest } = cp;
+          return rest as Coupon;
+        });
+
+        if (dbUsers && dbUsers.length > 0) {
+          this.data.users = dbUsers.map((u: any) => {
+            const { _id, __v, ...rest } = u;
+            return rest as CustomerUser;
+          });
+        }
+
+        this.saveToDisk();
+      }
     } catch (err) {
-      console.error('[ServerDataStore MongoDB Init Error]', err);
+      console.error('[ServerDataStore getFreshData Error]', err);
     }
+    return this.data;
   }
 
   private loadFromDisk() {
@@ -178,7 +175,7 @@ class ServerDataStore {
     try {
       await connectToDatabase();
       await ProductModel.findOneAndUpdate({ id: product.id }, product, { upsert: true, new: true });
-      console.log(`[MongoDB] Successfully saved product ${product.id} to MongoDB Atlas`);
+      console.log(`[MongoDB] Successfully saved product '${product.name}' (${product.id}) to MongoDB Atlas`);
     } catch (err) {
       console.error(`[MongoDB] Error saving product ${product.id}:`, err);
     }

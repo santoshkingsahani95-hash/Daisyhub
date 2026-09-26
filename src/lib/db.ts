@@ -772,12 +772,12 @@ class DataStore {
   getGlobalSEO(): SEOMetadata {
     const cms = this.getCMS();
     return cms.seo || {
-      metaTitle: "DaisyHubb – Women's Clothing & Ladies Fashion Online in Nepal",
-      metaDescription: "Shop trendy women's clothing online in Nepal at DaisyHubb. Discover stylish ladies wear, dresses, tops, kurtis and more at affordable prices.",
-      keywords: "women's clothing Nepal, ladies clothing Nepal, women's fashion Nepal, ladies fashion Nepal, women's clothes online Nepal, ladies clothes online Nepal, women's wear Nepal, ladies wear Nepal, women's dresses Nepal, women's tops Nepal, women's kurtis Nepal, buy women's clothes online Nepal",
+      metaTitle: "Ace Garment – Best Women's Garment & Ladies Clothing Store Online in Nepal | Daisy Hub",
+      metaDescription: "Ace Garment (Daisy Hub) is Nepal's premier online ladies garment boutique. Shop exclusive women's fashion, ladies dresses, tops, trousers, co-ord sets, and trendy apparel with fast delivery across Kathmandu & all Nepal.",
+      keywords: "Ace Garment, Ace Garment Nepal, Ace Garment Kathmandu, Ace Garment ladies wear, garment, garment shop Nepal, garment store Kathmandu, ladies garment Nepal, women garment online Nepal, garment online shopping Nepal, best garment shop in Kathmandu, ladies clothing Nepal, women's clothing online Nepal, ladies clothes online Nepal, women fashion Nepal, ladies fashion Kathmandu, buy ladies clothes Nepal, DAISY HUB, daisyhubb",
       canonicalUrl: process.env.NEXT_PUBLIC_SITE_URL || 'https://daisyhubb.com',
-      ogImage: '',
-      h1: "Women's Clothing & Fashion Online in Nepal",
+      ogImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1200&auto=format&fit=crop',
+      h1: "Ace Garment – Premium Ladies Clothing & Garments Online in Nepal",
     };
   }
 

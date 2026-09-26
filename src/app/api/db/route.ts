@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     await connectToDatabase();
-    const data = serverDb.getData();
+    const data = await serverDb.getFreshData();
     return NextResponse.json(
       { success: true, data },
       {
@@ -160,7 +160,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
 
-    const updatedData = serverDb.getData();
+    const updatedData = await serverDb.getFreshData();
     return NextResponse.json(
       { success: true, data: updatedData },
       {
