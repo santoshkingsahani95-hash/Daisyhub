@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/mongodb';
 
 // Force dynamic server rendering for API DB sync route
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {

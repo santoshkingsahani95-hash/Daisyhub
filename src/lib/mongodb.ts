@@ -9,37 +9,52 @@ if (!cached) {
 }
 
 export async function connectToDatabase() {
-  if (cached.conn) {
+  if (cached.conn && mongoose.connection.readyState === 1) {
     return cached.conn;
   }
 
-  let targetUri = process.env.MONGODB_URI || DEFAULT_FALLBACK_URI;
+  // Reset stale or failed connection state
+  if (mongoose.connection.readyState !== 1) {
+    cached.conn = null;
+    cached.promise = null;
+  }
 
-  if (targetUri.includes('<db_username>') || targetUri.includes('<db_password>')) {
-    targetUri = DEFAULT_FALLBACK_URI;
+  let targetUri = DEFAULT_FALLBACK_URI;
+
+  if (process.env.MONGODB_URI) {
+    let envUri = process.env.MONGODB_URI;
+    if (envUri.includes('Daisyhub123@')) {
+      envUri = envUri.replace('Daisyhub123@', 'Daisyhubb123@');
+    }
+    if (!envUri.includes('<db_username>') && !envUri.includes('<db_password>')) {
+      targetUri = envUri;
+    }
   }
 
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
       serverSelectionTimeoutMS: 8000,
+      dbName: 'ace-garment',
     };
 
     cached.promise = mongoose
       .connect(targetUri, opts)
       .then((m) => {
-        console.log('✅ Connected to MongoDB Atlas');
+        console.log(`✅ Connected to MongoDB Atlas (Database: ${m.connection.db?.databaseName || 'ace-garment'})`);
         return m;
       })
       .catch(async (err) => {
-        console.warn(`[MongoDB Primary Connection Warning]: ${err.message}. Attempting fallback connection...`);
+        console.warn(`[MongoDB Primary Connection Warning]: ${err.message}. Retrying fallback connection...`);
         try {
+          await mongoose.disconnect();
           const fallbackConn = await mongoose.connect(DEFAULT_FALLBACK_URI, opts);
-          console.log('✅ Connected to MongoDB Atlas (via Direct Shard Fallback)');
+          console.log(`✅ Connected to MongoDB Atlas via Fallback (Database: ${fallbackConn.connection.db?.databaseName || 'ace-garment'})`);
           return fallbackConn;
         } catch (fallbackErr: any) {
           console.error('❌ MongoDB Connection Error:', fallbackErr.message);
           cached.promise = null;
+          cached.conn = null;
           return null;
         }
       });

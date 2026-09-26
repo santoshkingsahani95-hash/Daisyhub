@@ -25,7 +25,7 @@ interface DatabaseSchema {
 class ServerDataStore {
   public async getFreshData(): Promise<DatabaseSchema> {
     try {
-      await connectToDatabase();
+      const conn = await connectToDatabase();
       let [dbProds, dbCats, dbCols, cmsDoc, dbOrds, dbCoups, dbUsers] = await Promise.all([
         ProductModel.find().lean(),
         CategoryModel.find().lean(),
@@ -35,6 +35,18 @@ class ServerDataStore {
         CouponModel.find().lean(),
         UserModel.find().lean(),
       ]);
+
+      if ((!dbCats || dbCats.length === 0) && conn && conn.db) {
+        dbCats = await conn.db.collection('categories').find({}).toArray();
+      }
+      if ((!dbProds || dbProds.length === 0) && conn && conn.db) {
+        dbProds = await conn.db.collection('products').find({}).toArray();
+      }
+      if ((!dbCols || dbCols.length === 0) && conn && conn.db) {
+        dbCols = await conn.db.collection('collections').find({}).toArray();
+      }
+
+      console.log(`[serverDb getFreshData] Products: ${dbProds.length}, Categories: ${dbCats.length}, CMS: ${!!cmsDoc}`);
 
       if (!cmsDoc) {
         await CMSModel.findOneAndUpdate({ key: 'homepage' }, initialCMS, { upsert: true });

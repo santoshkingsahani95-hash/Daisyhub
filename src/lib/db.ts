@@ -6,12 +6,29 @@ import { generateDefaultDeliveryRates } from './nepal-locations';
 async function postApiAction(action: string, payload: Record<string, any> = {}) {
   if (typeof window === 'undefined') return;
   try {
-    await fetch('/api/db', {
+    const res = await fetch('/api/db', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, ...payload }),
       cache: 'no-store',
     });
+    if (!res.ok) {
+      console.error('[DataStore] POST /api/db failed:', res.status, res.statusText);
+      return;
+    }
+    const result = await res.json();
+    if (result.success && result.data) {
+      const sData = result.data;
+      if (sData.products && Array.isArray(sData.products)) {
+        localStorage.setItem('ace_db_products', JSON.stringify(sData.products));
+      }
+      if (sData.categories && Array.isArray(sData.categories)) {
+        localStorage.setItem('ace_db_categories', JSON.stringify(sData.categories));
+      }
+      if (sData.cms) {
+        localStorage.setItem('ace_db_cms', JSON.stringify(sData.cms));
+      }
+    }
   } catch (e) {
     console.warn('[DataStore] Failed to send mutation to server API:', e);
   }

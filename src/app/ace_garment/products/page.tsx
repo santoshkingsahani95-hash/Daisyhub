@@ -18,9 +18,35 @@ export default function AdminProductsPage() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-      if (e.target?.result) {
-        callback(e.target.result as string);
-      }
+      const rawUrl = e.target?.result as string;
+      if (!rawUrl) return;
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 800;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          callback(canvas.toDataURL('image/jpeg', 0.85));
+        } else {
+          callback(rawUrl);
+        }
+      };
+      img.onerror = () => callback(rawUrl);
+      img.src = rawUrl;
     };
     reader.readAsDataURL(file);
   };
