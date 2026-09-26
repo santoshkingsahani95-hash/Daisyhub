@@ -174,37 +174,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* 5. EDITORIAL BANNER */}
-        <section className="relative w-full h-[65vh] md:h-[75vh] bg-brand-dark overflow-hidden flex items-center justify-center">
-          <Image
-            src={cms.editorialBanner.image}
-            alt="Editorial Campaign"
-            fill
-            unoptimized
-            className="object-cover object-center brightness-[0.70]"
-          />
-          <div className="absolute inset-0 bg-black/40" />
-
-          <div className="relative z-10 max-w-3xl mx-auto px-6 text-center text-white space-y-4">
-            <span className="text-xs font-semibold tracking-ultra uppercase text-brand-gold">
-              EDITORIAL CAMPAIGN
-            </span>
-            <h2 className="font-serif-title text-4xl md:text-6xl font-bold tracking-tight">
-              {cms.editorialBanner.heading}
-            </h2>
-            <p className="text-sm md:text-base text-white/90 max-w-lg mx-auto font-sans font-light">
-              {cms.editorialBanner.subtitle}
-            </p>
-            <div className="pt-4">
-              <Link
-                href={cms.editorialBanner.buttonUrl}
-                className="inline-block px-8 py-4 bg-white text-brand-dark hover:bg-brand-cream text-xs font-bold uppercase tracking-widest transition-all shadow-xl"
-              >
-                {cms.editorialBanner.buttonText}
-              </Link>
-            </div>
-          </div>
-        </section>
 
         {/* 6. BEST SELLERS */}
         <section className="py-20 max-w-7xl mx-auto px-6">

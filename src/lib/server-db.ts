@@ -1,5 +1,5 @@
 import { Product, Category, Collection, Order, Coupon, HomepageCMS, CustomerUser } from '@/types';
-import { initialCMS } from './seed-data';
+import { initialCMS, seedProducts, initialCategories, initialCollections } from './seed-data';
 import { connectToDatabase } from './mongodb';
 import {
   ProductModel,
@@ -26,7 +26,7 @@ class ServerDataStore {
   public async getFreshData(): Promise<DatabaseSchema> {
     try {
       await connectToDatabase();
-      const [dbProds, dbCats, dbCols, cmsDoc, dbOrds, dbCoups, dbUsers] = await Promise.all([
+      let [dbProds, dbCats, dbCols, cmsDoc, dbOrds, dbCoups, dbUsers] = await Promise.all([
         ProductModel.find().lean(),
         CategoryModel.find().lean(),
         CollectionModel.find().lean(),
@@ -35,6 +35,11 @@ class ServerDataStore {
         CouponModel.find().lean(),
         UserModel.find().lean(),
       ]);
+
+      if (!cmsDoc) {
+        await CMSModel.findOneAndUpdate({ key: 'homepage' }, initialCMS, { upsert: true });
+        cmsDoc = await CMSModel.findOne({ key: 'homepage' }).lean();
+      }
 
       const products = dbProds.map((p: any) => {
         const { _id, __v, ...rest } = p;
