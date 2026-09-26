@@ -1,30 +1,32 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://daisyhubb.com';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://daisyhub.com';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Ace Garment – Best Women's Garment & Ladies Clothing Store Online in Nepal | Daisy Hub",
-    template: "%s | Ace Garment – Ladies Fashion Nepal",
+    default: "DaisyHub (daisyhub.com) – Best Women's Clothing & Ladies Fashion Store Online in Nepal",
+    template: "%s | DaisyHub Nepal",
   },
   description:
-    "Ace Garment (Daisy Hub) is Nepal's premier online ladies garment boutique. Shop exclusive women's fashion, ladies dresses, tops, trousers, co-ord sets, and trendy apparel with fast delivery across Kathmandu & all Nepal.",
+    "DaisyHub (daisyhub.com) is Nepal's premier online ladies clothing boutique. Shop exclusive women's fashion, ladies dresses, tops, trousers, co-ord sets, and trendy apparel with fast delivery across Kathmandu & all Nepal.",
   keywords: [
-    'Ace Garment',
-    'Ace Garment Nepal',
-    'Ace Garment Kathmandu',
-    'Ace Garment ladies wear',
-    'garment',
-    'garment shop Nepal',
-    'garment store Kathmandu',
-    'ladies garment Nepal',
-    'women garment online Nepal',
-    'garment online shopping Nepal',
-    'best garment shop in Kathmandu',
-    'ladies clothing Nepal',
+    'daisyhub.com',
+    'daisyhub.com.np',
+    'daisyhub',
+    'DAISY HUB',
+    'daisy hub np',
+    'daisy hub nepal',
+    'daisyhub online shopping nepal',
+    'daisyhub ladies clothing',
+    'daisyhub women fashion',
+    'daisyhub clothing nepal',
+    'daisyhub kathmandu',
+    'daisyhubb',
+    "women's clothing Nepal",
     "women's clothing online Nepal",
+    'ladies clothing Nepal',
     'ladies clothes online Nepal',
     "women fashion Nepal",
     'ladies fashion Kathmandu',
@@ -33,29 +35,30 @@ export const metadata: Metadata = {
     "women's tops Nepal",
     'ladies trousers Nepal',
     'co-ord sets ladies Nepal',
-    'DAISY HUB',
-    'daisy hub np',
-    'daisyhubb',
+    'best ladies clothing store in Kathmandu',
+    'women apparel online Nepal',
+    'trendy ladies clothes Nepal',
+    'women online shopping Nepal',
   ],
-  authors: [{ name: 'Ace Garment - Daisy Hub' }],
-  creator: 'Ace Garment - Daisy Hub',
-  publisher: 'Ace Garment - Daisy Hub',
+  authors: [{ name: 'DaisyHub (daisyhub.com)' }],
+  creator: 'DaisyHub (daisyhub.com)',
+  publisher: 'DaisyHub (daisyhub.com)',
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
   openGraph: {
-    title: "Ace Garment – Premium Ladies Clothing & Women's Fashion Nepal",
-    description: "Shop exclusive ladies garment collections online in Nepal. Trendy dresses, tops, co-ords & chic fashion delivered to your doorstep.",
+    title: "DaisyHub – Premium Ladies Clothing & Women's Fashion Nepal (daisyhub.com)",
+    description: "Shop exclusive ladies clothing collections online in Nepal at DaisyHub. Trendy dresses, tops, co-ords & chic fashion delivered to your doorstep.",
     url: siteUrl,
-    siteName: 'Ace Garment - Daisy Hub',
+    siteName: 'DaisyHub (daisyhub.com)',
     images: [
       {
         url: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1200&auto=format&fit=crop',
         width: 1200,
         height: 630,
-        alt: 'Ace Garment Ladies Collection',
+        alt: 'DaisyHub Ladies Collection',
       },
     ],
     locale: 'en_US',
@@ -63,8 +66,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: "Ace Garment – Ladies Clothing Store Nepal",
-    description: "Nepal's top online ladies garment boutique. Discover stylish dresses, tops, co-ord sets and ladies wear.",
+    title: "DaisyHub – Women's Clothing Store Nepal (daisyhub.com)",
+    description: "Nepal's top online ladies clothing boutique. Discover stylish dresses, tops, co-ord sets and women's wear at DaisyHub.",
     images: ['https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1200&auto=format&fit=crop'],
   },
   robots: {
@@ -88,9 +91,9 @@ export default function RootLayout({
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'ClothingStore',
-    name: 'Ace Garment - Daisy Hub',
-    alternateName: ['Ace Garments', 'Daisy Hub', 'Ace Garment Nepal'],
-    description: "Nepal's leading online store for exclusive ladies clothing and women's fashion garments.",
+    name: 'DaisyHub (daisyhub.com)',
+    alternateName: ['Daisy Hub', 'DaisyHub', 'daisyhub.com', 'daisyhub.com.np', 'Daisy Hub Nepal'],
+    description: "Nepal's leading online store for exclusive ladies clothing and women's fashion garments on daisyhub.com.",
     url: siteUrl,
     logo: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=600&auto=format&fit=crop',
     image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1200&auto=format&fit=crop',
@@ -116,6 +119,7 @@ export default function RootLayout({
       closes: '20:00',
     },
     sameAs: [
+      'https://daisyhub.com',
       'https://www.instagram.com/daisy_hubnp?stkn=MTh4dTQzeGxoMXpnYg==',
     ],
   };

@@ -772,12 +772,12 @@ class DataStore {
   getGlobalSEO(): SEOMetadata {
     const cms = this.getCMS();
     return cms.seo || {
-      metaTitle: "Ace Garment – Best Women's Garment & Ladies Clothing Store Online in Nepal | Daisy Hub",
-      metaDescription: "Ace Garment (Daisy Hub) is Nepal's premier online ladies garment boutique. Shop exclusive women's fashion, ladies dresses, tops, trousers, co-ord sets, and trendy apparel with fast delivery across Kathmandu & all Nepal.",
-      keywords: "Ace Garment, Ace Garment Nepal, Ace Garment Kathmandu, Ace Garment ladies wear, garment, garment shop Nepal, garment store Kathmandu, ladies garment Nepal, women garment online Nepal, garment online shopping Nepal, best garment shop in Kathmandu, ladies clothing Nepal, women's clothing online Nepal, ladies clothes online Nepal, women fashion Nepal, ladies fashion Kathmandu, buy ladies clothes Nepal, DAISY HUB, daisyhubb",
-      canonicalUrl: process.env.NEXT_PUBLIC_SITE_URL || 'https://daisyhubb.com',
+      metaTitle: "DaisyHub (daisyhub.com) – Best Women's Clothing & Ladies Fashion Store Online in Nepal",
+      metaDescription: "DaisyHub (daisyhub.com) is Nepal's premier online ladies clothing boutique. Shop exclusive women's fashion, ladies dresses, tops, trousers, co-ord sets, and trendy apparel with fast delivery across Kathmandu & all Nepal.",
+      keywords: "daisyhub.com, daisyhub.com.np, daisyhub, DAISY HUB, daisy hub nepal, daisyhub ladies clothing, daisyhub women fashion, women's clothing Nepal, women's clothing online Nepal, ladies clothing Nepal, ladies clothes online Nepal, women fashion Nepal, ladies fashion Kathmandu, buy ladies clothes Nepal, ladies dresses online Nepal, women's tops Nepal, ladies trousers Nepal, co-ord sets ladies Nepal, best ladies clothing store in Kathmandu, women apparel online Nepal, daisyhubb",
+      canonicalUrl: process.env.NEXT_PUBLIC_SITE_URL || 'https://daisyhub.com',
       ogImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1200&auto=format&fit=crop',
-      h1: "Ace Garment – Premium Ladies Clothing & Garments Online in Nepal",
+      h1: "DaisyHub – Premium Ladies Clothing & Women's Fashion Online in Nepal (daisyhub.com)",
     };
   }
 
