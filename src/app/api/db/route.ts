@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { serverDb } from '@/lib/server-db';
+import { connectToDatabase } from '@/lib/mongodb';
 
 // Force dynamic server rendering for API DB sync route
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    await connectToDatabase();
     const data = serverDb.getData();
     return NextResponse.json(
       { success: true, data },
@@ -27,122 +29,123 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    await connectToDatabase();
     const body = await request.json();
     const { action } = body;
 
     switch (action) {
       case 'updateInventory': {
         const { productId, size, newStock } = body;
-        serverDb.updateInventory(productId, size, newStock);
+        await serverDb.updateInventory(productId, size, newStock);
         break;
       }
       case 'updateColorStock': {
         const { productId, colorName, newStock } = body;
-        serverDb.updateColorStock(productId, colorName, newStock);
+        await serverDb.updateColorStock(productId, colorName, newStock);
         break;
       }
       case 'saveProduct': {
         const { product } = body;
         if (product && product.id) {
-          serverDb.saveProduct(product);
+          await serverDb.saveProduct(product);
         }
         break;
       }
       case 'deleteProduct': {
         const { id } = body;
         if (id) {
-          serverDb.deleteProduct(id);
+          await serverDb.deleteProduct(id);
         }
         break;
       }
       case 'saveCategory': {
         const { category } = body;
         if (category) {
-          serverDb.saveCategory(category);
+          await serverDb.saveCategory(category);
         }
         break;
       }
       case 'deleteCategory': {
         const { id } = body;
         if (id) {
-          serverDb.deleteCategory(id);
+          await serverDb.deleteCategory(id);
         }
         break;
       }
       case 'saveCollection': {
         const { collection } = body;
         if (collection) {
-          serverDb.saveCollection(collection);
+          await serverDb.saveCollection(collection);
         }
         break;
       }
       case 'deleteCollection': {
         const { id } = body;
         if (id) {
-          serverDb.deleteCollection(id);
+          await serverDb.deleteCollection(id);
         }
         break;
       }
       case 'saveCoupon': {
         const { coupon } = body;
         if (coupon) {
-          serverDb.saveCoupon(coupon);
+          await serverDb.saveCoupon(coupon);
         }
         break;
       }
       case 'deleteCoupon': {
         const { code } = body;
         if (code) {
-          serverDb.deleteCoupon(code);
+          await serverDb.deleteCoupon(code);
         }
         break;
       }
       case 'saveUser': {
         const { user } = body;
         if (user) {
-          serverDb.saveUser(user);
+          await serverDb.saveUser(user);
         }
         break;
       }
       case 'deleteUser': {
         const { id } = body;
         if (id) {
-          serverDb.deleteUser(id);
+          await serverDb.deleteUser(id);
         }
         break;
       }
       case 'deleteOrder': {
         const { id } = body;
         if (id) {
-          serverDb.deleteOrder(id);
+          await serverDb.deleteOrder(id);
         }
         break;
       }
       case 'deleteReview': {
         const { productId, reviewId } = body;
         if (productId && reviewId) {
-          serverDb.deleteReview(productId, reviewId);
+          await serverDb.deleteReview(productId, reviewId);
         }
         break;
       }
       case 'updateCMS': {
         const { cms } = body;
         if (cms) {
-          serverDb.updateCMS(cms);
+          await serverDb.updateCMS(cms);
         }
         break;
       }
       case 'createOrder': {
         const { order } = body;
         if (order) {
-          serverDb.createOrder(order);
+          await serverDb.createOrder(order);
         }
         break;
       }
       case 'updateOrderStatus': {
         const { orderId, status } = body;
         if (orderId && status) {
-          serverDb.updateOrderStatus(orderId, status);
+          await serverDb.updateOrderStatus(orderId, status);
         }
         break;
       }

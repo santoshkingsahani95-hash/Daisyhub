@@ -166,10 +166,10 @@ const UserSchema = new Schema(
   { timestamps: true }
 );
 
-export const ProductModel = mongoose.models.Product || mongoose.model('Product', ProductSchema);
-export const CategoryModel = mongoose.models.Category || mongoose.model('Category', CategorySchema);
-export const CollectionModel = mongoose.models.Collection || mongoose.model('Collection', CollectionSchema);
-export const OrderModel = mongoose.models.Order || mongoose.model('Order', OrderSchema);
-export const CouponModel = mongoose.models.Coupon || mongoose.model('Coupon', CouponSchema);
-export const CMSModel = mongoose.models.CMS || mongoose.model('CMS', CMSSchema);
-export const UserModel = mongoose.models.User || mongoose.model('User', UserSchema);
+export const ProductModel = mongoose.models.Product || mongoose.model('Product', ProductSchema, 'products');
+export const CategoryModel = mongoose.models.Category || mongoose.model('Category', CategorySchema, 'categories');
+export const CollectionModel = mongoose.models.Collection || mongoose.model('Collection', CollectionSchema, 'collections');
+export const OrderModel = mongoose.models.Order || mongoose.model('Order', OrderSchema, 'orders');
+export const CouponModel = mongoose.models.Coupon || mongoose.model('Coupon', CouponSchema, 'coupons');
+export const CMSModel = mongoose.models.CMS || mongoose.model('CMS', CMSSchema, 'cms');
+export const UserModel = mongoose.models.User || mongoose.model('User', UserSchema, 'users');

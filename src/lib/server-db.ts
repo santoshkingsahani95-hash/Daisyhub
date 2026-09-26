@@ -49,42 +49,39 @@ class ServerDataStore {
   };
 
   private isLoaded = false;
-  private isMongoConnected = false;
 
   constructor() {
     this.loadFromDisk();
     this.initMongoDB();
   }
 
-  private async initMongoDB() {
+  public async initMongoDB() {
     try {
       const dbConn = await connectToDatabase();
       if (!dbConn) return;
 
-      this.isMongoConnected = true;
-
-      // Load Products from MongoDB
+      // Load Products from MongoDB Atlas
       const dbProds = await ProductModel.find().lean();
       this.data.products = dbProds.map((p: any) => {
         const { _id, __v, ...rest } = p;
         return rest as Product;
       });
 
-      // Load Categories from MongoDB
+      // Load Categories from MongoDB Atlas
       const dbCats = await CategoryModel.find().lean();
       this.data.categories = dbCats.map((c: any) => {
         const { _id, __v, ...rest } = c;
         return rest as Category;
       });
 
-      // Load Collections from MongoDB
+      // Load Collections from MongoDB Atlas
       const dbCols = await CollectionModel.find().lean();
       this.data.collections = dbCols.map((c: any) => {
         const { _id, __v, ...rest } = c;
         return rest as Collection;
       });
 
-      // Load CMS from MongoDB
+      // Load CMS from MongoDB Atlas
       const cmsDoc = await CMSModel.findOne({ key: 'homepage' }).lean();
       if (!cmsDoc) {
         await CMSModel.create({ key: 'homepage', ...this.data.cms });
@@ -93,21 +90,21 @@ class ServerDataStore {
         this.data.cms = { ...this.data.cms, ...rest };
       }
 
-      // Load Orders from MongoDB
+      // Load Orders from MongoDB Atlas
       const dbOrds = await OrderModel.find().lean();
       this.data.orders = dbOrds.map((o: any) => {
         const { _id, __v, ...rest } = o;
         return rest as Order;
       });
 
-      // Load Coupons from MongoDB
+      // Load Coupons from MongoDB Atlas
       const dbCoups = await CouponModel.find().lean();
       this.data.coupons = dbCoups.map((cp: any) => {
         const { _id, __v, ...rest } = cp;
         return rest as Coupon;
       });
 
-      // Load Users from MongoDB
+      // Load Users from MongoDB Atlas
       const dbUsers = await UserModel.find().lean();
       if (dbUsers.length > 0) {
         this.data.users = dbUsers.map((u: any) => {
@@ -168,7 +165,7 @@ class ServerDataStore {
     return this.getData().products;
   }
 
-  saveProduct(product: Product): Product {
+  async saveProduct(product: Product): Promise<Product> {
     const data = this.getData();
     const existingIdx = data.products.findIndex((p) => p.id === product.id);
     if (existingIdx >= 0) {
@@ -178,22 +175,35 @@ class ServerDataStore {
     }
     this.saveToDisk();
 
-    // MongoDB Sync
-    ProductModel.findOneAndUpdate({ id: product.id }, product, { upsert: true, new: true }).catch(() => {});
+    try {
+      await connectToDatabase();
+      await ProductModel.findOneAndUpdate({ id: product.id }, product, { upsert: true, new: true });
+      console.log(`[MongoDB] Successfully saved product ${product.id} to MongoDB Atlas`);
+    } catch (err) {
+      console.error(`[MongoDB] Error saving product ${product.id}:`, err);
+    }
 
     return product;
   }
 
-  deleteProduct(id: string): boolean {
+  async deleteProduct(id: string): Promise<boolean> {
     const data = this.getData();
     const initialLen = data.products.length;
     data.products = data.products.filter((p) => p.id !== id);
     this.saveToDisk();
-    ProductModel.deleteOne({ id }).catch(() => {});
+
+    try {
+      await connectToDatabase();
+      await ProductModel.deleteOne({ id });
+      console.log(`[MongoDB] Successfully deleted product ${id} from MongoDB Atlas`);
+    } catch (err) {
+      console.error(`[MongoDB] Error deleting product ${id}:`, err);
+    }
+
     return data.products.length < initialLen;
   }
 
-  updateInventory(productId: string, size: string, newStock: number): boolean {
+  async updateInventory(productId: string, size: string, newStock: number): Promise<boolean> {
     const data = this.getData();
     const prod = data.products.find((p) => p.id === productId);
     if (!prod) return false;
@@ -219,13 +229,17 @@ class ServerDataStore {
 
     this.saveToDisk();
 
-    // MongoDB Sync
-    ProductModel.findOneAndUpdate({ id: productId }, prod, { upsert: true }).catch(() => {});
+    try {
+      await connectToDatabase();
+      await ProductModel.findOneAndUpdate({ id: productId }, prod, { upsert: true });
+    } catch (err) {
+      console.error(`[MongoDB] Error updating inventory for ${productId}:`, err);
+    }
 
     return true;
   }
 
-  updateColorStock(productId: string, colorName: string, newStock: number): boolean {
+  async updateColorStock(productId: string, colorName: string, newStock: number): Promise<boolean> {
     const data = this.getData();
     const prod = data.products.find((p) => p.id === productId);
     if (!prod) return false;
@@ -244,13 +258,17 @@ class ServerDataStore {
 
     this.saveToDisk();
 
-    // MongoDB Sync
-    ProductModel.findOneAndUpdate({ id: productId }, prod, { upsert: true }).catch(() => {});
+    try {
+      await connectToDatabase();
+      await ProductModel.findOneAndUpdate({ id: productId }, prod, { upsert: true });
+    } catch (err) {
+      console.error(`[MongoDB] Error updating color stock for ${productId}:`, err);
+    }
 
     return true;
   }
 
-  saveCategory(category: Category): Category {
+  async saveCategory(category: Category): Promise<Category> {
     const data = this.getData();
     const existingIndex = data.categories.findIndex((c) => c.id === category.id || c.slug === category.slug);
     if (existingIndex >= 0) {
@@ -260,22 +278,35 @@ class ServerDataStore {
     }
     this.saveToDisk();
 
-    // MongoDB Sync
-    CategoryModel.findOneAndUpdate({ id: category.id }, category, { upsert: true }).catch(() => {});
+    try {
+      await connectToDatabase();
+      await CategoryModel.findOneAndUpdate({ id: category.id }, category, { upsert: true, new: true });
+      console.log(`[MongoDB] Successfully saved category '${category.name}' (${category.id}) to MongoDB Atlas!`);
+    } catch (err) {
+      console.error(`[MongoDB] Error saving category '${category.name}':`, err);
+    }
 
     return category;
   }
 
-  deleteCategory(id: string): boolean {
+  async deleteCategory(id: string): Promise<boolean> {
     const data = this.getData();
     const initialLen = data.categories.length;
     data.categories = data.categories.filter((c) => c.id !== id && c.slug !== id);
     this.saveToDisk();
-    CategoryModel.deleteOne({ $or: [{ id }, { slug: id }] }).catch(() => {});
+
+    try {
+      await connectToDatabase();
+      await CategoryModel.deleteOne({ $or: [{ id }, { slug: id }] });
+      console.log(`[MongoDB] Successfully deleted category ${id} from MongoDB Atlas!`);
+    } catch (err) {
+      console.error(`[MongoDB] Error deleting category ${id}:`, err);
+    }
+
     return data.categories.length < initialLen;
   }
 
-  saveCollection(collection: Collection): Collection {
+  async saveCollection(collection: Collection): Promise<Collection> {
     const data = this.getData();
     const existingIndex = data.collections.findIndex((c) => c.id === collection.id || c.slug === collection.slug);
     if (existingIndex >= 0) {
@@ -285,22 +316,35 @@ class ServerDataStore {
     }
     this.saveToDisk();
 
-    // MongoDB Sync
-    CollectionModel.findOneAndUpdate({ id: collection.id }, collection, { upsert: true }).catch(() => {});
+    try {
+      await connectToDatabase();
+      await CollectionModel.findOneAndUpdate({ id: collection.id }, collection, { upsert: true, new: true });
+      console.log(`[MongoDB] Successfully saved collection '${collection.name}' (${collection.id}) to MongoDB Atlas!`);
+    } catch (err) {
+      console.error(`[MongoDB] Error saving collection '${collection.name}':`, err);
+    }
 
     return collection;
   }
 
-  deleteCollection(id: string): boolean {
+  async deleteCollection(id: string): Promise<boolean> {
     const data = this.getData();
     const initialLen = data.collections.length;
     data.collections = data.collections.filter((c) => c.id !== id && c.slug !== id);
     this.saveToDisk();
-    CollectionModel.deleteOne({ $or: [{ id }, { slug: id }] }).catch(() => {});
+
+    try {
+      await connectToDatabase();
+      await CollectionModel.deleteOne({ $or: [{ id }, { slug: id }] });
+      console.log(`[MongoDB] Successfully deleted collection ${id} from MongoDB Atlas!`);
+    } catch (err) {
+      console.error(`[MongoDB] Error deleting collection ${id}:`, err);
+    }
+
     return data.collections.length < initialLen;
   }
 
-  saveCoupon(coupon: Coupon): Coupon {
+  async saveCoupon(coupon: Coupon): Promise<Coupon> {
     const data = this.getData();
     const cleanCode = coupon.code.trim().toUpperCase();
     const cleanCoupon = { ...coupon, code: cleanCode };
@@ -312,23 +356,36 @@ class ServerDataStore {
     }
     this.saveToDisk();
 
-    // MongoDB Sync
-    CouponModel.findOneAndUpdate({ code: cleanCode }, cleanCoupon, { upsert: true }).catch(() => {});
+    try {
+      await connectToDatabase();
+      await CouponModel.findOneAndUpdate({ code: cleanCode }, cleanCoupon, { upsert: true, new: true });
+      console.log(`[MongoDB] Successfully saved coupon ${cleanCode} to MongoDB Atlas!`);
+    } catch (err) {
+      console.error(`[MongoDB] Error saving coupon ${cleanCode}:`, err);
+    }
 
     return cleanCoupon;
   }
 
-  deleteCoupon(code: string): boolean {
+  async deleteCoupon(code: string): Promise<boolean> {
     const data = this.getData();
     const cleanCode = code.trim().toUpperCase();
     const initialLen = data.coupons.length;
     data.coupons = data.coupons.filter((c) => c.code.trim().toUpperCase() !== cleanCode);
     this.saveToDisk();
-    CouponModel.deleteOne({ code: cleanCode }).catch(() => {});
+
+    try {
+      await connectToDatabase();
+      await CouponModel.deleteOne({ code: cleanCode });
+      console.log(`[MongoDB] Successfully deleted coupon ${cleanCode} from MongoDB Atlas!`);
+    } catch (err) {
+      console.error(`[MongoDB] Error deleting coupon ${cleanCode}:`, err);
+    }
+
     return data.coupons.length < initialLen;
   }
 
-  saveUser(user: CustomerUser): CustomerUser {
+  async saveUser(user: CustomerUser): Promise<CustomerUser> {
     const data = this.getData();
     const existingIndex = data.users.findIndex((u) => u.id === user.id || u.email === user.email);
     if (existingIndex >= 0) {
@@ -338,31 +395,52 @@ class ServerDataStore {
     }
     this.saveToDisk();
 
-    // MongoDB Sync
-    UserModel.findOneAndUpdate({ id: user.id }, user, { upsert: true }).catch(() => {});
+    try {
+      await connectToDatabase();
+      await UserModel.findOneAndUpdate({ id: user.id }, user, { upsert: true, new: true });
+      console.log(`[MongoDB] Successfully saved user ${user.email} to MongoDB Atlas!`);
+    } catch (err) {
+      console.error(`[MongoDB] Error saving user ${user.email}:`, err);
+    }
 
     return user;
   }
 
-  deleteUser(id: string): boolean {
+  async deleteUser(id: string): Promise<boolean> {
     const data = this.getData();
     const initialLen = data.users.length;
     data.users = data.users.filter((u) => u.id !== id && u.email !== id);
     this.saveToDisk();
-    UserModel.deleteOne({ $or: [{ id }, { email: id }] }).catch(() => {});
+
+    try {
+      await connectToDatabase();
+      await UserModel.deleteOne({ $or: [{ id }, { email: id }] });
+      console.log(`[MongoDB] Successfully deleted user ${id} from MongoDB Atlas!`);
+    } catch (err) {
+      console.error(`[MongoDB] Error deleting user ${id}:`, err);
+    }
+
     return data.users.length < initialLen;
   }
 
-  deleteOrder(id: string): boolean {
+  async deleteOrder(id: string): Promise<boolean> {
     const data = this.getData();
     const initialLen = data.orders.length;
     data.orders = data.orders.filter((o) => o.id !== id && o.orderNumber !== id);
     this.saveToDisk();
-    OrderModel.deleteOne({ $or: [{ id }, { orderNumber: id }] }).catch(() => {});
+
+    try {
+      await connectToDatabase();
+      await OrderModel.deleteOne({ $or: [{ id }, { orderNumber: id }] });
+      console.log(`[MongoDB] Successfully deleted order ${id} from MongoDB Atlas!`);
+    } catch (err) {
+      console.error(`[MongoDB] Error deleting order ${id}:`, err);
+    }
+
     return data.orders.length < initialLen;
   }
 
-  deleteReview(productId: string, reviewId: string): boolean {
+  async deleteReview(productId: string, reviewId: string): Promise<boolean> {
     const data = this.getData();
     const prod = data.products.find((p) => p.id === productId || p.slug === productId);
     if (prod && prod.reviews) {
@@ -378,44 +456,66 @@ class ServerDataStore {
           prod.rating = 5.0;
         }
         this.saveToDisk();
-        ProductModel.findOneAndUpdate({ id: prod.id }, prod, { upsert: true }).catch(() => {});
+
+        try {
+          await connectToDatabase();
+          await ProductModel.findOneAndUpdate({ id: prod.id }, prod, { upsert: true });
+        } catch (err) {
+          console.error(`[MongoDB] Error deleting review ${reviewId}:`, err);
+        }
+
         return true;
       }
     }
     return false;
   }
 
-  updateCMS(newCms: Partial<HomepageCMS>): HomepageCMS {
+  async updateCMS(newCms: Partial<HomepageCMS>): Promise<HomepageCMS> {
     const data = this.getData();
     data.cms = { ...data.cms, ...newCms };
     this.saveToDisk();
 
-    // MongoDB Sync
-    CMSModel.findOneAndUpdate({ key: 'homepage' }, data.cms, { upsert: true }).catch(() => {});
+    try {
+      await connectToDatabase();
+      await CMSModel.findOneAndUpdate({ key: 'homepage' }, data.cms, { upsert: true, new: true });
+      console.log(`[MongoDB] Successfully updated CMS in MongoDB Atlas!`);
+    } catch (err) {
+      console.error('[MongoDB] Error updating CMS:', err);
+    }
 
     return data.cms;
   }
 
-  createOrder(order: Order): Order {
+  async createOrder(order: Order): Promise<Order> {
     const data = this.getData();
     data.orders.unshift(order);
     this.saveToDisk();
 
-    // MongoDB Sync
-    OrderModel.findOneAndUpdate({ id: order.id }, order, { upsert: true }).catch(() => {});
+    try {
+      await connectToDatabase();
+      await OrderModel.findOneAndUpdate({ id: order.id }, order, { upsert: true, new: true });
+      console.log(`[MongoDB] Successfully created order ${order.orderNumber} in MongoDB Atlas!`);
+    } catch (err) {
+      console.error(`[MongoDB] Error creating order ${order.orderNumber}:`, err);
+    }
 
     return order;
   }
 
-  updateOrderStatus(orderId: string, status: Order['orderStatus']): Order | undefined {
+  async updateOrderStatus(orderId: string, status: Order['orderStatus']): Promise<Order | undefined> {
     const data = this.getData();
     const ord = data.orders.find((o) => o.id === orderId || o.orderNumber === orderId);
     if (ord) {
       ord.orderStatus = status;
       this.saveToDisk();
 
-      // MongoDB Sync
-      OrderModel.findOneAndUpdate({ id: ord.id }, { orderStatus: status }).catch(() => {});
+      try {
+        await connectToDatabase();
+        await OrderModel.findOneAndUpdate({ id: ord.id }, { orderStatus: status });
+        console.log(`[MongoDB] Successfully updated order status for ${ord.orderNumber} to ${status}`);
+      } catch (err) {
+        console.error(`[MongoDB] Error updating order status for ${ord.orderNumber}:`, err);
+      }
     }
     return ord;
   }
