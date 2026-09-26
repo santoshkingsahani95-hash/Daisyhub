@@ -11,12 +11,12 @@ export default function SEOManagementPage() {
 
   // Global SEO State
   const [globalSeo, setGlobalSeo] = useState<SEOMetadata>({
-    metaTitle: "DaisyHub (daisyhub.com) – Best Women's Clothing & Ladies Fashion Store Online in Nepal",
-    metaDescription: "DaisyHub (daisyhub.com) is Nepal's premier online ladies clothing boutique. Shop exclusive women's fashion, ladies dresses, tops, trousers, co-ord sets, and trendy apparel with fast delivery across Kathmandu & all Nepal.",
-    keywords: "daisyhub.com, daisyhub.com.np, daisyhub, DAISY HUB, daisy hub nepal, daisyhub ladies clothing, daisyhub women fashion, women's clothing Nepal, women's clothing online Nepal, ladies clothing Nepal, ladies clothes online Nepal, women fashion Nepal, ladies fashion Kathmandu, buy ladies clothes Nepal, ladies dresses online Nepal, women's tops Nepal, ladies trousers Nepal, co-ord sets ladies Nepal, best ladies clothing store in Kathmandu, women apparel online Nepal, daisyhubb",
+    metaTitle: "DaisyHub (daisyhub.com / daisyhubb.com) – Best Women's Clothing & Ladies Fashion Store Online in Nepal",
+    metaDescription: "DaisyHub (daisyhub.com / daisyhubb.com) is Nepal's premier online ladies clothing boutique. Shop exclusive women's fashion, ladies dresses, tops, trousers, co-ord sets, and trendy apparel with fast delivery across Kathmandu & all Nepal.",
+    keywords: "daisyhub.com, daisyhubb.com, daisyhub.com.np, daisyhubb.com.np, daisyhub, daisyhubb, DAISY HUB, daisy hub nepal, daisyhub ladies clothing, daisyhub women fashion, women's clothing Nepal, women's clothing online Nepal, ladies clothing Nepal, ladies clothes online Nepal, women fashion Nepal, ladies fashion Kathmandu, buy ladies clothes Nepal, ladies dresses online Nepal, women's tops Nepal, ladies trousers Nepal, co-ord sets ladies Nepal, best ladies clothing store in Kathmandu, women apparel online Nepal",
     canonicalUrl: 'https://daisyhub.com',
     ogImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1200&auto=format&fit=crop',
-    h1: "DaisyHub – Premium Ladies Clothing & Women's Fashion Online in Nepal (daisyhub.com)",
+    h1: "DaisyHub – Premium Ladies Clothing & Women's Fashion Online in Nepal (daisyhub.com / daisyhubb.com)",
   });
 
   // Category SEO State
