@@ -44,6 +44,8 @@ export default function SEOManagementPage() {
 
   useEffect(() => {
     loadSEOData();
+    window.addEventListener('ace-db-updated', loadSEOData);
+    return () => window.removeEventListener('ace-db-updated', loadSEOData);
   }, []);
 
   const loadSEOData = () => {

@@ -9,7 +9,12 @@ export default function AdminReviewsPage() {
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    setProducts(db.getProducts());
+    const handleDbUpdate = () => {
+      setProducts([...db.getProducts()]);
+    };
+    handleDbUpdate();
+    window.addEventListener('ace-db-updated', handleDbUpdate);
+    return () => window.removeEventListener('ace-db-updated', handleDbUpdate);
   }, []);
 
   const allReviewsWithProd = products.flatMap((p) =>

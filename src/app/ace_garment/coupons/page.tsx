@@ -20,6 +20,8 @@ export default function AdminCouponsPage() {
 
   useEffect(() => {
     loadCoupons();
+    window.addEventListener('ace-db-updated', loadCoupons);
+    return () => window.removeEventListener('ace-db-updated', loadCoupons);
   }, []);
 
   const handleCreateCoupon = (e: React.FormEvent) => {

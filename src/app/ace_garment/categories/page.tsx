@@ -56,7 +56,12 @@ export default function AdminCategoriesPage() {
   };
 
   useEffect(() => {
-    setCategories(db.getCategories());
+    const handleDbUpdate = () => {
+      setCategories([...db.getCategories()]);
+    };
+    handleDbUpdate();
+    window.addEventListener('ace-db-updated', handleDbUpdate);
+    return () => window.removeEventListener('ace-db-updated', handleDbUpdate);
   }, []);
 
   const handleOpenAdd = () => {

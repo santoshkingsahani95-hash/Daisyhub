@@ -45,12 +45,12 @@ class DataStore {
       // Perform immediate sync with server API
       this.syncWithServer();
 
-      // Poll server every 4 seconds so multi-device updates reflect automatically
+      // Poll server every 2 seconds for real-time multi-device database sync
       setInterval(() => {
         if (!document.hidden) {
           this.syncWithServer();
         }
-      }, 4000);
+      }, 2000);
 
       // Also sync when tab regains focus or becomes visible
       window.addEventListener('focus', () => this.syncWithServer());
