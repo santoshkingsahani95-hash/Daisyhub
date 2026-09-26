@@ -152,7 +152,7 @@ export async function POST(request: Request) {
       case 'syncFull': {
         const { data } = body;
         if (data) {
-          serverDb.syncFullData(data);
+          await serverDb.syncFullData(data);
         }
         break;
       }
