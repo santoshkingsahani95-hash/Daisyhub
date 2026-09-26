@@ -277,10 +277,6 @@ class DataStore {
       prod.sizes = [{ size: size || 'Free Size', stock: cleanStock }];
     }
 
-    if (prod.colors) {
-      prod.colors.forEach((c) => (c.stock = cleanStock));
-    }
-
     const totalSizeStock = prod.sizes.reduce((sum, s) => sum + (s.stock || 0), 0);
     prod.isOutOfStock = totalSizeStock <= 0;
 
@@ -295,14 +291,14 @@ class DataStore {
     const prod = prods.find((p) => p.id === productId);
     if (!prod) return false;
     const cleanStock = isNaN(Number(newStock)) ? 0 : Math.max(0, Math.min(999, Math.floor(Number(newStock))));
-    const targetColor = prod.colors.find((c) => c.name.toLowerCase() === colorName.toLowerCase());
-    if (targetColor) {
-      targetColor.stock = cleanStock;
-    } else if (prod.colors.length > 0) {
-      prod.colors[0].stock = cleanStock;
+    if (prod.colors && prod.colors.length > 0) {
+      const targetColor = prod.colors.find((c) => c.name.toLowerCase() === colorName.toLowerCase());
+      if (targetColor) {
+        targetColor.stock = cleanStock;
+      }
     }
 
-    const totalColorStock = prod.colors.reduce((acc, c) => acc + (c.stock !== undefined ? c.stock : 0), 0);
+    const totalColorStock = prod.colors ? prod.colors.reduce((acc, c) => acc + (typeof c.stock === 'number' ? c.stock : 0), 0) : 0;
     prod.sizes = [{ size: 'Free Size', stock: totalColorStock }];
     prod.isOutOfStock = totalColorStock <= 0;
 
@@ -500,7 +496,10 @@ class DataStore {
   }
 
   updateDeliveryRates(rates: DistrictDeliveryRate[]): DistrictDeliveryRate[] {
-    this.updateCMS({ deliveryRates: rates });
+    this.cms.deliveryRates = rates;
+    this.saveAndBroadcast('ace_db_cms', this.cms);
+    postApiAction('updateDeliveryRates', { rates });
+    postApiAction('updateCMS', { cms: this.cms });
     return rates;
   }
 

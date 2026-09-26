@@ -11,6 +11,9 @@ export default function AdminDeliveryRatesPage() {
   const [selectedProvinceFilter, setSelectedProvinceFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [updateMsg, setUpdateMsg] = useState<string>('');
+  const [isDirty, setIsDirty] = useState<boolean>(false);
+  const isDirtyRef = React.useRef(false);
+  isDirtyRef.current = isDirty;
 
   // Bulk Apply Form State
   const [bulkProvince, setBulkProvince] = useState<string>('Bagmati Province');
@@ -20,15 +23,26 @@ export default function AdminDeliveryRatesPage() {
     const loaded = db.getDeliveryRates();
     setRates(loaded && loaded.length > 0 ? loaded : generateDefaultDeliveryRates());
 
+    // Fetch latest from MongoDB Atlas on mount
+    db.syncWithServer().then(() => {
+      if (!isDirtyRef.current) {
+        const fresh = db.getDeliveryRates();
+        if (fresh && fresh.length > 0) setRates(fresh);
+      }
+    });
+
     const handleDbUpdate = () => {
-      const fresh = db.getDeliveryRates();
-      if (fresh && fresh.length > 0) setRates(fresh);
+      if (!isDirtyRef.current) {
+        const fresh = db.getDeliveryRates();
+        if (fresh && fresh.length > 0) setRates(fresh);
+      }
     };
     window.addEventListener('ace-db-updated', handleDbUpdate);
     return () => window.removeEventListener('ace-db-updated', handleDbUpdate);
   }, []);
 
   const handleRateChange = (districtName: string, field: keyof DistrictDeliveryRate, value: any) => {
+    setIsDirty(true);
     setRates((prev) =>
       prev.map((r) => {
         if (r.district === districtName) {
@@ -56,6 +70,7 @@ export default function AdminDeliveryRatesPage() {
   };
 
   const handleBulkApply = () => {
+    setIsDirty(true);
     setRates((prev) =>
       prev.map((r) => {
         if (r.province === bulkProvince) {
@@ -78,6 +93,7 @@ export default function AdminDeliveryRatesPage() {
       const defs = generateDefaultDeliveryRates();
       setRates(defs);
       db.updateDeliveryRates(defs);
+      setIsDirty(false);
       setUpdateMsg('All 77 district delivery rates reset to defaults and saved!');
       setTimeout(() => setUpdateMsg(''), 3000);
     }
@@ -86,6 +102,7 @@ export default function AdminDeliveryRatesPage() {
   const handleSaveAll = (e: React.FormEvent) => {
     e.preventDefault();
     db.updateDeliveryRates(rates);
+    setIsDirty(false);
     setUpdateMsg('🎉 All 77 Nepal District Delivery Rates saved and synced live across all devices!');
     setTimeout(() => setUpdateMsg(''), 4000);
   };
@@ -243,8 +260,8 @@ export default function AdminDeliveryRatesPage() {
             </thead>
             <tbody className="divide-y divide-brand-border">
               {filteredRates.map((item) => {
-                const currentFee = item.deliveryFee !== undefined ? item.deliveryFee : (item.homeDeliveryFee || 150);
-                const isEnabled = item.enabled !== undefined ? item.enabled : (item.homeDeliveryEnabled !== false);
+                const currentFee = typeof item.deliveryFee === 'number' ? item.deliveryFee : (typeof item.homeDeliveryFee === 'number' ? item.homeDeliveryFee : 150);
+                const isEnabled = typeof item.enabled === 'boolean' ? item.enabled : (typeof item.homeDeliveryEnabled === 'boolean' ? item.homeDeliveryEnabled : true);
 
                 return (
                   <tr key={item.district} className="hover:bg-brand-cream/30 transition-colors">

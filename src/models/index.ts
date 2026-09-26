@@ -145,9 +145,10 @@ const CMSSchema = new Schema(
     editorialBanner: { type: Schema.Types.Mixed },
     instagramImages: [{ type: Schema.Types.Mixed }],
     fonepaySettings: { type: Schema.Types.Mixed },
+    deliveryRates: [{ type: Schema.Types.Mixed }],
     seo: { type: Schema.Types.Mixed },
   },
-  { timestamps: true }
+  { timestamps: true, strict: false }
 );
 
 // 7. User Schema
@@ -166,6 +167,49 @@ const UserSchema = new Schema(
   { timestamps: true }
 );
 
+// 8. Inventory Schema
+const InventorySchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true },
+    productId: { type: String, required: true, index: true },
+    sku: { type: String, required: true },
+    productName: { type: String, required: true },
+    category: { type: String },
+    totalStock: { type: Number, default: 0 },
+    isOutOfStock: { type: Boolean, default: false },
+    colors: [
+      {
+        name: String,
+        code: String,
+        stock: Number,
+      },
+    ],
+    sizes: [
+      {
+        size: String,
+        stock: Number,
+        sku: String,
+      },
+    ],
+  },
+  { timestamps: true }
+);
+
+// 9. Delivery Rate Schema
+const DeliveryRateSchema = new Schema(
+  {
+    district: { type: String, required: true, unique: true, index: true },
+    province: { type: String, required: true },
+    deliveryFee: { type: Number, required: true, default: 180 },
+    enabled: { type: Boolean, required: true, default: true },
+    homeDeliveryFee: { type: Number },
+    branchDeliveryFee: { type: Number },
+    homeDeliveryEnabled: { type: Boolean },
+    branchDeliveryEnabled: { type: Boolean },
+  },
+  { timestamps: true }
+);
+
 export const ProductModel = mongoose.models.Product || mongoose.model('Product', ProductSchema, 'products');
 export const CategoryModel = mongoose.models.Category || mongoose.model('Category', CategorySchema, 'categories');
 export const CollectionModel = mongoose.models.Collection || mongoose.model('Collection', CollectionSchema, 'collections');
@@ -173,3 +217,7 @@ export const OrderModel = mongoose.models.Order || mongoose.model('Order', Order
 export const CouponModel = mongoose.models.Coupon || mongoose.model('Coupon', CouponSchema, 'coupons');
 export const CMSModel = mongoose.models.CMS || mongoose.model('CMS', CMSSchema, 'cms');
 export const UserModel = mongoose.models.User || mongoose.model('User', UserSchema, 'users');
+export const InventoryModel = mongoose.models.Inventory || mongoose.model('Inventory', InventorySchema, 'inventory');
+export const DeliveryRateModel = mongoose.models.DeliveryRate || mongoose.model('DeliveryRate', DeliveryRateSchema, 'delivery_rates');
+
+

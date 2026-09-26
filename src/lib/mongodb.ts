@@ -2,6 +2,10 @@ import mongoose from 'mongoose';
 
 const DEFAULT_FALLBACK_URI = 'mongodb://santoshkingsahani95_db_user:Daisyhubb123@ac-bgczwid-shard-00-00.8pmx4rq.mongodb.net:27017,ac-bgczwid-shard-00-01.8pmx4rq.mongodb.net:27017,ac-bgczwid-shard-00-02.8pmx4rq.mongodb.net:27017/ace-garment?ssl=true&replicaSet=atlas-940b4o-shard-0&authSource=admin&appName=Daisyhub';
 
+function sanitizeMessage(msg: string): string {
+  return (msg || '').replace(/mongodb(\+srv)?:\/\/[^@]+@/gi, 'mongodb://***:***@');
+}
+
 let cached = (global as any).mongoose;
 
 if (!cached) {
@@ -33,9 +37,10 @@ export async function connectToDatabase() {
 
   if (!cached.promise) {
     const opts = {
-      bufferCommands: false,
-      serverSelectionTimeoutMS: 8000,
+      bufferCommands: true,
+      serverSelectionTimeoutMS: 10000,
       dbName: 'ace-garment',
+      maxPoolSize: 10,
     };
 
     cached.promise = mongoose
@@ -45,14 +50,14 @@ export async function connectToDatabase() {
         return m;
       })
       .catch(async (err) => {
-        console.warn(`[MongoDB Primary Connection Warning]: ${err.message}. Retrying fallback connection...`);
+        console.warn(`[MongoDB Primary Connection Warning]: ${sanitizeMessage(err.message)}. Retrying fallback connection...`);
         try {
           await mongoose.disconnect();
           const fallbackConn = await mongoose.connect(DEFAULT_FALLBACK_URI, opts);
           console.log(`✅ Connected to MongoDB Atlas via Fallback (Database: ${fallbackConn.connection.db?.databaseName || 'ace-garment'})`);
           return fallbackConn;
         } catch (fallbackErr: any) {
-          console.error('❌ MongoDB Connection Error:', fallbackErr.message);
+          console.error('❌ MongoDB Connection Error:', sanitizeMessage(fallbackErr.message));
           cached.promise = null;
           cached.conn = null;
           return null;

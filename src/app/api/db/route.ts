@@ -136,6 +136,13 @@ export async function POST(request: Request) {
         }
         break;
       }
+      case 'updateDeliveryRates': {
+        const { rates } = body;
+        if (rates && Array.isArray(rates)) {
+          await serverDb.updateDeliveryRates(rates);
+        }
+        break;
+      }
       case 'createOrder': {
         const { order } = body;
         if (order) {

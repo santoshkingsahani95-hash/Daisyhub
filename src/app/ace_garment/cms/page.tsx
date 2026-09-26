@@ -102,11 +102,22 @@ export default function AdminCMSPage() {
     image: '',
   });
 
+  const [isDirty, setIsDirty] = useState(false);
+  const isDirtyRef = React.useRef(false);
+  isDirtyRef.current = isDirty;
+
+  const updateCmsState = (newCmsObj: HomepageCMS) => {
+    setIsDirty(true);
+    setCms(newCmsObj);
+  };
+
   const loadData = () => {
-    setCms(db.getCMS());
-    setProducts(db.getProducts());
-    setCategories(db.getCategories());
-    setCollections(db.getCollections());
+    if (!isDirtyRef.current) {
+      setCms(db.getCMS());
+      setProducts(db.getProducts());
+      setCategories(db.getCategories());
+      setCollections(db.getCollections());
+    }
   };
 
   useEffect(() => {
@@ -409,6 +420,7 @@ export default function AdminCMSPage() {
   const handleSaveCMSBanners = (e: React.FormEvent) => {
     e.preventDefault();
     db.updateCMS(cms);
+    setIsDirty(false);
     showNotification('Homepage Banners updated live!');
   };
 
@@ -609,7 +621,7 @@ export default function AdminCMSPage() {
                 type="checkbox"
                 id="annEnable"
                 checked={cms.announcementBar.enabled}
-                onChange={(e) => setCms({ ...cms, announcementBar: { ...cms.announcementBar, enabled: e.target.checked } })}
+                onChange={(e) => updateCmsState({ ...cms, announcementBar: { ...cms.announcementBar, enabled: e.target.checked } })}
                 className="w-4 h-4 accent-brand-dark"
               />
               <label htmlFor="annEnable" className="text-xs font-bold text-brand-dark">Enable Top Announcement Bar</label>
@@ -619,7 +631,7 @@ export default function AdminCMSPage() {
               <input
                 type="text"
                 value={cms.announcementBar.text}
-                onChange={(e) => setCms({ ...cms, announcementBar: { ...cms.announcementBar, text: e.target.value } })}
+                onChange={(e) => updateCmsState({ ...cms, announcementBar: { ...cms.announcementBar, text: e.target.value } })}
                 className="w-full p-3 border border-brand-border rounded text-xs font-medium focus:outline-none focus:border-brand-dark"
               />
             </div>
@@ -636,7 +648,7 @@ export default function AdminCMSPage() {
                 <textarea
                   rows={2}
                   value={cms.hero.heading}
-                  onChange={(e) => setCms({ ...cms, hero: { ...cms.hero, heading: e.target.value } })}
+                  onChange={(e) => updateCmsState({ ...cms, hero: { ...cms.hero, heading: e.target.value } })}
                   className="w-full p-3 border border-brand-border rounded font-serif-title text-sm"
                 />
               </div>
@@ -645,7 +657,7 @@ export default function AdminCMSPage() {
                 <textarea
                   rows={2}
                   value={cms.hero.subtitle}
-                  onChange={(e) => setCms({ ...cms, hero: { ...cms.hero, subtitle: e.target.value } })}
+                  onChange={(e) => updateCmsState({ ...cms, hero: { ...cms.hero, subtitle: e.target.value } })}
                   className="w-full p-3 border border-brand-border rounded"
                 />
               </div>
@@ -654,7 +666,7 @@ export default function AdminCMSPage() {
                 <input
                   type="text"
                   value={cms.hero.buttonText}
-                  onChange={(e) => setCms({ ...cms, hero: { ...cms.hero, buttonText: e.target.value } })}
+                  onChange={(e) => updateCmsState({ ...cms, hero: { ...cms.hero, buttonText: e.target.value } })}
                   className="w-full p-2.5 border border-brand-border rounded"
                 />
               </div>
@@ -663,7 +675,7 @@ export default function AdminCMSPage() {
                 <input
                   type="text"
                   value={cms.hero.buttonUrl}
-                  onChange={(e) => setCms({ ...cms, hero: { ...cms.hero, buttonUrl: e.target.value } })}
+                  onChange={(e) => updateCmsState({ ...cms, hero: { ...cms.hero, buttonUrl: e.target.value } })}
                   className="w-full p-2.5 border border-brand-border rounded"
                 />
               </div>
@@ -679,7 +691,7 @@ export default function AdminCMSPage() {
                   accept="image/*"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) handleFileUpload(f, (url) => setCms({ ...cms, hero: { ...cms.hero, desktopImage: url } }));
+                    if (f) handleFileUpload(f, (url) => updateCmsState({ ...cms, hero: { ...cms.hero, desktopImage: url } }));
                   }}
                   className="text-xs"
                 />
@@ -696,7 +708,7 @@ export default function AdminCMSPage() {
                   accept="image/*"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) handleFileUpload(f, (url) => setCms({ ...cms, hero: { ...cms.hero, mobileImage: url } }));
+                    if (f) handleFileUpload(f, (url) => updateCmsState({ ...cms, hero: { ...cms.hero, mobileImage: url } }));
                   }}
                   className="text-xs"
                 />
@@ -715,7 +727,7 @@ export default function AdminCMSPage() {
                 <input
                   type="text"
                   value={cms.editorialBanner.heading}
-                  onChange={(e) => setCms({ ...cms, editorialBanner: { ...cms.editorialBanner, heading: e.target.value } })}
+                  onChange={(e) => updateCmsState({ ...cms, editorialBanner: { ...cms.editorialBanner, heading: e.target.value } })}
                   className="w-full p-2.5 border border-brand-border rounded"
                 />
               </div>
@@ -724,7 +736,7 @@ export default function AdminCMSPage() {
                 <input
                   type="text"
                   value={cms.editorialBanner.subtitle}
-                  onChange={(e) => setCms({ ...cms, editorialBanner: { ...cms.editorialBanner, subtitle: e.target.value } })}
+                  onChange={(e) => updateCmsState({ ...cms, editorialBanner: { ...cms.editorialBanner, subtitle: e.target.value } })}
                   className="w-full p-2.5 border border-brand-border rounded"
                 />
               </div>
@@ -738,7 +750,7 @@ export default function AdminCMSPage() {
                   accept="image/*"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) handleFileUpload(f, (url) => setCms({ ...cms, editorialBanner: { ...cms.editorialBanner, image: url } }));
+                    if (f) handleFileUpload(f, (url) => updateCmsState({ ...cms, editorialBanner: { ...cms.editorialBanner, image: url } }));
                   }}
                 />
               </div>

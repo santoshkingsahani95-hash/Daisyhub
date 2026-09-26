@@ -159,11 +159,12 @@ export default function AdminInventoryPage() {
           const updatedColors = p.colors.map((c) =>
             c.name.toLowerCase() === colorName.toLowerCase() ? { ...c, stock: newStock } : c
           );
-          const totalColorStock = updatedColors.reduce((acc, c) => acc + (c.stock !== undefined ? c.stock : 10), 0);
+          const totalColorStock = updatedColors.reduce((acc, c) => acc + (typeof c.stock === 'number' ? c.stock : 0), 0);
           return {
             ...p,
             colors: updatedColors,
             sizes: [{ size: 'Free Size', stock: totalColorStock }],
+            isOutOfStock: totalColorStock <= 0,
           };
         }
         return p;

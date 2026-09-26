@@ -68,234 +68,7 @@ const initialCollections = [
   },
 ];
 
-const seedProducts = [
-  {
-    id: 'prod-flora-maxi',
-    slug: 'floral-chiffon-maxi-dress',
-    name: 'Floral Chiffon Tiered Maxi Dress',
-    description: 'An elegant floral printed chiffon maxi dress featuring delicate ruffles, a cinched waistline, and comfortable inner lining. Perfect for daytime events and gatherings.',
-    details: ['100% Premium Chiffon fabric', 'Full soft cotton lining', 'Elastic waistband with self-tie belt', 'Breathable and lightweight'],
-    fabricCare: 'Hand wash in cold water or dry clean. Do not bleach. Cool iron if needed.',
-    category: 'dresses',
-    subcategory: 'Maxi Dresses',
-    collections: ['new-arrivals', 'best-sellers', 'trending'],
-    price: 3200,
-    salePrice: 2650,
-    discountPercentage: 17,
-    rating: 4.9,
-    reviewCount: 18,
-    isTrending: true,
-    isNewArrival: true,
-    isBestSeller: true,
-    isSale: true,
-    isOutOfStock: false,
-    colors: [
-      {
-        name: 'Pastel Floral',
-        code: '#e8c5c8',
-        images: [
-          'https://images.unsplash.com/photo-1595777457583-95e059d581b8?q=80&w=800&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?q=80&w=800&auto=format&fit=crop',
-        ],
-        stock: 12,
-      },
-      {
-        name: 'Sage Floral',
-        code: '#9caf88',
-        images: [
-          'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?q=80&w=800&auto=format&fit=crop',
-        ],
-        stock: 8,
-      },
-    ],
-    sizes: [
-      { size: 'S', stock: 5, sku: 'DH-DRS-01-S' },
-      { size: 'M', stock: 8, sku: 'DH-DRS-01-M' },
-      { size: 'L', stock: 7, sku: 'DH-DRS-01-L' },
-    ],
-    sku: 'DH-DRS-01',
-    createdAt: new Date().toISOString(),
-    reviews: [
-      {
-        id: 'rev-1',
-        userName: 'Aayusha Shrestha',
-        rating: 5,
-        comment: 'Absolutely stunning dress! The fabric is lightweight and super comfortable. Received so many compliments!',
-        createdAt: '2026-02-14',
-        verifiedPurchase: true,
-      },
-      {
-        id: 'rev-2',
-        userName: 'Pooja Thapa',
-        rating: 5,
-        comment: 'Great fitting and fast delivery in Lalitpur. Will order again from DaisyHub!',
-        createdAt: '2026-02-20',
-        verifiedPurchase: true,
-      },
-    ],
-    insideValleyFee: 100,
-    outsideValleyFee: 200,
-    isFreeDelivery: false,
-  },
-  {
-    id: 'prod-satin-coord',
-    slug: 'luxurious-satin-two-piece-coord-set',
-    name: 'Luxurious Satin Two-Piece Co-ord Set',
-    description: 'Chic two-piece satin co-ord set featuring a button-up shirt and wide-leg matching trousers. Premium silky sheen with ultra-soft handfeel.',
-    details: ['High grade silk satin blend', 'Relaxed fit shirt with lapel collar', 'High-waist elasticated trousers with side pockets'],
-    fabricCare: 'Dry clean recommended or gentle hand wash in cold water.',
-    category: 'sets',
-    subcategory: 'Two-Piece Sets',
-    collections: ['new-arrivals', 'best-sellers', 'trending'],
-    price: 3800,
-    salePrice: 3290,
-    discountPercentage: 13,
-    rating: 4.8,
-    reviewCount: 14,
-    isTrending: true,
-    isNewArrival: true,
-    isBestSeller: true,
-    isSale: true,
-    isOutOfStock: false,
-    colors: [
-      {
-        name: 'Emerald Green',
-        code: '#046307',
-        images: [
-          'https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=800&auto=format&fit=crop',
-        ],
-        stock: 10,
-      },
-      {
-        name: 'Champagne Beige',
-        code: '#f5e6d3',
-        images: [
-          'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=800&auto=format&fit=crop',
-        ],
-        stock: 6,
-      },
-    ],
-    sizes: [
-      { size: 'S', stock: 4, sku: 'DH-SET-01-S' },
-      { size: 'M', stock: 7, sku: 'DH-SET-01-M' },
-      { size: 'L', stock: 5, sku: 'DH-SET-01-L' },
-    ],
-    sku: 'DH-SET-01',
-    createdAt: new Date().toISOString(),
-    reviews: [
-      {
-        id: 'rev-3',
-        userName: 'Smarika Maharjan',
-        rating: 5,
-        comment: 'Very elegant satin set. Fits perfectly and looks super high-end.',
-        createdAt: '2026-03-01',
-        verifiedPurchase: true,
-      },
-    ],
-    insideValleyFee: 100,
-    outsideValleyFee: 200,
-    isFreeDelivery: true,
-  },
-  {
-    id: 'prod-linen-blouse',
-    slug: 'classic-linen-button-down-shirt',
-    name: 'Classic Linen Button-Down Oversized Shirt',
-    description: 'Versatile oversized button-down shirt crafted from breathable cotton-linen blend. Ideal for layering or casual everyday wear.',
-    details: ['Organic cotton linen blend', 'Oversized silhouette', 'Chest pocket detail', 'Mother-of-pearl finish buttons'],
-    fabricCare: 'Machine wash warm on gentle cycle. Tumble dry low.',
-    category: 'tops',
-    subcategory: 'Shirts',
-    collections: ['new-arrivals', 'trending'],
-    price: 2400,
-    salePrice: 1990,
-    discountPercentage: 17,
-    rating: 4.7,
-    reviewCount: 9,
-    isTrending: true,
-    isNewArrival: true,
-    isBestSeller: false,
-    isSale: true,
-    isOutOfStock: false,
-    colors: [
-      {
-        name: 'Crisp White',
-        code: '#ffffff',
-        images: [
-          'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=800&auto=format&fit=crop',
-        ],
-        stock: 15,
-      },
-      {
-        name: 'Sky Blue',
-        code: '#87ceeb',
-        images: [
-          'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?q=80&w=800&auto=format&fit=crop',
-        ],
-        stock: 9,
-      },
-    ],
-    sizes: [
-      { size: 'Free Size', stock: 24, sku: 'DH-TOP-01-FS' },
-    ],
-    sku: 'DH-TOP-01',
-    createdAt: new Date().toISOString(),
-    reviews: [],
-    insideValleyFee: 100,
-    outsideValleyFee: 200,
-    isFreeDelivery: false,
-  },
-  {
-    id: 'prod-pleated-trousers',
-    slug: 'high-waist-wide-leg-pleated-trousers',
-    name: 'High-Waist Wide-Leg Pleated Trousers',
-    description: 'Sophisticated tailored trousers with front pleats, slant pockets, and a flattering high-waist fit. Perfect for office and evening wear.',
-    details: ['Premium crepe suiting fabric', 'Front zipper with hook & bar closure', 'Deep side slant pockets', 'Straight wide-leg cut'],
-    fabricCare: 'Machine wash cold inside out. Hang dry.',
-    category: 'bottoms',
-    subcategory: 'Pants & Trousers',
-    collections: ['best-sellers', 'trending'],
-    price: 2800,
-    salePrice: 2400,
-    discountPercentage: 14,
-    rating: 4.9,
-    reviewCount: 22,
-    isTrending: true,
-    isNewArrival: false,
-    isBestSeller: true,
-    isSale: true,
-    isOutOfStock: false,
-    colors: [
-      {
-        name: 'Jet Black',
-        code: '#1a1a1a',
-        images: [
-          'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?q=80&w=800&auto=format&fit=crop',
-        ],
-        stock: 18,
-      },
-      {
-        name: 'Camel Tan',
-        code: '#c19a6b',
-        images: [
-          'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?q=80&w=800&auto=format&fit=crop',
-        ],
-        stock: 14,
-      },
-    ],
-    sizes: [
-      { size: 'S (26-27)', stock: 8, sku: 'DH-BTM-01-S' },
-      { size: 'M (28-29)', stock: 12, sku: 'DH-BTM-01-M' },
-      { size: 'L (30-31)', stock: 10, sku: 'DH-BTM-01-L' },
-      { size: 'XL (32-33)', stock: 6, sku: 'DH-BTM-01-XL' },
-    ],
-    sku: 'DH-BTM-01',
-    createdAt: new Date().toISOString(),
-    reviews: [],
-    insideValleyFee: 100,
-    outsideValleyFee: 200,
-    isFreeDelivery: false,
-  },
-];
+const seedProducts = [];
 
 const initialCMS = {
   key: 'homepage',
@@ -379,11 +152,47 @@ async function seedDatabase() {
 
     const db = mongoose.connection.db;
 
-    // 1. Seed Products
+    // 1. Seed Products & Inventory (Cleared)
     const prodCol = db.collection('products');
     await prodCol.deleteMany({});
-    await prodCol.insertMany(seedProducts);
-    console.log(`✓ Seeded ${seedProducts.length} Products into MongoDB Atlas!`);
+    if (seedProducts.length > 0) {
+      await prodCol.insertMany(seedProducts);
+    }
+    console.log(`✓ Cleared Products in MongoDB Atlas (${seedProducts.length} remaining)!`);
+
+    const invCol = db.collection('inventory');
+    await invCol.deleteMany({});
+    const seedInventory = seedProducts.map((p) => {
+      const totalStock = p.colors && p.colors.length > 0
+        ? p.colors.reduce((sum, c) => sum + (c.stock || 0), 0)
+        : (p.sizes ? p.sizes.reduce((sum, s) => sum + (s.stock || 0), 0) : 0);
+      return {
+        id: `inv-${p.id}`,
+        productId: p.id,
+        sku: p.sku,
+        productName: p.name,
+        category: p.category,
+        totalStock,
+        isOutOfStock: totalStock <= 0,
+        colors: p.colors || [],
+        sizes: p.sizes || [],
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    if (seedInventory.length > 0) {
+      await invCol.insertMany(seedInventory);
+    }
+    console.log(`✓ Cleared Inventory in MongoDB Atlas (${seedInventory.length} remaining)!`);
+
+    // Clear Orders and Coupons test data
+    const ordCol = db.collection('orders');
+    await ordCol.deleteMany({});
+    console.log('✓ Cleared test Orders in MongoDB Atlas!');
+
+    const coupCol = db.collection('coupons');
+    await coupCol.deleteMany({});
+    console.log('✓ Cleared test Coupons in MongoDB Atlas!');
+    console.log(`✓ Seeded ${seedInventory.length} Inventory items into MongoDB Atlas 'inventory' table!`);
 
     // 2. Seed Categories
     const catCol = db.collection('categories');
@@ -402,6 +211,39 @@ async function seedDatabase() {
     await cmsCol.deleteMany({});
     await cmsCol.insertOne(initialCMS);
     console.log('✓ Seeded Homepage CMS into MongoDB Atlas!');
+
+    // 5. Seed Delivery Rates (77 Nepal Districts)
+    const NEPAL_PROVINCES = [
+      { name: 'Koshi Province', districts: ['Bhojpur', 'Dhankuta', 'Ilam', 'Jhapa', 'Khotang', 'Morang', 'Okhaldhunga', 'Panchthar', 'Sankhuwasabha', 'Solukhumbu', 'Sunsari', 'Taplejung', 'Terhathum', 'Udayapur'] },
+      { name: 'Madhesh Province', districts: ['Bara', 'Dhanusha', 'Mahottari', 'Parsa', 'Rautahat', 'Saptari', 'Sarlahi', 'Siraha'] },
+      { name: 'Bagmati Province', districts: ['Bhaktapur', 'Chitwan', 'Dhading', 'Dolakha', 'Kathmandu', 'Kavrepalanchok', 'Lalitpur', 'Makwanpur', 'Nuwakot', 'Ramechhap', 'Rasuwa', 'Sindhuli', 'Sindhupalchok'] },
+      { name: 'Gandaki Province', districts: ['Baglung', 'Gorkha', 'Kaski', 'Lamjung', 'Manang', 'Mustang', 'Myagdi', 'Nawalpur', 'Parbat', 'Syangja', 'Tanahun'] },
+      { name: 'Lumbini Province', districts: ['Arghakhanchi', 'Banke', 'Bardiya', 'Dang', 'Gulmi', 'Kapilvastu', 'Parasi', 'Palpa', 'Pyuthan', 'Rolpa', 'Rukum East', 'Rupandehi'] },
+      { name: 'Karnali Province', districts: ['Dailekh', 'Dolpa', 'Humla', 'Jajarkot', 'Jumla', 'Kalikot', 'Mugu', 'Salyan', 'Surkhet', 'Rukum West'] },
+      { name: 'Sudurpashchim Province', districts: ['Achham', 'Baitadi', 'Bajhang', 'Bajura', 'Dadeldhura', 'Darchula', 'Doti', 'Kailali', 'Kanchanpur'] },
+    ];
+
+    const initialRates = [];
+    NEPAL_PROVINCES.forEach((province) => {
+      province.districts.forEach((district) => {
+        const isValley = ['Kathmandu', 'Lalitpur', 'Bhaktapur'].includes(district);
+        initialRates.push({
+          district,
+          province: province.name,
+          deliveryFee: isValley ? 100 : 180,
+          enabled: true,
+          homeDeliveryFee: isValley ? 100 : 180,
+          branchDeliveryFee: isValley ? 50 : 120,
+          homeDeliveryEnabled: true,
+          branchDeliveryEnabled: true,
+        });
+      });
+    });
+
+    const delRatesCol = db.collection('delivery_rates');
+    await delRatesCol.deleteMany({});
+    await delRatesCol.insertMany(initialRates);
+    console.log(`✓ Seeded ${initialRates.length} Nepal District Delivery Rates into MongoDB Atlas 'delivery_rates' collection!`);
 
     // 5. Seed Admin User
     const userCol = db.collection('users');

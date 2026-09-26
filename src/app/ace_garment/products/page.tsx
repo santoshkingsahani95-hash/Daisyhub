@@ -236,7 +236,7 @@ export default function AdminProductsPage() {
         images: c.images.length > 0 ? c.images : ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop'],
       })),
       sizes: [
-        { size: 'Free Size', stock: colorsList.reduce((acc, c) => acc + (c.stock || 50), 0) },
+        { size: 'Free Size', stock: colorsList.reduce((acc, c) => acc + (typeof c.stock === 'number' ? c.stock : 10), 0) },
       ],
       insideValleyFee: Number(formData.insideValleyFee) || 100,
       outsideValleyFee: Number(formData.outsideValleyFee) || 200,
