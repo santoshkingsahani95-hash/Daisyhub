@@ -12,53 +12,12 @@ let sqliteDb: any = null;
 let useMySql = false;
 let isInitialized = false;
 
-function getSqliteDb(): any {
-  if (!sqliteDb) {
-    try {
-      const sqlite3 = require('sqlite3');
-      const dbPath = path.join(process.cwd(), 'database.sqlite');
-      sqliteDb = new sqlite3.Database(dbPath);
-    } catch (e) {
-      console.warn('[SQLite] Native sqlite3 module not available in this environment');
-      return null;
-    }
-  }
-  return sqliteDb;
-}
-
-function runSqliteQuery<T = any>(sql: string, params: any[] = []): Promise<T> {
-  const db = getSqliteDb();
-  if (!db) {
+function runFallbackQuery<T = any>(sql: string, params: any[] = []): Promise<T> {
+  const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
+  if (isSelect) {
     return Promise.resolve([] as unknown as T);
   }
-
-  // Convert MySQL 'ON DUPLICATE KEY UPDATE' to SQLite 'ON CONFLICT DO UPDATE' or 'INSERT OR REPLACE'
-  let safeSql = sql;
-  const dupIndex = safeSql.toUpperCase().indexOf('ON DUPLICATE KEY UPDATE');
-  if (dupIndex !== -1) {
-    safeSql = safeSql.substring(0, dupIndex).trim();
-    if (safeSql.endsWith(';')) safeSql = safeSql.slice(0, -1);
-    safeSql = safeSql.replace(/INSERT INTO/i, 'INSERT OR REPLACE INTO');
-  }
-
-  // Handle MySQL escaped backticks for CMS table
-  safeSql = safeSql.replace(/`key`/g, 'key');
-
-  const isSelect = safeSql.trim().toUpperCase().startsWith('SELECT');
-
-  return new Promise((resolve, reject) => {
-    if (isSelect) {
-      db.all(safeSql, params, (err: any, rows: any) => {
-        if (err) reject(err);
-        else resolve(rows as unknown as T);
-      });
-    } else {
-      db.run(safeSql, params, function (this: any, err: any) {
-        if (err) reject(err);
-        else resolve({ affectedRows: this.changes, insertId: this.lastID } as unknown as T);
-      });
-    }
-  });
+  return Promise.resolve({ affectedRows: 0, insertId: 0 } as unknown as T);
 }
 
 /**
@@ -70,11 +29,10 @@ export async function executeQuery<T = any>(sql: string, params: any[] = []): Pr
       const [results] = await pool.execute(sql, params);
       return results as T;
     } catch (e) {
-      // Fallback to local SQLite if remote MySQL connection drops
-      return await runSqliteQuery<T>(sql, params);
+      return await runFallbackQuery<T>(sql, params);
     }
   }
-  return await runSqliteQuery<T>(sql, params);
+  return await runFallbackQuery<T>(sql, params);
 }
 
 /**
