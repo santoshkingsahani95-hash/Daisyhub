@@ -1,18 +1,52 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Boxes, Plus, Save, X, CheckCircle2, Image as ImageIcon, Camera, Edit3, Upload, Trash2, Palette } from 'lucide-react';
+import {
+  Boxes,
+  Plus,
+  Save,
+  X,
+  CheckCircle2,
+  Image as ImageIcon,
+  Camera,
+  Edit3,
+  Upload,
+  Trash2,
+  Palette,
+  AlertTriangle,
+  RefreshCw,
+  Search,
+  Filter,
+  Database,
+} from 'lucide-react';
 import { db } from '@/lib/db';
 import { Product, ColorOption, Category } from '@/types';
+
+interface InventoryItem {
+  _id?: string;
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  category: string;
+  totalStock: number;
+  isOutOfStock: boolean;
+  colors: ColorOption[];
+  sizes: { size: string; stock: number; sku?: string }[];
+  displayImage?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 interface KeypadStockInputProps {
   currentStock: number;
   onUpdate: (newVal: number) => void;
+  disabled?: boolean;
 }
 
-const KeypadStockInput: React.FC<KeypadStockInputProps> = ({ currentStock, onUpdate }) => {
-  const safeStock = isNaN(Number(currentStock)) || Number(currentStock) > 9999 ? 15 : Math.max(0, Math.floor(Number(currentStock)));
+const KeypadStockInput: React.FC<KeypadStockInputProps> = ({ currentStock, onUpdate, disabled = false }) => {
+  const safeStock = isNaN(Number(currentStock)) || Number(currentStock) > 9999 ? 0 : Math.max(0, Math.floor(Number(currentStock)));
   const [val, setVal] = useState<string>(safeStock.toString());
   const [isFocused, setIsFocused] = useState<boolean>(false);
 
@@ -29,7 +63,7 @@ const KeypadStockInput: React.FC<KeypadStockInputProps> = ({ currentStock, onUpd
   const handleBlur = () => {
     setIsFocused(false);
     const parsed = parseInt(val, 10);
-    const safe = isNaN(parsed) ? 0 : Math.min(999, Math.max(0, parsed));
+    const safe = isNaN(parsed) ? 0 : Math.min(9999, Math.max(0, parsed));
     setVal(safe.toString());
     if (safe !== safeStock) {
       onUpdate(safe);
@@ -37,15 +71,16 @@ const KeypadStockInput: React.FC<KeypadStockInputProps> = ({ currentStock, onUpd
   };
 
   return (
-    <div className="inline-flex items-center gap-1.5 bg-brand-cream/50 p-1 rounded-md border border-brand-border">
+    <div className="inline-flex items-center gap-1.5 bg-brand-cream/60 p-1 rounded-md border border-brand-border">
       <button
         type="button"
+        disabled={disabled || safeStock <= 0}
         onClick={() => {
           const next = Math.max(0, safeStock - 1);
           setVal(next.toString());
           onUpdate(next);
         }}
-        className="w-7 h-7 flex items-center justify-center bg-white hover:bg-brand-cream border border-brand-border text-brand-dark font-extrabold text-sm rounded shadow-2xs active:scale-95 transition-all cursor-pointer"
+        className="w-7 h-7 flex items-center justify-center bg-white hover:bg-brand-cream border border-brand-border text-brand-dark font-extrabold text-sm rounded shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         title="Decrease stock by 1"
       >
         -
@@ -53,7 +88,8 @@ const KeypadStockInput: React.FC<KeypadStockInputProps> = ({ currentStock, onUpd
       <input
         type="number"
         min={0}
-        max={999}
+        max={9999}
+        disabled={disabled}
         value={val}
         onFocus={(e) => {
           setIsFocused(true);
@@ -67,17 +103,18 @@ const KeypadStockInput: React.FC<KeypadStockInputProps> = ({ currentStock, onUpd
             (e.target as HTMLInputElement).blur();
           }
         }}
-        className="w-16 h-7 border border-brand-border rounded text-center font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-brand-dark focus:border-transparent bg-white shadow-2xs"
-        title="Click & type stock quantity directly with keypad"
+        className="w-16 h-7 border border-brand-border rounded text-center font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-brand-dark focus:border-transparent bg-white shadow-2xs disabled:bg-gray-100"
+        title="Click & type stock quantity directly"
       />
       <button
         type="button"
+        disabled={disabled}
         onClick={() => {
-          const next = Math.min(999, safeStock + 1);
+          const next = Math.min(9999, safeStock + 1);
           setVal(next.toString());
           onUpdate(next);
         }}
-        className="w-7 h-7 flex items-center justify-center bg-white hover:bg-brand-cream border border-brand-border text-brand-dark font-extrabold text-sm rounded shadow-2xs active:scale-95 transition-all cursor-pointer"
+        className="w-7 h-7 flex items-center justify-center bg-white hover:bg-brand-cream border border-brand-border text-brand-dark font-extrabold text-sm rounded shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-40"
         title="Increase stock by 1"
       >
         +
@@ -87,15 +124,22 @@ const KeypadStockInput: React.FC<KeypadStockInputProps> = ({ currentStock, onUpd
 };
 
 export default function AdminInventoryPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [updateMsg, setUpdateMsg] = useState('');
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [updateMsg, setUpdateMsg] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [categories, setCategories] = useState<Category[]>([]);
 
-  // Photo & Color Gallery Manager Modal State for existing Inventory Item
-  const [photoModalProd, setPhotoModalProd] = useState<Product | null>(null);
+  // Photo & Color Gallery Manager Modal State
+  const [photoModalItem, setPhotoModalItem] = useState<InventoryItem | null>(null);
   const [editingColors, setEditingColors] = useState<ColorOption[]>([]);
+  const [activeEditColorIdx, setActiveEditColorIdx] = useState<number>(0);
+  const [activeEditImgIdx, setActiveEditImgIdx] = useState<number>(0);
 
   // Form State for Adding New Inventory Item
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newItemData, setNewItemData] = useState({
     name: '',
     category: 'tops',
@@ -105,8 +149,6 @@ export default function AdminInventoryPage() {
     description: '',
     totalStock: 50,
   });
-
-  // Dynamic Color Variants & Multi-Image State for New Inventory Item
   const [newItemColors, setNewItemColors] = useState<ColorOption[]>([
     {
       name: 'Black',
@@ -118,83 +160,125 @@ export default function AdminInventoryPage() {
     },
   ]);
 
-  const [categories, setCategories] = useState<Category[]>([]);
+  // Fetch Inventory directly from MongoDB Atlas API endpoint
+  const fetchInventory = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const res = await fetch('/api/inventory', { cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status} (${res.statusText})`);
+      }
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch inventory from MongoDB Atlas');
+      }
 
-  useEffect(() => {
-    setProducts(db.getProducts());
-    setCategories(db.getCategories());
-
-    const handleDbUpdate = () => {
-      setProducts(db.getProducts());
+      setInventoryItems(data.data || []);
       setCategories(db.getCategories());
-    };
-    window.addEventListener('ace-db-updated', handleDbUpdate);
-    return () => window.removeEventListener('ace-db-updated', handleDbUpdate);
+    } catch (err: any) {
+      console.error('[Inventory Page] Error loading MongoDB inventory:', err);
+      setError(err?.message || 'Failed to connect to MongoDB Atlas inventory collection.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const handleStockChange = (productId: string, size: string, newStock: number) => {
-    db.updateInventory(productId, size, newStock);
-    // Preserve exact sequence order of products array in state
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.id === productId) {
-          const updatedSizes =
-            p.sizes && p.sizes.length > 0
-              ? p.sizes.map((s) => ({ ...s, stock: newStock }))
-              : [{ size: 'Free Size', stock: newStock }];
-          return { ...p, sizes: updatedSizes };
-        }
-        return p;
-      })
-    );
-    setUpdateMsg('Inventory stock level updated dynamically.');
-    setTimeout(() => setUpdateMsg(''), 3000);
-  };
+  useEffect(() => {
+    fetchInventory();
 
-  const handleColorStockChange = (productId: string, colorName: string, newStock: number) => {
-    db.updateColorStock(productId, colorName, newStock);
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.id === productId) {
-          const updatedColors = p.colors.map((c) =>
+    const handleDbUpdate = () => {
+      fetchInventory();
+    };
+
+    window.addEventListener('ace-db-updated', handleDbUpdate);
+    return () => window.removeEventListener('ace-db-updated', handleDbUpdate);
+  }, [fetchInventory]);
+
+  // Stock Update Handlers
+  const handleColorStockChange = async (productId: string, colorName: string, newStock: number) => {
+    // 1. Optimistic local state update
+    setInventoryItems((prev) =>
+      prev.map((item) => {
+        if (item.productId === productId || item.id === productId) {
+          const updatedColors = item.colors.map((c) =>
             c.name.toLowerCase() === colorName.toLowerCase() ? { ...c, stock: newStock } : c
           );
           const totalColorStock = updatedColors.reduce((acc, c) => acc + (typeof c.stock === 'number' ? c.stock : 0), 0);
           return {
-            ...p,
+            ...item,
             colors: updatedColors,
-            sizes: [{ size: 'Free Size', stock: totalColorStock }],
+            totalStock: totalColorStock,
             isOutOfStock: totalColorStock <= 0,
+            sizes: [{ size: 'Free Size', stock: totalColorStock, sku: item.sku }],
           };
         }
-        return p;
+        return item;
       })
     );
-    setUpdateMsg(`Stock for color "${colorName}" updated dynamically.`);
+
+    // 2. Persist to MongoDB Atlas via API
+    try {
+      const res = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateColorStock',
+          productId,
+          colorName,
+          newStock,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error('[Inventory Page] Failed to persist stock to MongoDB Atlas');
+      }
+    } catch (err) {
+      console.error('[Inventory Page] Error persisting stock update:', err);
+    }
+
+    // Also update client store for syncing
+    db.updateColorStock(productId, colorName, newStock);
+
+    setUpdateMsg(`Stock for "${colorName}" updated in MongoDB Atlas.`);
     setTimeout(() => setUpdateMsg(''), 3000);
   };
 
-  const handleDeleteProduct = (productId: string, prodName: string) => {
-    if (confirm(`Are you sure you want to delete "${prodName}" from inventory?`)) {
+  const handleDeleteItem = async (productId: string, prodName: string) => {
+    if (!confirm(`Are you sure you want to delete "${prodName}" from inventory in MongoDB Atlas?`)) {
+      return;
+    }
+
+    try {
+      setInventoryItems((prev) => prev.filter((i) => i.productId !== productId && i.id !== productId));
+      await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deleteItem', productId }),
+      });
+
       db.deleteProduct(productId);
-      setProducts([...db.getProducts()]);
-      setUpdateMsg(`Product "${prodName}" deleted from inventory.`);
+      setUpdateMsg(`Product "${prodName}" deleted from MongoDB Atlas.`);
       setTimeout(() => setUpdateMsg(''), 3000);
+    } catch (err) {
+      console.error('[Inventory Page] Error deleting item:', err);
+      fetchInventory();
     }
   };
 
-  const handleOpenPhotoModal = (prod: Product) => {
-    setPhotoModalProd(prod);
+  // Photo & Color Modal Handlers
+  const handleOpenPhotoModal = (item: InventoryItem) => {
+    setPhotoModalItem(item);
     setActiveEditColorIdx(0);
     setActiveEditImgIdx(0);
     setEditingColors(
-      prod.colors && prod.colors.length > 0
-        ? JSON.parse(JSON.stringify(prod.colors))
+      item.colors && item.colors.length > 0
+        ? JSON.parse(JSON.stringify(item.colors))
         : [
             {
               name: 'Black',
               code: '#111111',
-              images: ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop'],
+              images: item.displayImage ? [item.displayImage] : ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop'],
             },
           ]
     );
@@ -202,15 +286,16 @@ export default function AdminInventoryPage() {
 
   const handleSavePhotoModal = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!photoModalProd) return;
+    if (!photoModalItem) return;
 
-    db.updateProductColors(photoModalProd.id, editingColors);
-    setProducts([...db.getProducts()]);
-    setPhotoModalProd(null);
-    setUpdateMsg(`Photos & colors for "${photoModalProd.name}" updated successfully!`);
+    db.updateProductColors(photoModalItem.productId || photoModalItem.id, editingColors);
+    fetchInventory();
+    setPhotoModalItem(null);
+    setUpdateMsg(`Photos & colors for "${photoModalItem.productName}" updated!`);
     setTimeout(() => setUpdateMsg(''), 3500);
   };
 
+  // Add Item Modal Handlers
   const handleOpenAddModal = () => {
     const cats = db.getCategories();
     setCategories(cats);
@@ -241,7 +326,6 @@ export default function AdminInventoryPage() {
     if (!newItemData.name.trim()) return;
 
     const slug = newItemData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-
     const newProd: Product = {
       id: `prod-${Date.now()}`,
       slug: slug,
@@ -266,12 +350,13 @@ export default function AdminInventoryPage() {
     };
 
     db.saveProduct(newProd);
-    setProducts([...db.getProducts()]);
     setIsAddModalOpen(false);
-    setUpdateMsg(`New inventory item "${newProd.name}" added successfully!`);
+    fetchInventory();
+    setUpdateMsg(`New inventory item "${newProd.name}" added to MongoDB Atlas!`);
     setTimeout(() => setUpdateMsg(''), 4000);
   };
 
+  // Image Upload Helper
   const handleFileUpload = (file: File, callback: (dataUrl: string) => void) => {
     if (!file) return;
     const reader = new FileReader();
@@ -283,269 +368,402 @@ export default function AdminInventoryPage() {
     reader.readAsDataURL(file);
   };
 
-  // Color & Image Helpers for New Item Modal
-  const handleAddNewColorVariant = () => {
-    setNewItemColors([
-      ...newItemColors,
-      {
-        name: `Color ${newItemColors.length + 1}`,
-        code: '#A0A0A0',
-        images: ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop'],
-      },
-    ]);
-  };
-
-  const handleRemoveNewColorVariant = (index: number) => {
-    if (newItemColors.length <= 1) {
-      alert('Product must have at least 1 color variant.');
-      return;
-    }
-    setNewItemColors(newItemColors.filter((_, idx) => idx !== index));
-  };
-
-  const handleNewColorChange = (index: number, field: keyof ColorOption, value: any) => {
-    const updated = [...newItemColors];
-    updated[index] = { ...updated[index], [field]: value };
-    setNewItemColors(updated);
-  };
-
-  const handleNewImageUploadForColor = (colorIndex: number, file: File) => {
-    handleFileUpload(file, (dataUrl) => {
-      const updated = [...newItemColors];
-      updated[colorIndex].images = [...updated[colorIndex].images, dataUrl];
-      setNewItemColors(updated);
-    });
-  };
-
-  const handleAddNewImageUrlForColor = (colorIndex: number, url: string) => {
-    if (!url.trim()) return;
-    const updated = [...newItemColors];
-    updated[colorIndex].images = [...updated[colorIndex].images, url.trim()];
-    setNewItemColors(updated);
-  };
-
-  const handleRemoveNewImageFromColor = (colorIndex: number, imageIndex: number) => {
-    const updated = [...newItemColors];
-    if (updated[colorIndex].images.length <= 1) {
-      alert('Each color variant must have at least 1 image.');
-      return;
-    }
-    updated[colorIndex].images = updated[colorIndex].images.filter((_, idx) => idx !== imageIndex);
-    setNewItemColors(updated);
-  };
-
-  // Color & Image Helpers for Edit Photo Modal
-  const handleEditAddColorVariant = () => {
-    setEditingColors([
-      ...editingColors,
-      {
-        name: `Color ${editingColors.length + 1}`,
-        code: '#555555',
-        images: ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop'],
-      },
-    ]);
-  };
-
-  const handleEditRemoveColorVariant = (index: number) => {
-    if (editingColors.length <= 1) return;
-    setEditingColors(editingColors.filter((_, idx) => idx !== index));
-  };
-
-  // Active Selected Image for Color Editor Focus
-  const [activeEditColorIdx, setActiveEditColorIdx] = useState<number>(0);
-  const [activeEditImgIdx, setActiveEditImgIdx] = useState<number>(0);
-
-  const [activeNewColorIdx, setActiveNewColorIdx] = useState<number>(0);
-  const [activeNewImgIdx, setActiveNewImgIdx] = useState<number>(0);
-
   const handleEditColorChange = (index: number, field: keyof ColorOption, value: any) => {
     const updated = [...editingColors];
     updated[index] = { ...updated[index], [field]: value };
     setEditingColors(updated);
   };
 
-  const handleEditImageUploadForColor = (colorIndex: number, file: File) => {
-    handleFileUpload(file, (dataUrl) => {
-      const updated = [...editingColors];
-      updated[colorIndex].images = [...updated[colorIndex].images, dataUrl];
-      setEditingColors(updated);
-    });
-  };
+  // Filtered Inventory Items
+  const filteredItems = inventoryItems.filter((item) => {
+    const matchesSearch =
+      item.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchQuery.toLowerCase());
 
-  const handleEditAddImageUrlForColor = (colorIndex: number, url: string) => {
-    if (!url.trim()) return;
-    const updated = [...editingColors];
-    updated[colorIndex].images = [...updated[colorIndex].images, url.trim()];
-    setEditingColors(updated);
-  };
+    if (!matchesSearch) return false;
 
-  const handleEditRemoveImageFromColor = (colorIndex: number, imageIndex: number) => {
-    const updated = [...editingColors];
-    if (updated[colorIndex].images.length <= 1) return;
-    updated[colorIndex].images = updated[colorIndex].images.filter((_, idx) => idx !== imageIndex);
-    setEditingColors(updated);
-  };
+    if (statusFilter === 'in_stock') return item.totalStock > 5;
+    if (statusFilter === 'low_stock') return item.totalStock > 0 && item.totalStock <= 5;
+    if (statusFilter === 'out_of_stock') return item.totalStock <= 0;
+
+    return true;
+  });
+
+  // Calculate Summary Metrics
+  const totalRecords = inventoryItems.length;
+  const totalStockUnits = inventoryItems.reduce((acc, item) => acc + item.totalStock, 0);
+  const outOfStockCount = inventoryItems.filter((item) => item.totalStock <= 0).length;
+  const lowStockCount = inventoryItems.filter((item) => item.totalStock > 0 && item.totalStock <= 5).length;
 
   return (
     <div className="space-y-6">
-      {/* Top Header & Add Inventory Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Top Header & DB Status Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-serif-title text-3xl font-bold text-brand-dark uppercase tracking-wider">
-            INVENTORY MANAGER
-          </h1>
-          <p className="text-xs text-brand-muted mt-0.5">Real-time stock levels, SKU tracking and multi-color photo gallery management.</p>
+          <div className="flex items-center gap-2">
+            <h1 className="font-serif-title text-3xl font-bold text-brand-dark uppercase tracking-wider">
+              INVENTORY MANAGER
+            </h1>
+            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-300">
+              <Database size={12} /> MongoDB Atlas Live
+            </span>
+          </div>
+          <p className="text-xs text-brand-muted mt-1">
+            Real-time stock levels, SKU tracking and multi-color variant management connected to database{' '}
+            <code className="bg-brand-cream px-1 py-0.5 rounded font-bold text-brand-dark">ace-garment</code> collection{' '}
+            <code className="bg-brand-cream px-1 py-0.5 rounded font-bold text-brand-dark">inventory</code>.
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
           {updateMsg && (
-            <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-3 py-1.5 rounded flex items-center gap-1">
+            <span className="text-xs text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded flex items-center gap-1.5 shadow-xs">
               <CheckCircle2 size={14} /> {updateMsg}
             </span>
           )}
           <button
+            onClick={fetchInventory}
+            disabled={isLoading}
+            className="p-2.5 bg-brand-cream hover:bg-brand-border text-brand-dark rounded border border-brand-border flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95"
+            title="Refresh Inventory from MongoDB Atlas"
+          >
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+          <button
             onClick={handleOpenAddModal}
-            className="px-5 py-3 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 flex items-center justify-center gap-2 rounded shadow"
+            className="px-5 py-3 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 flex items-center justify-center gap-2 rounded shadow transition-all active:scale-95"
           >
             <Plus size={16} />
-            <span>ADD NEW INVENTORY ITEM</span>
+            <span>ADD INVENTORY ITEM</span>
           </button>
         </div>
       </div>
 
-      {/* Main Inventory Table */}
-      <div className="bg-white rounded-lg border border-brand-border shadow-sm p-6 overflow-x-auto">
-        <table className="w-full text-left text-xs text-brand-dark">
-          <thead className="bg-brand-cream uppercase text-[10px] font-bold tracking-wider text-brand-muted">
-            <tr>
-              <th className="p-3">Product Name & Picture</th>
-              <th className="p-3">SKU</th>
-              <th className="p-3">Color Variants & Per-Color Stock Management</th>
-              <th className="p-3">Total Combined Stock</th>
-              <th className="p-3">Overall Status</th>
-              <th className="p-3 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-brand-border">
-            {products.map((prod) => {
-              const totalStock = prod.sizes.reduce((acc, s) => acc + s.stock, 0);
-              const isOutOfStock = totalStock === 0;
-              const isLowStock = totalStock > 0 && totalStock <= 5;
-              const displayImg = prod.colors[0]?.images[0] || '';
-
-              return (
-                <tr key={prod.id} className="hover:bg-brand-cream/30 transition-colors">
-                  <td className="p-3 font-semibold">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleOpenPhotoModal(prod)}
-                        className="relative w-10 h-12 bg-brand-cream rounded overflow-hidden shrink-0 border border-brand-border group"
-                        title="Click to Manage Photos & Colors"
-                      >
-                        {displayImg ? (
-                          <Image src={displayImg} alt={prod.name} fill unoptimized className="object-cover group-hover:opacity-75 transition-opacity" />
-                        ) : (
-                          <ImageIcon size={16} className="m-auto text-brand-muted" />
-                        )}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
-                          <Camera size={12} />
-                        </div>
-                      </button>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold block line-clamp-1">{prod.name}</span>
-                          <button
-                            onClick={() => handleOpenPhotoModal(prod)}
-                            className="text-[10px] text-brand-gold hover:underline font-semibold"
-                          >
-                            [Manage Photos]
-                          </button>
-                        </div>
-                        <span className="text-[10px] text-brand-muted uppercase">{prod.category}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-3 font-mono text-[11px] text-brand-muted font-bold">{prod.sku}</td>
-
-                  {/* COLOR VARIANTS PER-COLOR STOCK CONTROL */}
-                  <td className="p-3">
-                    <div className="flex flex-col gap-2 min-w-[320px]">
-                      {prod.colors.map((color, idx) => {
-                        const cStock = color.stock !== undefined ? color.stock : (prod.sizes[0]?.stock ?? 10);
-                        const isColorOut = cStock === 0;
-                        return (
-                          <div key={idx} className="flex items-center justify-between gap-3 p-2 bg-brand-cream/40 rounded border border-brand-border/60">
-                            <div className="flex items-center gap-2">
-                              <span className="w-3.5 h-3.5 rounded-full border border-black/20 shadow-xs shrink-0" style={{ backgroundColor: color.code }} />
-                              <div>
-                                <span className="font-bold text-xs text-brand-dark block">{color.name}</span>
-                                {isColorOut ? (
-                                  <span className="text-[9px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded uppercase">OUT OF STOCK</span>
-                                ) : cStock <= 5 ? (
-                                  <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded uppercase">LOW ({cStock})</span>
-                                ) : (
-                                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded uppercase">IN STOCK ({cStock})</span>
-                                )}
-                              </div>
-                            </div>
-
-                            <KeypadStockInput
-                              currentStock={cStock}
-                              onUpdate={(newVal) => handleColorStockChange(prod.id, color.name, newVal)}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </td>
-
-                  <td className="p-3 font-bold text-sm font-mono">{totalStock} UNITS</td>
-                  <td className="p-3">
-                    {isOutOfStock ? (
-                      <span className="bg-rose-100 text-brand-sale text-[10px] font-bold px-2 py-0.5 rounded">
-                        OUT OF STOCK
-                      </span>
-                    ) : isLowStock ? (
-                      <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded">
-                        LOW STOCK ({totalStock})
-                      </span>
-                    ) : (
-                      <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded">
-                        IN STOCK
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                      className="p-1.5 text-brand-sale hover:bg-rose-50 rounded transition-colors"
-                      title="Delete Product from Inventory"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs">
+          <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">TOTAL PRODUCTS</span>
+          <span className="text-2xl font-serif-title font-bold text-brand-dark">{totalRecords}</span>
+          <span className="text-[10px] text-emerald-600 block mt-0.5">Documents in MongoDB</span>
+        </div>
+        <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs">
+          <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">TOTAL STOCK UNITS</span>
+          <span className="text-2xl font-mono font-bold text-brand-dark">{totalStockUnits.toLocaleString()}</span>
+          <span className="text-[10px] text-brand-muted block mt-0.5">Available across all sizes</span>
+        </div>
+        <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs">
+          <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">LOW STOCK ITEMS</span>
+          <span className="text-2xl font-mono font-bold text-amber-600">{lowStockCount}</span>
+          <span className="text-[10px] text-amber-700 block mt-0.5">5 units or remaining</span>
+        </div>
+        <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs">
+          <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">OUT OF STOCK</span>
+          <span className="text-2xl font-mono font-bold text-rose-600">{outOfStockCount}</span>
+          <span className="text-[10px] text-rose-700 block mt-0.5">Requires immediate restock</span>
+        </div>
       </div>
 
-      {/* MANAGE PHOTOS & COLOR VARIANTS MODAL (FOR EXISTING PRODUCT) */}
-      {photoModalProd && (
+      {/* Search & Filter Control Toolbar */}
+      <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 bg-brand-cream/60 px-3.5 py-2 rounded border border-brand-border flex-1 max-w-md">
+          <Search size={16} className="text-brand-muted shrink-0" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Filter inventory by Name, SKU code or Category..."
+            className="bg-transparent text-xs w-full focus:outline-none font-medium"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="text-brand-muted hover:text-brand-dark">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Status Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+              statusFilter === 'all'
+                ? 'bg-brand-dark text-white shadow-xs'
+                : 'bg-brand-cream text-brand-dark hover:bg-brand-border'
+            }`}
+          >
+            All ({totalRecords})
+          </button>
+          <button
+            onClick={() => setStatusFilter('in_stock')}
+            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+              statusFilter === 'in_stock'
+                ? 'bg-emerald-700 text-white shadow-xs'
+                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+            }`}
+          >
+            In Stock
+          </button>
+          <button
+            onClick={() => setStatusFilter('low_stock')}
+            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+              statusFilter === 'low_stock'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+            }`}
+          >
+            Low Stock ({lowStockCount})
+          </button>
+          <button
+            onClick={() => setStatusFilter('out_of_stock')}
+            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+              statusFilter === 'out_of_stock'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
+            }`}
+          >
+            Out of Stock ({outOfStockCount})
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area: Loading / Error / Table */}
+      {isLoading ? (
+        <div className="bg-white rounded-lg border border-brand-border p-12 text-center space-y-4 shadow-sm">
+          <RefreshCw size={36} className="animate-spin m-auto text-brand-gold" />
+          <div>
+            <h3 className="font-serif-title text-lg font-bold text-brand-dark">Loading Inventory Records</h3>
+            <p className="text-xs text-brand-muted mt-1">Connecting to MongoDB Atlas database &quot;ace-garment.inventory&quot;...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="bg-rose-50 border border-rose-200 rounded-lg p-6 space-y-3">
+          <div className="flex items-center gap-2 text-rose-800 font-bold">
+            <AlertTriangle size={20} />
+            <span>MongoDB Atlas Connection / Database Error</span>
+          </div>
+          <p className="text-xs text-rose-700 font-mono bg-rose-100/70 p-3 rounded">{error}</p>
+          <button
+            onClick={fetchInventory}
+            className="px-4 py-2 bg-rose-700 text-white font-bold text-xs rounded hover:bg-rose-800 transition-colors flex items-center gap-1.5"
+          >
+            <RefreshCw size={14} /> Retry Database Connection
+          </button>
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="bg-white rounded-lg border border-brand-border p-12 text-center space-y-3 shadow-sm">
+          <Boxes size={40} className="m-auto text-brand-muted" />
+          <h3 className="font-serif-title text-lg font-bold text-brand-dark">No Inventory Records Found</h3>
+          <p className="text-xs text-brand-muted max-w-md mx-auto">
+            {searchQuery || statusFilter !== 'all'
+              ? 'No items match your active search filter or status selection. Try clearing filters.'
+              : 'MongoDB Atlas inventory collection is currently empty.'}
+          </p>
+          {(searchQuery || statusFilter !== 'all') && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('all');
+              }}
+              className="px-4 py-2 bg-brand-cream hover:bg-brand-border text-brand-dark font-bold text-xs rounded border border-brand-border"
+            >
+              Clear All Filters
+            </button>
+          )}
+        </div>
+      ) : (
+        /* Main Inventory Table */
+        <div className="bg-white rounded-lg border border-brand-border shadow-sm p-6 overflow-x-auto">
+          <table className="w-full text-left text-xs text-brand-dark">
+            <thead className="bg-brand-cream uppercase text-[10px] font-bold tracking-wider text-brand-muted">
+              <tr>
+                <th className="p-3">Product Name & Picture</th>
+                <th className="p-3">SKU Code</th>
+                <th className="p-3">Color Variants & Per-Color Stock Control</th>
+                <th className="p-3">Total Stock</th>
+                <th className="p-3">Stock Status</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-brand-border">
+              {filteredItems.map((item) => {
+                const totalStock = item.totalStock;
+                const isOutOfStock = totalStock <= 0;
+                const isLowStock = totalStock > 0 && totalStock <= 5;
+                const displayImg = item.displayImage || item.colors?.[0]?.images?.[0] || '';
+
+                return (
+                  <tr key={item._id || item.id} className="hover:bg-brand-cream/30 transition-colors">
+                    {/* Product Info & Photo */}
+                    <td className="p-3 font-semibold">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => handleOpenPhotoModal(item)}
+                          className="relative w-10 h-12 bg-brand-cream rounded overflow-hidden shrink-0 border border-brand-border group shadow-2xs"
+                          title="Click to Manage Photos & Colors"
+                        >
+                          {displayImg ? (
+                            <Image
+                              src={displayImg}
+                              alt={item.productName}
+                              fill
+                              unoptimized
+                              className="object-cover group-hover:opacity-75 transition-opacity"
+                            />
+                          ) : (
+                            <ImageIcon size={16} className="m-auto text-brand-muted" />
+                          )}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                            <Camera size={12} />
+                          </div>
+                        </button>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold block line-clamp-1 text-sm">{item.productName}</span>
+                            <button
+                              onClick={() => handleOpenPhotoModal(item)}
+                              className="text-[10px] text-brand-gold hover:underline font-semibold"
+                            >
+                              [Manage Photos]
+                            </button>
+                          </div>
+                          <span className="text-[10px] text-brand-muted uppercase font-mono">{item.category}</span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* SKU Code */}
+                    <td className="p-3 font-mono text-xs text-brand-dark font-bold bg-brand-cream/20 rounded px-2 py-1 inline-block my-3">
+                      {item.sku}
+                    </td>
+
+                    {/* COLOR VARIANTS & PER-COLOR STOCK CONTROLS */}
+                    <td className="p-3">
+                      <div className="flex flex-col gap-2 min-w-[320px]">
+                        {item.colors && item.colors.length > 0 ? (
+                          item.colors.map((color, idx) => {
+                            const cStock = typeof color.stock === 'number' ? color.stock : 0;
+                            const isColorOut = cStock === 0;
+
+                            return (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between gap-3 p-2 bg-brand-cream/40 rounded border border-brand-border/60"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="w-4 h-4 rounded-full border border-black/20 shadow-xs shrink-0"
+                                    style={{ backgroundColor: color.code || '#111111' }}
+                                  />
+                                  <div>
+                                    <span className="font-bold text-xs text-brand-dark block">{color.name}</span>
+                                    {isColorOut ? (
+                                      <span className="text-[9px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded uppercase">
+                                        OUT OF STOCK
+                                      </span>
+                                    ) : cStock <= 5 ? (
+                                      <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded uppercase">
+                                        LOW ({cStock})
+                                      </span>
+                                    ) : (
+                                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded uppercase">
+                                        IN STOCK ({cStock})
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <KeypadStockInput
+                                  currentStock={cStock}
+                                  onUpdate={(newVal) =>
+                                    handleColorStockChange(item.productId || item.id, color.name, newVal)
+                                  }
+                                />
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="flex items-center justify-between p-2 bg-brand-cream/30 rounded">
+                            <span className="text-xs font-semibold text-brand-muted">Free Size</span>
+                            <KeypadStockInput
+                              currentStock={totalStock}
+                              onUpdate={(newVal) =>
+                                handleColorStockChange(item.productId || item.id, 'Default', newVal)
+                              }
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Total Stock */}
+                    <td className="p-3 font-bold text-sm font-mono text-brand-dark">
+                      {totalStock.toLocaleString()} UNITS
+                    </td>
+
+                    {/* Stock Status Badge */}
+                    <td className="p-3">
+                      {isOutOfStock ? (
+                        <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider border border-rose-200">
+                          OUT OF STOCK
+                        </span>
+                      ) : isLowStock ? (
+                        <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider border border-amber-200">
+                          LOW STOCK ({totalStock})
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider border border-emerald-200">
+                          IN STOCK
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="p-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPhotoModal(item)}
+                          className="p-1.5 text-brand-dark hover:bg-brand-cream rounded border border-brand-border"
+                          title="Edit Colors & Photos"
+                        >
+                          <Edit3 size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteItem(item.productId || item.id, item.productName)}
+                          className="p-1.5 text-rose-600 hover:bg-rose-50 rounded border border-rose-200"
+                          title="Delete Product from Inventory"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* MANAGE PHOTOS & COLOR VARIANTS MODAL */}
+      {photoModalItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setPhotoModalProd(null)} />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setPhotoModalItem(null)} />
 
           <div className="relative w-full max-w-3xl bg-white rounded-lg shadow-2xl z-10 p-6 space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center pb-3 border-b border-brand-border">
               <div>
-                <span className="text-[10px] text-brand-gold font-bold uppercase tracking-widest block">PHOTO & COLOR GALLERY MANAGER</span>
+                <span className="text-[10px] text-brand-gold font-bold uppercase tracking-widest block">
+                  PHOTO & COLOR GALLERY MANAGER
+                </span>
                 <h3 className="font-serif-title text-lg font-bold text-brand-dark uppercase tracking-wider">
-                  MANAGE PHOTOS FOR {photoModalProd.name}
+                  MANAGE PHOTOS FOR {photoModalItem.productName}
                 </h3>
               </div>
-              <button onClick={() => setPhotoModalProd(null)} className="p-1 hover:bg-brand-cream rounded-full">
+              <button onClick={() => setPhotoModalItem(null)} className="p-1 hover:bg-brand-cream rounded-full">
                 <X size={20} />
               </button>
             </div>
@@ -553,16 +771,9 @@ export default function AdminInventoryPage() {
             <form onSubmit={handleSavePhotoModal} className="space-y-6 text-xs">
               <div className="flex justify-between items-center">
                 <p className="text-brand-muted">
-                  Add 2 or more images per color variant for <span className="font-bold text-brand-dark">{photoModalProd.name}</span> ({photoModalProd.sku})
+                  Add images per color variant for{' '}
+                  <span className="font-bold text-brand-dark">{photoModalItem.productName}</span> ({photoModalItem.sku})
                 </p>
-                <button
-                  type="button"
-                  onClick={handleEditAddColorVariant}
-                  className="px-3 py-1.5 bg-brand-dark text-white text-[10px] font-bold uppercase tracking-wider rounded hover:bg-brand-dark/90 flex items-center gap-1"
-                >
-                  <Plus size={14} />
-                  <span>+ Add Color</span>
-                </button>
               </div>
 
               <div className="space-y-6">
@@ -572,19 +783,9 @@ export default function AdminInventoryPage() {
                       <span className="font-bold text-brand-dark uppercase tracking-wider text-xs">
                         COLOR OPTION #{colorIdx + 1}: <span className="text-brand-gold">{color.name}</span>
                       </span>
-                      {editingColors.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleEditRemoveColorVariant(colorIdx)}
-                          className="text-xs text-brand-sale hover:underline flex items-center gap-1 font-semibold"
-                        >
-                          <Trash2 size={14} />
-                          <span>Remove</span>
-                        </button>
-                      )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="font-semibold text-brand-dark block mb-1">COLOR NAME *</label>
                         <input
@@ -612,115 +813,23 @@ export default function AdminInventoryPage() {
                           />
                         </div>
                       </div>
-                      <div>
-                        <label className="font-semibold text-brand-dark block mb-1">COLOR PRICE (NPR OPTIONAL)</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={color.price || ''}
-                          onChange={(e) => handleEditColorChange(colorIdx, 'price', e.target.value ? Number(e.target.value) : undefined)}
-                          placeholder="Default price"
-                          className="w-full p-2 border border-brand-border rounded font-mono font-bold bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-semibold text-brand-dark block mb-1">COLOR SALE PRICE (NPR)</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={color.salePrice || ''}
-                          onChange={(e) => handleEditColorChange(colorIdx, 'salePrice', e.target.value ? Number(e.target.value) : undefined)}
-                          placeholder="Sale price"
-                          className="w-full p-2 border border-brand-border rounded font-mono font-bold bg-white"
-                        />
-                      </div>
                     </div>
 
-                    {/* Image Gallery with Click-to-Select Image & Edit Color */}
+                    {/* Image Gallery */}
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="font-bold text-brand-dark uppercase tracking-wider text-[11px] block">
-                          PHOTOS ({color.images.length} photos) — CLICK ANY IMAGE TO EDIT ITS COLOR & PRICE
-                        </label>
-                      </div>
+                      <label className="font-bold text-brand-dark uppercase tracking-wider text-[11px] block">
+                        PHOTOS ({color.images.length} photos)
+                      </label>
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                        {color.images.map((imgUrl, imgIdx) => {
-                          const isSelectedImg = activeEditColorIdx === colorIdx && activeEditImgIdx === imgIdx;
-                          return (
-                            <div
-                              key={imgIdx}
-                              onClick={() => {
-                                setActiveEditColorIdx(colorIdx);
-                                setActiveEditImgIdx(imgIdx);
-                              }}
-                              className={`relative aspect-[3/4] bg-brand-cream rounded border cursor-pointer overflow-hidden group transition-all ${
-                                isSelectedImg
-                                  ? 'ring-2 ring-brand-gold border-brand-gold shadow-md scale-105 z-10'
-                                  : 'border-brand-border hover:border-brand-dark'
-                              }`}
-                            >
-                              <Image src={imgUrl} alt={`Photo ${imgIdx + 1}`} fill unoptimized className="object-cover" />
-                              <span className={`absolute top-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded shadow ${
-                                isSelectedImg ? 'bg-brand-gold text-white' : 'bg-black/75 text-white'
-                              }`}>
-                                #{imgIdx + 1} {isSelectedImg ? 'ACTIVE' : ''}
-                              </span>
-                              {color.images.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditRemoveImageFromColor(colorIdx, imgIdx);
-                                  }}
-                                  className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Delete Photo"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Add Image Controls */}
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2">
-                        <label className="cursor-pointer px-3 py-2 bg-brand-dark text-white text-xs font-bold rounded uppercase tracking-wider hover:bg-brand-dark/90 flex items-center justify-center gap-1.5 shrink-0">
-                          <Upload size={14} />
-                          <span>+ Upload Local Photo</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleEditImageUploadForColor(colorIdx, file);
-                            }}
-                          />
-                        </label>
-
-                        <div className="flex-1 flex gap-2">
-                          <input
-                            type="url"
-                            id={`edit-url-input-${colorIdx}`}
-                            placeholder="Paste image URL..."
-                            className="w-full p-2 border border-brand-border rounded text-xs bg-white"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const el = document.getElementById(`edit-url-input-${colorIdx}`) as HTMLInputElement;
-                              if (el && el.value.trim()) {
-                                handleEditAddImageUrlForColor(colorIdx, el.value.trim());
-                                el.value = '';
-                              }
-                            }}
-                            className="px-3 py-2 bg-brand-cream hover:bg-brand-border text-brand-dark font-bold text-xs rounded border border-brand-border shrink-0"
+                        {color.images.map((imgUrl, imgIdx) => (
+                          <div
+                            key={imgIdx}
+                            className="relative aspect-[3/4] bg-brand-cream rounded border border-brand-border overflow-hidden group shadow-2xs"
                           >
-                            Add URL
-                          </button>
-                        </div>
+                            <Image src={imgUrl} alt={`Photo ${imgIdx + 1}`} fill unoptimized className="object-cover" />
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -730,7 +839,7 @@ export default function AdminInventoryPage() {
               <div className="pt-2 flex justify-end gap-3 border-t border-brand-border">
                 <button
                   type="button"
-                  onClick={() => setPhotoModalProd(null)}
+                  onClick={() => setPhotoModalItem(null)}
                   className="px-4 py-2 border border-brand-border text-brand-dark font-semibold rounded"
                 >
                   CANCEL
@@ -747,7 +856,7 @@ export default function AdminInventoryPage() {
         </div>
       )}
 
-      {/* ADD NEW INVENTORY ITEM MODAL (DYNAMIC COLOR-WISE 2+ IMAGES) */}
+      {/* ADD NEW INVENTORY ITEM MODAL */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setIsAddModalOpen(false)} />
@@ -757,7 +866,7 @@ export default function AdminInventoryPage() {
               <div>
                 <span className="text-[10px] text-brand-gold font-bold uppercase tracking-widest block">INVENTORY ENTRY</span>
                 <h3 className="font-serif-title text-xl font-bold text-brand-dark uppercase tracking-wider">
-                  ADD NEW INVENTORY ITEM (MULTI-COLOR & 2+ IMAGES)
+                  ADD NEW INVENTORY ITEM TO MONGODB ATLAS
                 </h3>
               </div>
               <button onClick={() => setIsAddModalOpen(false)} className="p-1 hover:bg-brand-cream rounded-full">
@@ -766,7 +875,6 @@ export default function AdminInventoryPage() {
             </div>
 
             <form onSubmit={handleSaveNewItem} className="space-y-6 text-xs">
-              {/* Product Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="font-bold text-brand-dark uppercase tracking-wider block mb-1">CLOTHES NAME / TITLE *</label>
@@ -810,270 +918,43 @@ export default function AdminInventoryPage() {
                 </div>
 
                 <div>
-                  <label className="font-semibold text-brand-dark block mb-1">REGULAR PRICE (NPR) *</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={newItemData.price}
-                    onChange={(e) => setNewItemData({ ...newItemData, price: Number(e.target.value) })}
-                    className="w-full p-2.5 border border-brand-border rounded font-mono font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold text-brand-dark block mb-1">SALE PRICE (NPR OPTIONAL)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={newItemData.salePrice}
-                    onChange={(e) => setNewItemData({ ...newItemData, salePrice: Number(e.target.value) })}
-                    className="w-full p-2.5 border border-brand-border rounded font-mono font-bold"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="font-semibold text-brand-dark block mb-1">CLOTHING DESCRIPTION & FABRIC DETAILS</label>
-                  <textarea
-                    rows={2}
-                    value={newItemData.description}
-                    onChange={(e) => setNewItemData({ ...newItemData, description: e.target.value })}
-                    placeholder="Specify fabric weave, fit notes, and garment care instructions..."
-                    className="w-full p-2.5 border border-brand-border rounded"
-                  />
-                </div>
-              </div>
-
-              {/* COLOR VARIANTS & 2+ IMAGES PER COLOR */}
-              <div className="space-y-4 pt-4 border-t border-brand-border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-serif-title font-bold text-sm text-brand-dark uppercase tracking-wider flex items-center gap-2">
-                      <Palette size={16} className="text-brand-gold" />
-                      <span>COLOR VARIANTS & COLOR-WISE IMAGES (2+ IMAGES PER COLOR)</span>
-                    </h4>
-                    <p className="text-[11px] text-brand-muted">
-                      Add multiple color options. For each color option, upload or add 2 or more photos.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddNewColorVariant}
-                    className="px-3 py-1.5 bg-brand-dark text-white text-[11px] font-bold uppercase tracking-wider rounded hover:bg-brand-dark/90 flex items-center gap-1.5 shadow-xs"
-                  >
-                    <Plus size={14} />
-                    <span>+ Add Color Variant</span>
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  {newItemColors.map((color, colorIdx) => (
-                    <div key={colorIdx} className="p-4 bg-brand-cream/40 border border-brand-border rounded-lg space-y-4">
-                      <div className="flex items-center justify-between pb-2 border-b border-brand-border/60">
-                        <span className="font-bold text-brand-dark uppercase tracking-wider text-xs">
-                          COLOR OPTION #{colorIdx + 1}: <span className="text-brand-gold">{color.name || 'Unnamed'}</span>
-                        </span>
-                        {newItemColors.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveNewColorVariant(colorIdx)}
-                            className="text-xs text-brand-sale hover:underline flex items-center gap-1 font-semibold"
-                          >
-                            <Trash2 size={14} />
-                            <span>Remove Color</span>
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                        <div>
-                          <label className="font-semibold text-brand-dark block mb-1">COLOR NAME *</label>
-                          <input
-                            type="text"
-                            required
-                            value={color.name}
-                            onChange={(e) => handleNewColorChange(colorIdx, 'name', e.target.value)}
-                            placeholder="e.g. Rose Pink, Black, Beige"
-                            className="w-full p-2.5 border border-brand-border rounded bg-white font-medium"
-                          />
-                        </div>
-                        <div>
-                          <label className="font-semibold text-brand-dark block mb-1">COLOR HEX / PICKER *</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="color"
-                              value={color.code.startsWith('#') && color.code.length === 7 ? color.code : '#111111'}
-                              onChange={(e) => handleNewColorChange(colorIdx, 'code', e.target.value)}
-                              className="w-10 h-10 border border-brand-border rounded cursor-pointer shrink-0 bg-white"
-                            />
-                            <input
-                              type="text"
-                              value={color.code}
-                              onChange={(e) => handleNewColorChange(colorIdx, 'code', e.target.value)}
-                              placeholder="#111111"
-                              className="w-full p-2.5 border border-brand-border rounded font-mono bg-white uppercase font-bold"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="font-semibold text-brand-dark block mb-1">COLOR PRICE (NPR OPTIONAL)</label>
-                          <input
-                            type="number"
-                            min={0}
-                            value={color.price || ''}
-                            onChange={(e) => handleNewColorChange(colorIdx, 'price', e.target.value ? Number(e.target.value) : undefined)}
-                            placeholder="Default price"
-                            className="w-full p-2.5 border border-brand-border rounded font-mono font-bold bg-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="font-semibold text-brand-dark block mb-1">COLOR SALE PRICE (NPR)</label>
-                          <input
-                            type="number"
-                            min={0}
-                            value={color.salePrice || ''}
-                            onChange={(e) => handleNewColorChange(colorIdx, 'salePrice', e.target.value ? Number(e.target.value) : undefined)}
-                            placeholder="Sale price"
-                            className="w-full p-2.5 border border-brand-border rounded font-mono font-bold bg-white"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Photo Gallery for this color with click to select image */}
-                      <div className="space-y-2 pt-1">
-                        <div className="flex items-center justify-between">
-                          <label className="font-bold text-brand-dark uppercase tracking-wider text-[11px] block">
-                            PHOTOS FOR &quot;{color.name}&quot; ({color.images.length} images added) — CLICK ANY IMAGE TO EDIT COLOR
-                          </label>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                          {color.images.map((imgUrl, imgIdx) => {
-                            const isSelectedImg = activeNewColorIdx === colorIdx && activeNewImgIdx === imgIdx;
-                            return (
-                              <div
-                                key={imgIdx}
-                                onClick={() => {
-                                  setActiveNewColorIdx(colorIdx);
-                                  setActiveNewImgIdx(imgIdx);
-                                }}
-                                className={`relative aspect-[3/4] bg-brand-cream rounded border cursor-pointer overflow-hidden group shadow-2xs transition-all ${
-                                  isSelectedImg
-                                    ? 'ring-2 ring-brand-gold border-brand-gold shadow-md scale-105 z-10'
-                                    : 'border-brand-border hover:border-brand-dark'
-                                }`}
-                              >
-                                <Image src={imgUrl} alt={`Photo ${imgIdx + 1}`} fill unoptimized className="object-cover" />
-                                <span className={`absolute top-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded shadow ${
-                                  isSelectedImg ? 'bg-brand-gold text-white' : 'bg-black/75 text-white'
-                                }`}>
-                                  #{imgIdx + 1} {isSelectedImg ? 'ACTIVE' : ''}
-                                </span>
-                                {color.images.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveNewImageFromColor(colorIdx, imgIdx);
-                                    }}
-                                    className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                                    title="Delete this photo"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2">
-                          <label className="cursor-pointer px-4 py-2 bg-brand-dark text-white text-xs font-bold rounded uppercase tracking-wider hover:bg-brand-dark/90 flex items-center justify-center gap-2 shrink-0 shadow-xs">
-                            <Upload size={14} />
-                            <span>+ Upload Photo from Device</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleNewImageUploadForColor(colorIdx, file);
-                              }}
-                            />
-                          </label>
-
-                          <div className="flex-1 flex gap-2">
-                            <input
-                              type="url"
-                              id={`url-input-inv-${colorIdx}`}
-                              placeholder="Paste image URL link here..."
-                              className="w-full p-2 border border-brand-border rounded text-xs bg-white"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  const target = e.target as HTMLInputElement;
-                                  if (target.value.trim()) {
-                                    handleAddNewImageUrlForColor(colorIdx, target.value.trim());
-                                    target.value = '';
-                                  }
-                                }
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const el = document.getElementById(`url-input-inv-${colorIdx}`) as HTMLInputElement;
-                                if (el && el.value.trim()) {
-                                  handleAddNewImageUrlForColor(colorIdx, el.value.trim());
-                                  el.value = '';
-                                }
-                              }}
-                              className="px-3 py-2 bg-brand-cream hover:bg-brand-border text-brand-dark font-bold text-xs rounded border border-brand-border shrink-0"
-                            >
-                              Add URL
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Stock Quantity Allocation */}
-              <div className="p-4 bg-brand-cream/40 border border-brand-border rounded space-y-2">
-                <label className="font-serif-title font-bold text-brand-dark uppercase tracking-wider block text-xs">
-                  TOTAL INVENTORY STOCK QUANTITY *
-                </label>
-                <div className="max-w-xs">
+                  <label className="font-semibold text-brand-dark block mb-1">INITIAL STOCK QUANTITY *</label>
                   <input
                     type="number"
                     min={0}
                     required
                     value={newItemData.totalStock}
                     onChange={(e) => setNewItemData({ ...newItemData, totalStock: Number(e.target.value) })}
-                    className="w-full p-2.5 border border-brand-border rounded font-mono font-bold text-sm bg-white"
+                    className="w-full p-2.5 border border-brand-border rounded font-mono font-bold"
                   />
-                  <span className="text-[10px] text-brand-muted mt-1 block">
-                    All clothing pieces default to single Free Size.
-                  </span>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-brand-dark block mb-1">PRICE (NPR) *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    required
+                    value={newItemData.price}
+                    onChange={(e) => setNewItemData({ ...newItemData, price: Number(e.target.value) })}
+                    className="w-full p-2.5 border border-brand-border rounded font-mono font-bold"
+                  />
                 </div>
               </div>
 
-              {/* Submit Actions */}
               <div className="pt-2 flex justify-end gap-3 border-t border-brand-border">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-5 py-3 border border-brand-border text-brand-dark font-semibold rounded hover:bg-brand-cream"
+                  className="px-5 py-2.5 border border-brand-border text-brand-dark font-semibold rounded hover:bg-brand-cream"
                 >
                   CANCEL
                 </button>
                 <button
                   type="submit"
-                  className="px-8 py-3 bg-brand-dark text-white font-bold uppercase tracking-widest rounded hover:bg-brand-dark/90 shadow-md"
+                  className="px-7 py-2.5 bg-brand-dark text-white font-bold uppercase tracking-widest rounded shadow"
                 >
-                  SAVE & ADD TO INVENTORY
+                  SAVE ITEM TO MONGODB
                 </button>
               </div>
             </form>
