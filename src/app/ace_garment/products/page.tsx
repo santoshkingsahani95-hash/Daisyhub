@@ -77,17 +77,35 @@ export default function AdminProductsPage() {
     },
   ]);
 
-  useEffect(() => {
+  const fetchFreshProducts = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/db', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data && Array.isArray(json.data.products)) {
+          setProducts(json.data.products);
+          if (Array.isArray(json.data.categories)) {
+            setCategories(json.data.categories);
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('[Products Page] Direct API fetch warning:', e);
+    }
     setProducts(db.getProducts());
     setCategories(db.getCategories());
+  }, []);
+
+  useEffect(() => {
+    fetchFreshProducts();
 
     const handleDbUpdate = () => {
-      setProducts(db.getProducts());
-      setCategories(db.getCategories());
+      fetchFreshProducts();
     };
     window.addEventListener('ace-db-updated', handleDbUpdate);
     return () => window.removeEventListener('ace-db-updated', handleDbUpdate);
-  }, []);
+  }, [fetchFreshProducts]);
 
   const filtered = products.filter(
     (p) =>
@@ -153,10 +171,10 @@ export default function AdminProductsPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this product?')) {
       db.deleteProduct(id);
-      setProducts(db.getProducts());
+      setTimeout(() => fetchFreshProducts(), 500);
     }
   };
 
@@ -214,7 +232,7 @@ export default function AdminProductsPage() {
     setColorsList(updated);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const slugGen = formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
@@ -244,8 +262,8 @@ export default function AdminProductsPage() {
     };
 
     db.saveProduct(newProd);
-    setProducts(db.getProducts());
     setIsModalOpen(false);
+    setTimeout(() => fetchFreshProducts(), 500);
   };
 
   return (

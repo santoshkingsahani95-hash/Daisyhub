@@ -25,26 +25,42 @@ function ShopContent() {
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCat);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
-  const [maxPrice, setMaxPrice] = useState<number>(5000);
+  const [maxPrice, setMaxPrice] = useState<number>(100000);
   const [sortBy, setSortBy] = useState<string>('featured');
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState<boolean>(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
 
-  useEffect(() => {
+  const loadFreshShopData = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/db', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data && Array.isArray(json.data.products)) {
+          setAllProducts(json.data.products);
+          if (Array.isArray(json.data.categories)) {
+            setCategories(json.data.categories);
+          }
+          return;
+        }
+      }
+    } catch (e) {}
     setCategories(db.getCategories());
     setAllProducts(db.getProducts());
+  }, []);
+
+  useEffect(() => {
+    loadFreshShopData();
 
     const handleDbUpdate = () => {
-      setCategories(db.getCategories());
-      setAllProducts(db.getProducts());
+      loadFreshShopData();
     };
     window.addEventListener('ace-db-updated', handleDbUpdate);
     window.addEventListener('storage', handleDbUpdate);
     return () => {
       window.removeEventListener('ace-db-updated', handleDbUpdate);
     };
-  }, []);
+  }, [loadFreshShopData]);
 
   const categoriesList = useMemo(() => {
     const systemCats = [
@@ -85,25 +101,25 @@ function ShopContent() {
     setSelectedCategory('all');
     setSelectedSizes([]);
     setSelectedColors([]);
-    setMaxPrice(5000);
+    setMaxPrice(100000);
     setSortBy('featured');
   };
 
   const filteredProducts = useMemo(() => {
     let list = [...allProducts];
 
-    // Category filter
+    // Category filter using matchCategory helper
     if (selectedCategory !== 'all') {
       if (selectedCategory === 'new-arrivals') {
         list = list.filter((p) => p.isNewArrival || p.collections?.includes('new-arrivals'));
       } else if (selectedCategory === 'sale') {
         list = list.filter((p) => p.isSale || p.salePrice !== undefined);
       } else if (selectedCategory === 'trending') {
-        list = list.filter((p) => p.isTrending);
+        list = list.filter((p) => p.isTrending || p.collections?.includes('trending'));
       } else if (selectedCategory === 'best-sellers') {
-        list = list.filter((p) => p.isBestSeller);
+        list = list.filter((p) => p.isBestSeller || p.reviewCount > 30 || p.collections?.includes('best-sellers'));
       } else {
-        list = list.filter((p) => p.category.toLowerCase() === selectedCategory.toLowerCase());
+        list = list.filter((p) => db.getProductsByCategory(selectedCategory).some((cp) => cp.id === p.id));
       }
     }
 

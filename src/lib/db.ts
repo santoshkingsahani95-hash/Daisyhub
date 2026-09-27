@@ -2,6 +2,42 @@ import { Product, Category, Collection, Order, Coupon, HomepageCMS, CustomerUser
 import { seedProducts, initialCategories, initialCollections, initialCMS } from './seed-data';
 import { generateDefaultDeliveryRates } from './nepal-locations';
 
+// Category matching helper supporting unlimited products per category and flexible singular/plural/alias matching
+export function matchCategory(productCat: string, filterCat: string): boolean {
+  if (!productCat || !filterCat) return false;
+  const pCat = productCat.toLowerCase().trim();
+  const fCat = filterCat.toLowerCase().trim();
+
+  if (fCat === 'all' || pCat === 'all') return true;
+  if (pCat === fCat) return true;
+
+  // Singular vs plural tolerance ('top' <-> 'tops', 'dress' <-> 'dresses')
+  const pSingular = pCat.endsWith('es') ? pCat.slice(0, -2) : (pCat.endsWith('s') ? pCat.slice(0, -1) : pCat);
+  const fSingular = fCat.endsWith('es') ? fCat.slice(0, -2) : (fCat.endsWith('s') ? fCat.slice(0, -1) : fCat);
+
+  if (pSingular === fSingular) return true;
+  if (pCat.includes(fSingular) || fCat.includes(pSingular)) return true;
+  if (pCat.includes(fCat) || fCat.includes(pCat)) return true;
+
+  // Category synonyms / alias mapping
+  const topVariants = ['top', 'tops', 'cat-tops', 'tops-shirts', 't-shirt', 'tee', 'blouse', 'shirt'];
+  if (topVariants.includes(pCat) && topVariants.includes(fCat)) return true;
+
+  const dressVariants = ['dress', 'dresses', 'cat-dresses', 'maxi', 'midi', 'frock'];
+  if (dressVariants.includes(pCat) && dressVariants.includes(fCat)) return true;
+
+  const bottomVariants = ['bottom', 'bottoms', 'cat-bottoms', 'pants', 'trousers', 'jeans', 'skirt', 'palazzo'];
+  if (bottomVariants.includes(pCat) && bottomVariants.includes(fCat)) return true;
+
+  const setVariants = ['set', 'sets', 'co-ord-sets', 'cat-sets', 'two-piece', 'blazer-set'];
+  if (setVariants.includes(pCat) && setVariants.includes(fCat)) return true;
+
+  const outerVariants = ['coat-outer', 'outerwear', 'jacket', 'coat', 'peacoat'];
+  if (outerVariants.includes(pCat) && outerVariants.includes(fCat)) return true;
+
+  return false;
+}
+
 // Helper to push client-side mutations to the server API asynchronously
 async function postApiAction(action: string, payload: Record<string, any> = {}) {
   if (typeof window === 'undefined') return;
@@ -207,10 +243,12 @@ class DataStore {
       if (stored) {
         try {
           const parsed: Product[] = JSON.parse(stored);
-          this.products = parsed.map((p) => ({
-            ...p,
-            createdAt: p.createdAt || new Date().toISOString(),
-          }));
+          if (Array.isArray(parsed) && parsed.length >= this.products.length) {
+            this.products = parsed.map((p) => ({
+              ...p,
+              createdAt: p.createdAt || new Date().toISOString(),
+            }));
+          }
         } catch (e) {}
       }
     }
@@ -223,19 +261,24 @@ class DataStore {
 
   getProductsByCategory(categorySlug: string): Product[] {
     const prods = this.getProducts();
-    if (categorySlug === 'new-arrivals') {
+    if (!categorySlug || categorySlug === 'all') return prods;
+
+    const cleanSlug = categorySlug.toLowerCase().trim();
+
+    if (cleanSlug === 'new-arrivals') {
       return prods.filter((p) => p.isNewArrival || p.collections?.includes('new-arrivals'));
     }
-    if (categorySlug === 'sale') {
+    if (cleanSlug === 'sale') {
       return prods.filter((p) => p.isSale || p.salePrice !== undefined);
     }
-    if (categorySlug === 'trending') {
-      return prods.filter((p) => p.isTrending);
+    if (cleanSlug === 'trending') {
+      return prods.filter((p) => p.isTrending || p.collections?.includes('trending'));
     }
-    if (categorySlug === 'best-sellers') {
-      return prods.filter((p) => p.isBestSeller);
+    if (cleanSlug === 'best-sellers') {
+      return prods.filter((p) => p.isBestSeller || p.reviewCount > 30 || p.collections?.includes('best-sellers'));
     }
-    return prods.filter((p) => p.category.toLowerCase() === categorySlug.toLowerCase());
+
+    return prods.filter((p) => matchCategory(p.category, categorySlug));
   }
 
   saveProduct(product: Product): Product {

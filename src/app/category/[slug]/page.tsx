@@ -26,7 +26,30 @@ export default function CategoryPage() {
     image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1600&auto=format&fit=crop',
   });
 
-  const loadCategoryData = () => {
+  const loadCategoryData = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/db', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data && Array.isArray(json.data.products)) {
+          const list = json.data.products.filter((p: Product) => db.getProductsByCategory(slug).some((cp) => cp.id === p.id));
+          setProducts(list.length > 0 ? list : db.getProductsByCategory(slug));
+
+          if (Array.isArray(json.data.categories)) {
+            const catObj = json.data.categories.find((c: Category) => c.slug === slug);
+            if (catObj) {
+              setCategoryInfo({
+                title: catObj.name,
+                desc: catObj.description,
+                image: catObj.image,
+              });
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
     const list = db.getProductsByCategory(slug);
     setProducts(list);
 
@@ -62,7 +85,7 @@ export default function CategoryPage() {
         image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1600&auto=format&fit=crop',
       });
     }
-  };
+  }, [slug]);
 
   useEffect(() => {
     loadCategoryData();
@@ -73,7 +96,7 @@ export default function CategoryPage() {
       window.removeEventListener('ace-db-updated', handleDbUpdate);
       window.removeEventListener('storage', handleDbUpdate);
     };
-  }, [slug]);
+  }, [loadCategoryData]);
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
