@@ -1,5 +1,4 @@
 import mysql from 'mysql2/promise';
-import sqlite3 from 'sqlite3';
 import path from 'path';
 
 const MYSQL_HOST = process.env.MYSQL_HOST || '103.235.199.20';
@@ -9,20 +8,29 @@ const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || 'P@ss-W0rd';
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'daisyhub_daisyhubb';
 
 let pool: mysql.Pool | null = null;
-let sqliteDb: sqlite3.Database | null = null;
+let sqliteDb: any = null;
 let useMySql = false;
 let isInitialized = false;
 
-function getSqliteDb(): sqlite3.Database {
+function getSqliteDb(): any {
   if (!sqliteDb) {
-    const dbPath = path.join(process.cwd(), 'database.sqlite');
-    sqliteDb = new sqlite3.Database(dbPath);
+    try {
+      const sqlite3 = require('sqlite3');
+      const dbPath = path.join(process.cwd(), 'database.sqlite');
+      sqliteDb = new sqlite3.Database(dbPath);
+    } catch (e) {
+      console.warn('[SQLite] Native sqlite3 module not available in this environment');
+      return null;
+    }
   }
   return sqliteDb;
 }
 
 function runSqliteQuery<T = any>(sql: string, params: any[] = []): Promise<T> {
   const db = getSqliteDb();
+  if (!db) {
+    return Promise.resolve([] as unknown as T);
+  }
 
   // Convert MySQL 'ON DUPLICATE KEY UPDATE' to SQLite 'ON CONFLICT DO UPDATE' or 'INSERT OR REPLACE'
   let safeSql = sql;
@@ -40,12 +48,12 @@ function runSqliteQuery<T = any>(sql: string, params: any[] = []): Promise<T> {
 
   return new Promise((resolve, reject) => {
     if (isSelect) {
-      db.all(safeSql, params, (err, rows) => {
+      db.all(safeSql, params, (err: any, rows: any) => {
         if (err) reject(err);
         else resolve(rows as unknown as T);
       });
     } else {
-      db.run(safeSql, params, function (err) {
+      db.run(safeSql, params, function (this: any, err: any) {
         if (err) reject(err);
         else resolve({ affectedRows: this.changes, insertId: this.lastID } as unknown as T);
       });
