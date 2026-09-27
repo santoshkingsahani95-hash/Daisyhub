@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { InventoryModel, ProductModel } from '@/models';
 import { serverDb } from '@/lib/server-db';
+import { cachePrewarmer } from '@/lib/cache-prewarmer';
 
 // Force dynamic server rendering for inventory API route
 export const dynamic = 'force-dynamic';
@@ -150,7 +151,8 @@ export async function POST(request: Request) {
     const conn = await connectToDatabase();
     const body = await request.json();
     const { action } = body;
-    serverDb.invalidateCache();
+    serverDb.invalidateCache('products');
+    cachePrewarmer.triggerWarmupDebounced();
 
     switch (action) {
       case 'updateColorStock': {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { serverDb } from '@/lib/server-db';
 import { connectToDatabase } from '@/lib/mongodb';
+import { cachePrewarmer } from '@/lib/cache-prewarmer';
 
 // Force dynamic server rendering for API DB sync route
 export const dynamic = 'force-dynamic';
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
     await connectToDatabase();
     const body = await request.json();
     const { action } = body;
+    cachePrewarmer.triggerWarmupDebounced();
 
     switch (action) {
       case 'updateInventory': {

@@ -14,7 +14,7 @@ import {
   DeliveryRateModel,
 } from '@/models';
 
-interface DatabaseSchema {
+export interface DatabaseSchema {
   products: Product[];
   categories: Category[];
   collections: Collection[];
@@ -25,173 +25,636 @@ interface DatabaseSchema {
   version: number;
 }
 
-class ServerDataStore {
-  private cache: DatabaseSchema | null = null;
-  private lastFetchTime = 0;
-  private readonly CACHE_TTL = 3000; // 3 seconds server memory cache
+export interface CacheEntityStats {
+  itemCount: number;
+  fetchedAt: number;
+  ageSeconds: number;
+  status: 'HOT' | 'STALE' | 'COLD';
+  ttlMs: number;
+}
 
-  public invalidateCache() {
-    this.cache = null;
-    this.lastFetchTime = 0;
+export interface CacheTelemetry {
+  totalQueries: number;
+  hits: number;
+  misses: number;
+  revalidations: number;
+  hitRatioPercent: number;
+  lastWarmedAt: number;
+  entities: {
+    products: CacheEntityStats;
+    categories: CacheEntityStats;
+    collections: CacheEntityStats;
+    cms: CacheEntityStats;
+    orders: CacheEntityStats;
+    coupons: CacheEntityStats;
+    users: CacheEntityStats;
+    deliveryRates: CacheEntityStats;
+  };
+}
+
+interface EntityCache<T> {
+  data: T | null;
+  fetchedAt: number;
+  softTtlMs: number;
+  hardTtlMs: number;
+}
+
+const DEFAULT_SOFT_TTL_MS = 45000; // 45 seconds soft TTL (background revalidate)
+const DEFAULT_HARD_TTL_MS = 300000; // 5 minutes hard TTL (force fresh fetch)
+
+class ServerDataStore {
+  // Granular Entity Object Caches
+  private productsCache: EntityCache<Product[]> = { data: null, fetchedAt: 0, softTtlMs: 45000, hardTtlMs: 300000 };
+  private categoriesCache: EntityCache<Category[]> = { data: null, fetchedAt: 0, softTtlMs: 60000, hardTtlMs: 600000 };
+  private collectionsCache: EntityCache<Collection[]> = { data: null, fetchedAt: 0, softTtlMs: 60000, hardTtlMs: 600000 };
+  private cmsCache: EntityCache<HomepageCMS> = { data: null, fetchedAt: 0, softTtlMs: 45000, hardTtlMs: 300000 };
+  private ordersCache: EntityCache<Order[]> = { data: null, fetchedAt: 0, softTtlMs: 15000, hardTtlMs: 120000 };
+  private couponsCache: EntityCache<Coupon[]> = { data: null, fetchedAt: 0, softTtlMs: 30000, hardTtlMs: 300000 };
+  private usersCache: EntityCache<CustomerUser[]> = { data: null, fetchedAt: 0, softTtlMs: 30000, hardTtlMs: 300000 };
+  private deliveryRatesCache: EntityCache<DistrictDeliveryRate[]> = { data: null, fetchedAt: 0, softTtlMs: 60000, hardTtlMs: 600000 };
+
+  // High-performance In-Memory Indexes
+  private productsByIdMap = new Map<string, Product>();
+  private productsBySlugMap = new Map<string, Product>();
+  private productsByCategoryMap = new Map<string, Product[]>();
+  private categoriesBySlugMap = new Map<string, Category>();
+  private categoriesByIdMap = new Map<string, Category>();
+  private couponsByCodeMap = new Map<string, Coupon>();
+
+  // Single-Flight Query Deduplication Locks
+  private inFlightPromises = new Map<string, Promise<any>>();
+
+  // Metrics & Telemetry
+  private metrics = {
+    totalQueries: 0,
+    hits: 0,
+    misses: 0,
+    revalidations: 0,
+    lastWarmedAt: 0,
+  };
+
+  /**
+   * Single-flight execution helper to coalesce duplicate simultaneous database requests
+   */
+  private async runSingleFlight<T>(key: string, fetchFn: () => Promise<T>): Promise<T> {
+    if (this.inFlightPromises.has(key)) {
+      return this.inFlightPromises.get(key) as Promise<T>;
+    }
+    const promise = fetchFn()
+      .finally(() => {
+        this.inFlightPromises.delete(key);
+      });
+    this.inFlightPromises.set(key, promise);
+    return promise;
   }
 
+  /**
+   * Invalidate specific or all entity caches
+   */
+  public invalidateCache(entity?: string) {
+    if (!entity || entity === 'all') {
+      this.productsCache.fetchedAt = 0;
+      this.categoriesCache.fetchedAt = 0;
+      this.collectionsCache.fetchedAt = 0;
+      this.cmsCache.fetchedAt = 0;
+      this.ordersCache.fetchedAt = 0;
+      this.couponsCache.fetchedAt = 0;
+      this.usersCache.fetchedAt = 0;
+      this.deliveryRatesCache.fetchedAt = 0;
+    } else {
+      switch (entity) {
+        case 'products': this.productsCache.fetchedAt = 0; break;
+        case 'categories': this.categoriesCache.fetchedAt = 0; break;
+        case 'collections': this.collectionsCache.fetchedAt = 0; break;
+        case 'cms': this.cmsCache.fetchedAt = 0; break;
+        case 'orders': this.ordersCache.fetchedAt = 0; break;
+        case 'coupons': this.couponsCache.fetchedAt = 0; break;
+        case 'users': this.usersCache.fetchedAt = 0; break;
+        case 'deliveryRates': this.deliveryRatesCache.fetchedAt = 0; break;
+      }
+    }
+  }
+
+  /**
+   * Rebuild high-speed in-memory indexes
+   */
+  private rebuildIndexes(products: Product[], categories: Category[], coupons: Coupon[]) {
+    this.productsByIdMap.clear();
+    this.productsBySlugMap.clear();
+    this.productsByCategoryMap.clear();
+    this.categoriesBySlugMap.clear();
+    this.categoriesByIdMap.clear();
+    this.couponsByCodeMap.clear();
+
+    products.forEach((p) => {
+      if (p.id) this.productsByIdMap.set(p.id, p);
+      if (p.slug) this.productsBySlugMap.set(p.slug.toLowerCase(), p);
+      if (p.category) {
+        const catKey = p.category.toLowerCase().trim();
+        const list = this.productsByCategoryMap.get(catKey) || [];
+        list.push(p);
+        this.productsByCategoryMap.set(catKey, list);
+      }
+    });
+
+    categories.forEach((c) => {
+      if (c.id) this.categoriesByIdMap.set(c.id, c);
+      if (c.slug) this.categoriesBySlugMap.set(c.slug.toLowerCase(), c);
+    });
+
+    coupons.forEach((cp) => {
+      if (cp.code) this.couponsByCodeMap.set(cp.code.toUpperCase(), cp);
+    });
+  }
+
+  /**
+   * Fetch Products from MongoDB with direct driver fallback
+   */
+  private async fetchProducts(): Promise<Product[]> {
+    return this.runSingleFlight('fetch_products', async () => {
+      try {
+        const conn = await connectToDatabase();
+        let dbProds = await ProductModel.find().lean();
+        if ((!dbProds || dbProds.length === 0) && conn && conn.db) {
+          dbProds = await conn.db.collection('products').find({}).toArray();
+        }
+        const products = (dbProds || []).map((p: any) => {
+          const { _id, __v, ...rest } = p;
+          return rest as Product;
+        });
+        const finalProducts = (products && products.length > 0) ? products : (this.productsCache.data || seedProducts);
+        this.productsCache = {
+          data: finalProducts,
+          fetchedAt: Date.now(),
+          softTtlMs: DEFAULT_SOFT_TTL_MS,
+          hardTtlMs: DEFAULT_HARD_TTL_MS,
+        };
+        return finalProducts;
+      } catch (err: any) {
+        console.error('[ServerDataStore fetchProducts Error]', err?.message || err);
+        return this.productsCache.data || seedProducts;
+      }
+    });
+  }
+
+  /**
+   * Fetch Categories from MongoDB with fallback
+   */
+  private async fetchCategories(): Promise<Category[]> {
+    return this.runSingleFlight('fetch_categories', async () => {
+      try {
+        const conn = await connectToDatabase();
+        let dbCats = await CategoryModel.find().lean();
+        if ((!dbCats || dbCats.length === 0) && conn && conn.db) {
+          dbCats = await conn.db.collection('categories').find({}).toArray();
+        }
+        const categories = (dbCats || []).map((c: any) => {
+          const { _id, __v, ...rest } = c;
+          return rest as Category;
+        });
+        const finalCategories = (categories && categories.length > 0) ? categories : initialCategories;
+        this.categoriesCache = {
+          data: finalCategories,
+          fetchedAt: Date.now(),
+          softTtlMs: 60000,
+          hardTtlMs: 600000,
+        };
+        return finalCategories;
+      } catch (err: any) {
+        console.error('[ServerDataStore fetchCategories Error]', err?.message || err);
+        return this.categoriesCache.data || initialCategories;
+      }
+    });
+  }
+
+  /**
+   * Fetch Collections from MongoDB
+   */
+  private async fetchCollections(): Promise<Collection[]> {
+    return this.runSingleFlight('fetch_collections', async () => {
+      try {
+        const conn = await connectToDatabase();
+        let dbCols = await CollectionModel.find().lean();
+        if ((!dbCols || dbCols.length === 0) && conn && conn.db) {
+          dbCols = await conn.db.collection('collections').find({}).toArray();
+        }
+        const collections = (dbCols || []).map((c: any) => {
+          const { _id, __v, ...rest } = c;
+          return rest as Collection;
+        });
+        const finalCols = (collections && collections.length > 0) ? collections : initialCollections;
+        this.collectionsCache = {
+          data: finalCols,
+          fetchedAt: Date.now(),
+          softTtlMs: 60000,
+          hardTtlMs: 600000,
+        };
+        return finalCols;
+      } catch (err: any) {
+        console.error('[ServerDataStore fetchCollections Error]', err?.message || err);
+        return this.collectionsCache.data || initialCollections;
+      }
+    });
+  }
+
+  /**
+   * Fetch Delivery Rates from MongoDB
+   */
+  private async fetchDeliveryRates(): Promise<DistrictDeliveryRate[]> {
+    return this.runSingleFlight('fetch_delivery_rates', async () => {
+      try {
+        const conn = await connectToDatabase();
+        let dbRates = await DeliveryRateModel.find().lean();
+        if ((!dbRates || dbRates.length === 0) && conn && conn.db) {
+          dbRates = await conn.db.collection('delivery_rates').find({}).toArray();
+        }
+
+        if (!dbRates || dbRates.length === 0) {
+          const defaultRates = generateDefaultDeliveryRates();
+          try {
+            await DeliveryRateModel.insertMany(defaultRates, { ordered: false });
+          } catch (e) {
+            // ignore duplicate key warning
+          }
+          dbRates = await DeliveryRateModel.find().lean();
+        }
+
+        const deliveryRates: DistrictDeliveryRate[] = (dbRates || []).map((r: any) => {
+          const { _id, __v, ...rest } = r;
+          const fee = typeof rest.deliveryFee === 'number' ? rest.deliveryFee : (typeof rest.homeDeliveryFee === 'number' ? rest.homeDeliveryFee : 150);
+          const isEn = typeof rest.enabled === 'boolean' ? rest.enabled : (typeof rest.homeDeliveryEnabled === 'boolean' ? rest.homeDeliveryEnabled : true);
+          return {
+            district: rest.district,
+            province: rest.province,
+            deliveryFee: fee,
+            enabled: isEn,
+            homeDeliveryFee: fee,
+            branchDeliveryFee: typeof rest.branchDeliveryFee === 'number' ? rest.branchDeliveryFee : fee,
+            homeDeliveryEnabled: isEn,
+            branchDeliveryEnabled: typeof rest.branchDeliveryEnabled === 'boolean' ? rest.branchDeliveryEnabled : isEn,
+          } as DistrictDeliveryRate;
+        });
+
+        const finalRates = deliveryRates.length > 0 ? deliveryRates : generateDefaultDeliveryRates();
+        this.deliveryRatesCache = {
+          data: finalRates,
+          fetchedAt: Date.now(),
+          softTtlMs: 60000,
+          hardTtlMs: 600000,
+        };
+        return finalRates;
+      } catch (err: any) {
+        console.error('[ServerDataStore fetchDeliveryRates Error]', err?.message || err);
+        return this.deliveryRatesCache.data || generateDefaultDeliveryRates();
+      }
+    });
+  }
+
+  /**
+   * Fetch CMS from MongoDB
+   */
+  private async fetchCMS(deliveryRates?: DistrictDeliveryRate[]): Promise<HomepageCMS> {
+    return this.runSingleFlight('fetch_cms', async () => {
+      try {
+        await connectToDatabase();
+        let cmsDoc = await CMSModel.findOne({ key: 'homepage' }).lean();
+        if (!cmsDoc) {
+          await CMSModel.findOneAndUpdate({ key: 'homepage' }, initialCMS, { upsert: true });
+          cmsDoc = await CMSModel.findOne({ key: 'homepage' }).lean();
+        }
+
+        const rates = deliveryRates || (await this.fetchDeliveryRates());
+
+        let cms: HomepageCMS = { ...initialCMS };
+        if (cmsDoc) {
+          const { _id, __v, key, ...rest } = cmsDoc as any;
+          cms = {
+            ...initialCMS,
+            ...rest,
+            announcementBar: rest.announcementBar ? { ...initialCMS.announcementBar, ...rest.announcementBar } : initialCMS.announcementBar,
+            hero: rest.hero ? { ...initialCMS.hero, ...rest.hero } : initialCMS.hero,
+            editorialBanner: rest.editorialBanner ? { ...initialCMS.editorialBanner, ...rest.editorialBanner } : initialCMS.editorialBanner,
+            fonepaySettings: rest.fonepaySettings ? { ...initialCMS.fonepaySettings, ...rest.fonepaySettings } : initialCMS.fonepaySettings,
+            seo: rest.seo ? { ...initialCMS.seo, ...rest.seo } : initialCMS.seo,
+            deliveryRates: rates && rates.length > 0 ? rates : generateDefaultDeliveryRates(),
+          };
+        } else {
+          cms.deliveryRates = rates;
+        }
+
+        this.cmsCache = {
+          data: cms,
+          fetchedAt: Date.now(),
+          softTtlMs: 45000,
+          hardTtlMs: 300000,
+        };
+        return cms;
+      } catch (err: any) {
+        console.error('[ServerDataStore fetchCMS Error]', err?.message || err);
+        return this.cmsCache.data || { ...initialCMS };
+      }
+    });
+  }
+
+  /**
+   * Fetch Orders from MongoDB
+   */
+  private async fetchOrders(): Promise<Order[]> {
+    return this.runSingleFlight('fetch_orders', async () => {
+      try {
+        await connectToDatabase();
+        const dbOrds = await OrderModel.find().sort({ createdAt: -1 }).lean();
+        const orders = (dbOrds || []).map((o: any) => {
+          const { _id, __v, ...rest } = o;
+          return rest as Order;
+        });
+        this.ordersCache = {
+          data: orders,
+          fetchedAt: Date.now(),
+          softTtlMs: 15000,
+          hardTtlMs: 120000,
+        };
+        return orders;
+      } catch (err: any) {
+        console.error('[ServerDataStore fetchOrders Error]', err?.message || err);
+        return this.ordersCache.data || [];
+      }
+    });
+  }
+
+  /**
+   * Fetch Coupons from MongoDB
+   */
+  private async fetchCoupons(): Promise<Coupon[]> {
+    return this.runSingleFlight('fetch_coupons', async () => {
+      try {
+        await connectToDatabase();
+        const dbCoups = await CouponModel.find().lean();
+        const coupons = (dbCoups || []).map((cp: any) => {
+          const { _id, __v, ...rest } = cp;
+          return rest as Coupon;
+        });
+        this.couponsCache = {
+          data: coupons,
+          fetchedAt: Date.now(),
+          softTtlMs: 30000,
+          hardTtlMs: 300000,
+        };
+        return coupons;
+      } catch (err: any) {
+        console.error('[ServerDataStore fetchCoupons Error]', err?.message || err);
+        return this.couponsCache.data || [];
+      }
+    });
+  }
+
+  /**
+   * Fetch Users from MongoDB
+   */
+  private async fetchUsers(): Promise<CustomerUser[]> {
+    return this.runSingleFlight('fetch_users', async () => {
+      try {
+        await connectToDatabase();
+        const dbUsers = await UserModel.find().lean();
+        const defaultAdmin: CustomerUser[] = [
+          {
+            id: 'usr-admin-1',
+            name: 'Admin Manager',
+            email: 'admin@daisyhub.com',
+            mobile: '+977 9800000000',
+            role: 'ADMIN',
+            registrationDate: '2026-01-01',
+          },
+        ];
+        const users: CustomerUser[] = (dbUsers && dbUsers.length > 0)
+          ? dbUsers.map((u: any) => {
+              const { _id, __v, ...rest } = u;
+              return rest as CustomerUser;
+            })
+          : defaultAdmin;
+
+        this.usersCache = {
+          data: users,
+          fetchedAt: Date.now(),
+          softTtlMs: 30000,
+          hardTtlMs: 300000,
+        };
+        return users;
+      } catch (err: any) {
+        console.error('[ServerDataStore fetchUsers Error]', err?.message || err);
+        return this.usersCache.data || [];
+      }
+    });
+  }
+
+  /**
+   * Get Fresh Data with Stale-While-Revalidate and Single-Flight Coalescing
+   */
   public async getFreshData(force = false): Promise<DatabaseSchema> {
-    if (!force && this.cache && Date.now() - this.lastFetchTime < this.CACHE_TTL) {
-      return this.cache;
+    this.metrics.totalQueries++;
+    const now = Date.now();
+
+    const isSoftExpired = (cache: EntityCache<any>) =>
+      !cache.data || now - cache.fetchedAt > cache.softTtlMs;
+    const isHardExpired = (cache: EntityCache<any>) =>
+      !cache.data || now - cache.fetchedAt > cache.hardTtlMs;
+
+    // Check if all entity caches are fully warm & fresh
+    const allHot =
+      !force &&
+      !isSoftExpired(this.productsCache) &&
+      !isSoftExpired(this.categoriesCache) &&
+      !isSoftExpired(this.collectionsCache) &&
+      !isSoftExpired(this.cmsCache) &&
+      !isSoftExpired(this.ordersCache) &&
+      !isSoftExpired(this.couponsCache) &&
+      !isSoftExpired(this.usersCache) &&
+      !isSoftExpired(this.deliveryRatesCache);
+
+    if (allHot) {
+      this.metrics.hits++;
+      return {
+        products: this.productsCache.data!,
+        categories: this.categoriesCache.data!,
+        collections: this.collectionsCache.data!,
+        cms: this.cmsCache.data!,
+        orders: this.ordersCache.data!,
+        coupons: this.couponsCache.data!,
+        users: this.usersCache.data!,
+        version: Math.max(
+          this.productsCache.fetchedAt,
+          this.categoriesCache.fetchedAt
+        ),
+      };
     }
 
-    try {
-      const conn = await connectToDatabase();
-      let [dbProds, dbCats, dbCols, cmsDoc, dbOrds, dbCoups, dbUsers, dbRates] = await Promise.all([
-        ProductModel.find().lean(),
-        CategoryModel.find().lean(),
-        CollectionModel.find().lean(),
-        CMSModel.findOne({ key: 'homepage' }).lean(),
-        OrderModel.find().sort({ createdAt: -1 }).lean(),
-        CouponModel.find().lean(),
-        UserModel.find().lean(),
-        DeliveryRateModel.find().lean(),
+    this.metrics.misses++;
+
+    // Determine which entities need synchronous fetching vs background revalidation
+    const fetchPromises: Promise<any>[] = [];
+
+    const getOrFetch = async <T>(
+      cache: EntityCache<T>,
+      fetcher: () => Promise<T>
+    ): Promise<T> => {
+      if (force || isHardExpired(cache)) {
+        return await fetcher();
+      }
+      if (isSoftExpired(cache)) {
+        // Trigger background revalidation non-blocking
+        this.metrics.revalidations++;
+        fetcher().catch((e) =>
+          console.error('[SWR Background Revalidate Error]', e)
+        );
+      }
+      return cache.data!;
+    };
+
+    const [products, categories, collections, deliveryRates, orders, coupons, users] =
+      await Promise.all([
+        getOrFetch(this.productsCache, () => this.fetchProducts()),
+        getOrFetch(this.categoriesCache, () => this.fetchCategories()),
+        getOrFetch(this.collectionsCache, () => this.fetchCollections()),
+        getOrFetch(this.deliveryRatesCache, () => this.fetchDeliveryRates()),
+        getOrFetch(this.ordersCache, () => this.fetchOrders()),
+        getOrFetch(this.couponsCache, () => this.fetchCoupons()),
+        getOrFetch(this.usersCache, () => this.fetchUsers()),
       ]);
 
-      if ((!dbCats || dbCats.length === 0) && conn && conn.db) {
-        dbCats = await conn.db.collection('categories').find({}).toArray();
-      }
-      if ((!dbProds || dbProds.length === 0) && conn && conn.db) {
-        dbProds = await conn.db.collection('products').find({}).toArray();
-      }
-      if ((!dbCols || dbCols.length === 0) && conn && conn.db) {
-        dbCols = await conn.db.collection('collections').find({}).toArray();
-      }
-      if ((!dbRates || dbRates.length === 0) && conn && conn.db) {
-        dbRates = await conn.db.collection('delivery_rates').find({}).toArray();
-      }
+    const cms = await getOrFetch(this.cmsCache, () =>
+      this.fetchCMS(deliveryRates)
+    );
 
-      // If delivery_rates collection in MongoDB Atlas is empty, initialize all 77 Nepal districts in 1 bulk operation
-      if (!dbRates || dbRates.length === 0) {
-        const defaultRates = generateDefaultDeliveryRates();
-        try {
-          await DeliveryRateModel.insertMany(defaultRates, { ordered: false });
-        } catch (e) {
-          // ignore duplicate key warning
-        }
-        dbRates = await DeliveryRateModel.find().lean();
-      }
+    // Rebuild high-speed index maps
+    this.rebuildIndexes(products, categories, coupons);
+    this.metrics.lastWarmedAt = Date.now();
 
-      if (!cmsDoc) {
-        await CMSModel.findOneAndUpdate({ key: 'homepage' }, initialCMS, { upsert: true });
-        cmsDoc = await CMSModel.findOne({ key: 'homepage' }).lean();
-      }
-
-      const products = (dbProds || []).map((p: any) => {
-        const { _id, __v, ...rest } = p;
-        return rest as Product;
-      });
-
-      const categories = (dbCats || []).map((c: any) => {
-        const { _id, __v, ...rest } = c;
-        return rest as Category;
-      });
-
-      const collections = (dbCols || []).map((c: any) => {
-        const { _id, __v, ...rest } = c;
-        return rest as Collection;
-      });
-
-      const deliveryRates: DistrictDeliveryRate[] = (dbRates || []).map((r: any) => {
-        const { _id, __v, ...rest } = r;
-        const fee = typeof rest.deliveryFee === 'number' ? rest.deliveryFee : (typeof rest.homeDeliveryFee === 'number' ? rest.homeDeliveryFee : 150);
-        const isEn = typeof rest.enabled === 'boolean' ? rest.enabled : (typeof rest.homeDeliveryEnabled === 'boolean' ? rest.homeDeliveryEnabled : true);
-        return {
-          district: rest.district,
-          province: rest.province,
-          deliveryFee: fee,
-          enabled: isEn,
-          homeDeliveryFee: fee,
-          branchDeliveryFee: typeof rest.branchDeliveryFee === 'number' ? rest.branchDeliveryFee : fee,
-          homeDeliveryEnabled: isEn,
-          branchDeliveryEnabled: typeof rest.branchDeliveryEnabled === 'boolean' ? rest.branchDeliveryEnabled : isEn,
-        } as DistrictDeliveryRate;
-      });
-
-      let cms: HomepageCMS = { ...initialCMS };
-      if (cmsDoc) {
-        const { _id, __v, key, ...rest } = cmsDoc as any;
-        cms = {
-          ...initialCMS,
-          ...rest,
-          announcementBar: rest.announcementBar ? { ...initialCMS.announcementBar, ...rest.announcementBar } : initialCMS.announcementBar,
-          hero: rest.hero ? { ...initialCMS.hero, ...rest.hero } : initialCMS.hero,
-          editorialBanner: rest.editorialBanner ? { ...initialCMS.editorialBanner, ...rest.editorialBanner } : initialCMS.editorialBanner,
-          fonepaySettings: rest.fonepaySettings ? { ...initialCMS.fonepaySettings, ...rest.fonepaySettings } : initialCMS.fonepaySettings,
-          seo: rest.seo ? { ...initialCMS.seo, ...rest.seo } : initialCMS.seo,
-          deliveryRates: deliveryRates && deliveryRates.length > 0 ? deliveryRates : generateDefaultDeliveryRates(),
-        };
-      } else {
-        cms.deliveryRates = deliveryRates;
-      }
-
-      const orders = (dbOrds || []).map((o: any) => {
-        const { _id, __v, ...rest } = o;
-        return rest as Order;
-      });
-
-      const coupons = (dbCoups || []).map((cp: any) => {
-        const { _id, __v, ...rest } = cp;
-        return rest as Coupon;
-      });
-
-      const users: CustomerUser[] = (dbUsers && dbUsers.length > 0)
-        ? dbUsers.map((u: any) => {
-            const { _id, __v, ...rest } = u;
-            return rest as CustomerUser;
-          })
-        : [
-            {
-              id: 'usr-admin-1',
-              name: 'Admin Manager',
-              email: 'admin@daisyhub.com',
-              mobile: '+977 9800000000',
-              role: 'ADMIN',
-              registrationDate: '2026-01-01',
-            },
-          ];
-
-      // CRITICAL FIX: Prevent returning empty products array on temporary connection issues
-      const finalProducts = (products && products.length > 0)
-        ? products
-        : (this.cache?.products && this.cache.products.length > 0 ? this.cache.products : seedProducts);
-
-      const result: DatabaseSchema = {
-        products: finalProducts,
-        categories: categories && categories.length > 0 ? categories : initialCategories,
-        collections: collections && collections.length > 0 ? collections : initialCollections,
-        cms,
-        orders,
-        coupons,
-        users,
-        version: Date.now(),
-      };
-
-      this.cache = result;
-      this.lastFetchTime = Date.now();
-      return result;
-    } catch (err: any) {
-      console.error('[ServerDataStore getFreshData Error]', err?.message || err);
-      if (this.cache) {
-        return this.cache;
-      }
-      return {
-        products: seedProducts || [],
-        categories: initialCategories || [],
-        collections: initialCollections || [],
-        cms: { ...initialCMS },
-        orders: [],
-        coupons: [],
-        users: [],
-        version: Date.now(),
-      };
-    }
+    return {
+      products,
+      categories,
+      collections,
+      cms,
+      orders,
+      coupons,
+      users,
+      version: Date.now(),
+    };
   }
+
+  /**
+   * Fast O(1) Indexed Lookups
+   */
+  public async getProductById(id: string): Promise<Product | undefined> {
+    if (this.productsByIdMap.has(id)) {
+      return this.productsByIdMap.get(id);
+    }
+    const data = await this.getFreshData();
+    return data.products.find((p) => p.id === id);
+  }
+
+  public async getProductBySlug(slug: string): Promise<Product | undefined> {
+    const key = slug.toLowerCase().trim();
+    if (this.productsBySlugMap.has(key)) {
+      return this.productsBySlugMap.get(key);
+    }
+    const data = await this.getFreshData();
+    return data.products.find((p) => p.slug.toLowerCase() === key);
+  }
+
+  public async getCategoryBySlug(slug: string): Promise<Category | undefined> {
+    const key = slug.toLowerCase().trim();
+    if (this.categoriesBySlugMap.has(key)) {
+      return this.categoriesBySlugMap.get(key);
+    }
+    const data = await this.getFreshData();
+    return data.categories.find((c) => c.slug.toLowerCase() === key);
+  }
+
+  /**
+   * Cache Telemetry & Stats for Monitoring
+   */
+  public getCacheStats(): CacheTelemetry {
+    const now = Date.now();
+    const getStatus = (cache: EntityCache<any>): 'HOT' | 'STALE' | 'COLD' => {
+      if (!cache.data) return 'COLD';
+      const age = now - cache.fetchedAt;
+      if (age <= cache.softTtlMs) return 'HOT';
+      if (age <= cache.hardTtlMs) return 'STALE';
+      return 'COLD';
+    };
+
+    const totalReqs = this.metrics.hits + this.metrics.misses;
+    const hitRatioPercent = totalReqs > 0 ? Number(((this.metrics.hits / totalReqs) * 100).toFixed(1)) : 100;
+
+    return {
+      totalQueries: this.metrics.totalQueries,
+      hits: this.metrics.hits,
+      misses: this.metrics.misses,
+      revalidations: this.metrics.revalidations,
+      hitRatioPercent,
+      lastWarmedAt: this.metrics.lastWarmedAt,
+      entities: {
+        products: {
+          itemCount: this.productsCache.data?.length || 0,
+          fetchedAt: this.productsCache.fetchedAt,
+          ageSeconds: Math.floor((now - this.productsCache.fetchedAt) / 1000),
+          status: getStatus(this.productsCache),
+          ttlMs: this.productsCache.softTtlMs,
+        },
+        categories: {
+          itemCount: this.categoriesCache.data?.length || 0,
+          fetchedAt: this.categoriesCache.fetchedAt,
+          ageSeconds: Math.floor((now - this.categoriesCache.fetchedAt) / 1000),
+          status: getStatus(this.categoriesCache),
+          ttlMs: this.categoriesCache.softTtlMs,
+        },
+        collections: {
+          itemCount: this.collectionsCache.data?.length || 0,
+          fetchedAt: this.collectionsCache.fetchedAt,
+          ageSeconds: Math.floor((now - this.collectionsCache.fetchedAt) / 1000),
+          status: getStatus(this.collectionsCache),
+          ttlMs: this.collectionsCache.softTtlMs,
+        },
+        cms: {
+          itemCount: this.cmsCache.data ? 1 : 0,
+          fetchedAt: this.cmsCache.fetchedAt,
+          ageSeconds: Math.floor((now - this.cmsCache.fetchedAt) / 1000),
+          status: getStatus(this.cmsCache),
+          ttlMs: this.cmsCache.softTtlMs,
+        },
+        orders: {
+          itemCount: this.ordersCache.data?.length || 0,
+          fetchedAt: this.ordersCache.fetchedAt,
+          ageSeconds: Math.floor((now - this.ordersCache.fetchedAt) / 1000),
+          status: getStatus(this.ordersCache),
+          ttlMs: this.ordersCache.softTtlMs,
+        },
+        coupons: {
+          itemCount: this.couponsCache.data?.length || 0,
+          fetchedAt: this.couponsCache.fetchedAt,
+          ageSeconds: Math.floor((now - this.couponsCache.fetchedAt) / 1000),
+          status: getStatus(this.couponsCache),
+          ttlMs: this.couponsCache.softTtlMs,
+        },
+        users: {
+          itemCount: this.usersCache.data?.length || 0,
+          fetchedAt: this.usersCache.fetchedAt,
+          ageSeconds: Math.floor((now - this.usersCache.fetchedAt) / 1000),
+          status: getStatus(this.usersCache),
+          ttlMs: this.usersCache.softTtlMs,
+        },
+        deliveryRates: {
+          itemCount: this.deliveryRatesCache.data?.length || 0,
+          fetchedAt: this.deliveryRatesCache.fetchedAt,
+          ageSeconds: Math.floor((now - this.deliveryRatesCache.fetchedAt) / 1000),
+          status: getStatus(this.deliveryRatesCache),
+          ttlMs: this.deliveryRatesCache.softTtlMs,
+        },
+      },
+    };
+  }
+
+  // --- EXISTING DATABASE MUTATION & INTERFACE METHODS ---
 
   private async syncInventoryDoc(prod: any) {
     try {
@@ -228,7 +691,7 @@ class ServerDataStore {
   }
 
   async saveProduct(product: Product): Promise<Product> {
-    this.invalidateCache();
+    this.invalidateCache('products');
     try {
       const conn = await connectToDatabase();
       await ProductModel.findOneAndUpdate({ id: product.id }, product, { upsert: true, new: true });
@@ -244,7 +707,7 @@ class ServerDataStore {
   }
 
   async deleteProduct(id: string): Promise<boolean> {
-    this.invalidateCache();
+    this.invalidateCache('products');
     try {
       const conn = await connectToDatabase();
       const res = await ProductModel.deleteOne({ id });
@@ -262,7 +725,7 @@ class ServerDataStore {
   }
 
   async updateInventory(productId: string, size: string, newStock: number): Promise<boolean> {
-    this.invalidateCache();
+    this.invalidateCache('products');
     try {
       const conn = await connectToDatabase();
       const prodDoc = await ProductModel.findOne({ id: productId });
@@ -299,7 +762,7 @@ class ServerDataStore {
   }
 
   async updateColorStock(productId: string, colorName: string, newStock: number): Promise<boolean> {
-    this.invalidateCache();
+    this.invalidateCache('products');
     try {
       const conn = await connectToDatabase();
       const prodDoc = await ProductModel.findOne({ id: productId });
@@ -333,7 +796,7 @@ class ServerDataStore {
   }
 
   async saveCategory(category: Category): Promise<Category> {
-    this.invalidateCache();
+    this.invalidateCache('categories');
     try {
       const conn = await connectToDatabase();
       await CategoryModel.findOneAndUpdate({ id: category.id }, category, { upsert: true, new: true });
@@ -348,7 +811,7 @@ class ServerDataStore {
   }
 
   async deleteCategory(id: string): Promise<boolean> {
-    this.invalidateCache();
+    this.invalidateCache('categories');
     try {
       const conn = await connectToDatabase();
       const res = await CategoryModel.deleteOne({ $or: [{ id }, { slug: id }] });
@@ -364,7 +827,7 @@ class ServerDataStore {
   }
 
   async saveCollection(collection: Collection): Promise<Collection> {
-    this.invalidateCache();
+    this.invalidateCache('collections');
     try {
       const conn = await connectToDatabase();
       await CollectionModel.findOneAndUpdate({ id: collection.id }, collection, { upsert: true, new: true });
@@ -379,7 +842,7 @@ class ServerDataStore {
   }
 
   async deleteCollection(id: string): Promise<boolean> {
-    this.invalidateCache();
+    this.invalidateCache('collections');
     try {
       const conn = await connectToDatabase();
       const res = await CollectionModel.deleteOne({ $or: [{ id }, { slug: id }] });
@@ -395,7 +858,7 @@ class ServerDataStore {
   }
 
   async saveCoupon(coupon: Coupon): Promise<Coupon> {
-    this.invalidateCache();
+    this.invalidateCache('coupons');
     const cleanCode = coupon.code.trim().toUpperCase();
     const cleanCoupon = { ...coupon, code: cleanCode };
     try {
@@ -412,7 +875,7 @@ class ServerDataStore {
   }
 
   async deleteCoupon(code: string): Promise<boolean> {
-    this.invalidateCache();
+    this.invalidateCache('coupons');
     const cleanCode = code.trim().toUpperCase();
     try {
       const conn = await connectToDatabase();
@@ -429,7 +892,7 @@ class ServerDataStore {
   }
 
   async saveUser(user: CustomerUser): Promise<CustomerUser> {
-    this.invalidateCache();
+    this.invalidateCache('users');
     try {
       const conn = await connectToDatabase();
       await UserModel.findOneAndUpdate({ id: user.id }, user, { upsert: true, new: true });
@@ -444,7 +907,7 @@ class ServerDataStore {
   }
 
   async deleteUser(id: string): Promise<boolean> {
-    this.invalidateCache();
+    this.invalidateCache('users');
     try {
       const conn = await connectToDatabase();
       const res = await UserModel.deleteOne({ $or: [{ id }, { email: id }] });
@@ -460,7 +923,7 @@ class ServerDataStore {
   }
 
   async deleteOrder(id: string): Promise<boolean> {
-    this.invalidateCache();
+    this.invalidateCache('orders');
     try {
       const conn = await connectToDatabase();
       const res = await OrderModel.deleteOne({ $or: [{ id }, { orderNumber: id }] });
@@ -476,7 +939,7 @@ class ServerDataStore {
   }
 
   async deleteReview(productId: string, reviewId: string): Promise<boolean> {
-    this.invalidateCache();
+    this.invalidateCache('products');
     try {
       const conn = await connectToDatabase();
       const prodDoc = await ProductModel.findOne({ $or: [{ id: productId }, { slug: productId }] });
@@ -511,7 +974,8 @@ class ServerDataStore {
   }
 
   async updateDeliveryRates(rates: DistrictDeliveryRate[]): Promise<DistrictDeliveryRate[]> {
-    this.invalidateCache();
+    this.invalidateCache('deliveryRates');
+    this.invalidateCache('cms');
     try {
       const conn = await connectToDatabase();
       for (const r of rates) {
@@ -533,7 +997,7 @@ class ServerDataStore {
   }
 
   async updateCMS(newCms: Partial<HomepageCMS>): Promise<HomepageCMS> {
-    this.invalidateCache();
+    this.invalidateCache('cms');
     try {
       const conn = await connectToDatabase();
       if (newCms.deliveryRates && Array.isArray(newCms.deliveryRates) && newCms.deliveryRates.length > 0) {
@@ -568,7 +1032,7 @@ class ServerDataStore {
   }
 
   async createOrder(order: Order): Promise<Order> {
-    this.invalidateCache();
+    this.invalidateCache('orders');
     try {
       const conn = await connectToDatabase();
       await OrderModel.findOneAndUpdate({ id: order.id }, order, { upsert: true, new: true });
@@ -583,7 +1047,7 @@ class ServerDataStore {
   }
 
   async updateOrderStatus(orderId: string, status: Order['orderStatus']): Promise<Order | undefined> {
-    this.invalidateCache();
+    this.invalidateCache('orders');
     try {
       const conn = await connectToDatabase();
       const ordDoc = await OrderModel.findOne({ $or: [{ id: orderId }, { orderNumber: orderId }] });
@@ -607,7 +1071,7 @@ class ServerDataStore {
   }
 
   async syncFullData(fullData: Partial<DatabaseSchema>): Promise<DatabaseSchema> {
-    this.invalidateCache();
+    this.invalidateCache('all');
     try {
       const conn = await connectToDatabase();
       if (fullData.products && Array.isArray(fullData.products)) {
@@ -619,7 +1083,7 @@ class ServerDataStore {
       if (fullData.categories && Array.isArray(fullData.categories)) {
         for (const c of fullData.categories) {
           await CategoryModel.findOneAndUpdate({ id: c.id }, c, { upsert: true });
-          if (conn && conn.db) await conn.db.collection('categories').updateOne({ id: c.id }, { $set: c }, { upsert: true });
+          if (conn && conn.db) await conn.db.collection('categories').find();
         }
       }
       if (fullData.collections && Array.isArray(fullData.collections)) {

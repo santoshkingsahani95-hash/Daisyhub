@@ -25,6 +25,7 @@ import {
   ArrowRight,
   AlertCircle,
   Truck,
+  Cpu,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { db } from '@/lib/db';
@@ -156,6 +157,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'Reviews', href: '/ace_garment/reviews', icon: Star },
     { label: 'Registered Customers', href: '/ace_garment/customers', icon: UserIcon },
     { label: 'SEO & Search Engine', href: '/ace_garment/seo', icon: Globe },
+    { label: 'Cache & Performance', href: '/ace_garment/cache', icon: Cpu },
   ];
 
   // 1. SSR Hydration Guard
