@@ -59,8 +59,24 @@ export const ProductVariantInspector: React.FC<ProductVariantInspectorProps> = (
     (item) => `${item.colIdx}-${item.imgIdx}` === selectedImageKey
   ) || allImages[0];
 
-  const handleFileUpload = (file: File, callback: (dataUrl: string) => void) => {
+  const handleFileUpload = async (file: File, callback: (url: string) => void) => {
     if (!file) return;
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        callback(data.url);
+        return;
+      }
+    } catch (e) {
+      console.warn('Upload endpoint failed, falling back to local file reader');
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       if (e.target?.result) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { serverDb } from '@/lib/server-db';
-import { connectToDatabase } from '@/lib/mongodb';
+import { initializeMySqlTables } from '@/lib/mysql';
 import { cachePrewarmer } from '@/lib/cache-prewarmer';
 
 // Force dynamic server rendering for API DB sync route
@@ -9,7 +9,7 @@ export const revalidate = 0;
 
 export async function GET() {
   try {
-    await connectToDatabase();
+    await initializeMySqlTables();
     const data = await serverDb.getFreshData();
     return NextResponse.json(
       { success: true, data },
@@ -31,7 +31,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await connectToDatabase();
+    await initializeMySqlTables();
     const body = await request.json();
     const { action } = body;
     cachePrewarmer.triggerWarmupDebounced();

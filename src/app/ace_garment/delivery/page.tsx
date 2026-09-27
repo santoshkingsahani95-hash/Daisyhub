@@ -23,7 +23,7 @@ export default function AdminDeliveryRatesPage() {
     const loaded = db.getDeliveryRates();
     setRates(loaded && loaded.length > 0 ? loaded : generateDefaultDeliveryRates());
 
-    // Fetch latest from MongoDB Atlas on mount
+    // Fetch latest from MySQL Database on mount
     db.syncWithServer().then(() => {
       if (!isDirtyRef.current) {
         const fresh = db.getDeliveryRates();

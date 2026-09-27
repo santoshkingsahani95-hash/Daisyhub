@@ -1,18 +1,8 @@
 import { Product, Category, Collection, Order, Coupon, HomepageCMS, CustomerUser, DistrictDeliveryRate } from '@/types';
 import { seedProducts, initialCategories, initialCollections, initialCMS } from './seed-data';
 import { generateDefaultDeliveryRates } from './nepal-locations';
-import { connectToDatabase } from './mongodb';
-import {
-  ProductModel,
-  CategoryModel,
-  CollectionModel,
-  OrderModel,
-  CouponModel,
-  CMSModel,
-  UserModel,
-  InventoryModel,
-  DeliveryRateModel,
-} from '@/models';
+import { executeQuery, initializeMySqlTables, toJSON, parseJSON } from './mysql';
+import { sanitizeObjectImages } from './image-upload';
 
 export interface DatabaseSchema {
   products: Product[];
@@ -168,177 +158,233 @@ class ServerDataStore {
   }
 
   /**
-   * Fetch Products from MongoDB with direct driver fallback
+   * Fetch Products from MySQL with automatic seed fallback
    */
   private async fetchProducts(): Promise<Product[]> {
     return this.runSingleFlight('fetch_products', async () => {
       try {
-        const conn = await connectToDatabase();
-        let dbProds = await ProductModel.find().lean();
-        if ((!dbProds || dbProds.length === 0) && conn && conn.db) {
-          dbProds = await conn.db.collection('products').find({}).toArray();
+        await initializeMySqlTables();
+        const rows: any[] = await executeQuery('SELECT * FROM products');
+
+        let products: Product[] = [];
+        if (rows && rows.length > 0) {
+          products = rows.map((r: any) => sanitizeObjectImages({
+            id: r.id,
+            slug: r.slug,
+            name: r.name,
+            description: r.description || '',
+            details: parseJSON(r.details, []),
+            fabricCare: r.fabric_care || '',
+            category: r.category,
+            subcategory: r.subcategory || undefined,
+            collections: parseJSON(r.collections, []),
+            price: Number(r.price),
+            salePrice: r.sale_price !== null && r.sale_price !== undefined ? Number(r.sale_price) : undefined,
+            discountPercentage: r.discount_percentage !== null ? Number(r.discount_percentage) : undefined,
+            rating: Number(r.rating || 4.8),
+            reviewCount: Number(r.review_count || 0),
+            isTrending: Boolean(r.is_trending),
+            isNewArrival: Boolean(r.is_new_arrival),
+            isBestSeller: Boolean(r.is_best_seller),
+            isSale: Boolean(r.is_sale),
+            isOutOfStock: Boolean(r.is_out_of_stock),
+            colors: parseJSON(r.colors, []),
+            sizes: parseJSON(r.sizes, []),
+            sku: r.sku,
+            reviews: parseJSON(r.reviews, []),
+            insideValleyFee: Number(r.inside_valley_fee || 100),
+            outsideValleyFee: Number(r.outside_valley_fee || 200),
+            isFreeDelivery: Boolean(r.is_free_delivery),
+            seo: parseJSON(r.seo, undefined),
+            createdAt: r.created_at || new Date().toISOString(),
+          }));
         }
-        const products = (dbProds || []).map((p: any) => {
-          const { _id, __v, ...rest } = p;
-          return rest as Product;
-        });
-        const finalProducts = (products && products.length > 0) ? products : (this.productsCache.data || seedProducts);
+
+        // If MySQL table is empty, auto-seed with initial seedProducts
+        if (products.length === 0 && seedProducts && seedProducts.length > 0) {
+          console.log('[MySQL] Products table empty. Auto-populating initial seed products...');
+          for (const p of seedProducts) {
+            await this.saveProduct(p);
+          }
+          products = seedProducts;
+        }
+
         this.productsCache = {
-          data: finalProducts,
+          data: products,
           fetchedAt: Date.now(),
           softTtlMs: DEFAULT_SOFT_TTL_MS,
           hardTtlMs: DEFAULT_HARD_TTL_MS,
         };
-        return finalProducts;
+        return products;
       } catch (err: any) {
-        console.error('[ServerDataStore fetchProducts Error]', err?.message || err);
+        console.error('[MySQL fetchProducts Error]', err?.message || err);
         return this.productsCache.data || seedProducts;
       }
     });
   }
 
   /**
-   * Fetch Categories from MongoDB with fallback
+   * Fetch Categories from MySQL with fallback
    */
   private async fetchCategories(): Promise<Category[]> {
     return this.runSingleFlight('fetch_categories', async () => {
       try {
-        const conn = await connectToDatabase();
-        let dbCats = await CategoryModel.find().lean();
-        if ((!dbCats || dbCats.length === 0) && conn && conn.db) {
-          dbCats = await conn.db.collection('categories').find({}).toArray();
+        await initializeMySqlTables();
+        const rows: any[] = await executeQuery('SELECT * FROM categories');
+
+        let categories: Category[] = [];
+        if (rows && rows.length > 0) {
+          categories = rows.map((r: any) => ({
+            id: r.id,
+            slug: r.slug,
+            name: r.name,
+            description: r.description || '',
+            image: r.image || '',
+            subcategories: parseJSON(r.subcategories, []),
+            seo: parseJSON(r.seo, undefined),
+          }));
         }
-        const categories = (dbCats || []).map((c: any) => {
-          const { _id, __v, ...rest } = c;
-          return rest as Category;
-        });
-        const finalCategories = (categories && categories.length > 0) ? categories : initialCategories;
+
+        // If MySQL table is empty, auto-seed with initialCategories
+        if (categories.length === 0 && initialCategories && initialCategories.length > 0) {
+          console.log('[MySQL] Categories table empty. Auto-populating initial categories...');
+          for (const c of initialCategories) {
+            await this.saveCategory(c);
+          }
+          categories = initialCategories;
+        }
+
         this.categoriesCache = {
-          data: finalCategories,
+          data: categories,
           fetchedAt: Date.now(),
           softTtlMs: 60000,
           hardTtlMs: 600000,
         };
-        return finalCategories;
+        return categories;
       } catch (err: any) {
-        console.error('[ServerDataStore fetchCategories Error]', err?.message || err);
+        console.error('[MySQL fetchCategories Error]', err?.message || err);
         return this.categoriesCache.data || initialCategories;
       }
     });
   }
 
   /**
-   * Fetch Collections from MongoDB
+   * Fetch Collections from MySQL
    */
   private async fetchCollections(): Promise<Collection[]> {
     return this.runSingleFlight('fetch_collections', async () => {
       try {
-        const conn = await connectToDatabase();
-        let dbCols = await CollectionModel.find().lean();
-        if ((!dbCols || dbCols.length === 0) && conn && conn.db) {
-          dbCols = await conn.db.collection('collections').find({}).toArray();
+        await initializeMySqlTables();
+        const rows: any[] = await executeQuery('SELECT * FROM collections');
+
+        let collections: Collection[] = [];
+        if (rows && rows.length > 0) {
+          collections = rows.map((r: any) => ({
+            id: r.id,
+            slug: r.slug,
+            name: r.name,
+            description: r.description || '',
+            image: r.image || '',
+            seo: parseJSON(r.seo, undefined),
+          }));
         }
-        const collections = (dbCols || []).map((c: any) => {
-          const { _id, __v, ...rest } = c;
-          return rest as Collection;
-        });
-        const finalCols = (collections && collections.length > 0) ? collections : initialCollections;
+
+        // Auto-seed if empty
+        if (collections.length === 0 && initialCollections && initialCollections.length > 0) {
+          console.log('[MySQL] Collections table empty. Auto-populating initial collections...');
+          for (const col of initialCollections) {
+            await this.saveCollection(col);
+          }
+          collections = initialCollections;
+        }
+
         this.collectionsCache = {
-          data: finalCols,
+          data: collections,
           fetchedAt: Date.now(),
           softTtlMs: 60000,
           hardTtlMs: 600000,
         };
-        return finalCols;
+        return collections;
       } catch (err: any) {
-        console.error('[ServerDataStore fetchCollections Error]', err?.message || err);
+        console.error('[MySQL fetchCollections Error]', err?.message || err);
         return this.collectionsCache.data || initialCollections;
       }
     });
   }
 
   /**
-   * Fetch Delivery Rates from MongoDB
+   * Fetch Delivery Rates from MySQL
    */
   private async fetchDeliveryRates(): Promise<DistrictDeliveryRate[]> {
     return this.runSingleFlight('fetch_delivery_rates', async () => {
       try {
-        const conn = await connectToDatabase();
-        let dbRates = await DeliveryRateModel.find().lean();
-        if ((!dbRates || dbRates.length === 0) && conn && conn.db) {
-          dbRates = await conn.db.collection('delivery_rates').find({}).toArray();
+        await initializeMySqlTables();
+        const rows: any[] = await executeQuery('SELECT * FROM delivery_rates');
+
+        let rates: DistrictDeliveryRate[] = [];
+        if (rows && rows.length > 0) {
+          rates = rows.map((r: any) => ({
+            district: r.district,
+            province: r.province,
+            deliveryFee: Number(r.delivery_fee),
+            enabled: Boolean(r.enabled),
+            homeDeliveryFee: r.home_delivery_fee !== null ? Number(r.home_delivery_fee) : Number(r.delivery_fee),
+            branchDeliveryFee: r.branch_delivery_fee !== null ? Number(r.branch_delivery_fee) : Number(r.delivery_fee),
+            homeDeliveryEnabled: r.home_delivery_enabled !== null ? Boolean(r.home_delivery_enabled) : Boolean(r.enabled),
+            branchDeliveryEnabled: r.branch_delivery_enabled !== null ? Boolean(r.branch_delivery_enabled) : Boolean(r.enabled),
+          }));
         }
 
-        if (!dbRates || dbRates.length === 0) {
-          const defaultRates = generateDefaultDeliveryRates();
-          try {
-            await DeliveryRateModel.insertMany(defaultRates, { ordered: false });
-          } catch (e) {
-            // ignore duplicate key warning
-          }
-          dbRates = await DeliveryRateModel.find().lean();
+        // Auto-seed all 77 districts if empty
+        if (rates.length === 0) {
+          console.log('[MySQL] Delivery rates table empty. Bulk populating 77 Nepal districts...');
+          const defaults = generateDefaultDeliveryRates();
+          await this.updateDeliveryRates(defaults);
+          rates = defaults;
         }
 
-        const deliveryRates: DistrictDeliveryRate[] = (dbRates || []).map((r: any) => {
-          const { _id, __v, ...rest } = r;
-          const fee = typeof rest.deliveryFee === 'number' ? rest.deliveryFee : (typeof rest.homeDeliveryFee === 'number' ? rest.homeDeliveryFee : 150);
-          const isEn = typeof rest.enabled === 'boolean' ? rest.enabled : (typeof rest.homeDeliveryEnabled === 'boolean' ? rest.homeDeliveryEnabled : true);
-          return {
-            district: rest.district,
-            province: rest.province,
-            deliveryFee: fee,
-            enabled: isEn,
-            homeDeliveryFee: fee,
-            branchDeliveryFee: typeof rest.branchDeliveryFee === 'number' ? rest.branchDeliveryFee : fee,
-            homeDeliveryEnabled: isEn,
-            branchDeliveryEnabled: typeof rest.branchDeliveryEnabled === 'boolean' ? rest.branchDeliveryEnabled : isEn,
-          } as DistrictDeliveryRate;
-        });
-
-        const finalRates = deliveryRates.length > 0 ? deliveryRates : generateDefaultDeliveryRates();
         this.deliveryRatesCache = {
-          data: finalRates,
+          data: rates,
           fetchedAt: Date.now(),
           softTtlMs: 60000,
           hardTtlMs: 600000,
         };
-        return finalRates;
+        return rates;
       } catch (err: any) {
-        console.error('[ServerDataStore fetchDeliveryRates Error]', err?.message || err);
+        console.error('[MySQL fetchDeliveryRates Error]', err?.message || err);
         return this.deliveryRatesCache.data || generateDefaultDeliveryRates();
       }
     });
   }
 
   /**
-   * Fetch CMS from MongoDB
+   * Fetch CMS from MySQL
    */
   private async fetchCMS(deliveryRates?: DistrictDeliveryRate[]): Promise<HomepageCMS> {
     return this.runSingleFlight('fetch_cms', async () => {
       try {
-        await connectToDatabase();
-        let cmsDoc = await CMSModel.findOne({ key: 'homepage' }).lean();
-        if (!cmsDoc) {
-          await CMSModel.findOneAndUpdate({ key: 'homepage' }, initialCMS, { upsert: true });
-          cmsDoc = await CMSModel.findOne({ key: 'homepage' }).lean();
-        }
+        await initializeMySqlTables();
+        const rows: any[] = await executeQuery('SELECT * FROM cms WHERE `key` = ?', ['homepage']);
 
         const rates = deliveryRates || (await this.fetchDeliveryRates());
 
         let cms: HomepageCMS = { ...initialCMS };
-        if (cmsDoc) {
-          const { _id, __v, key, ...rest } = cmsDoc as any;
+        if (rows && rows.length > 0) {
+          const r = rows[0];
           cms = {
             ...initialCMS,
-            ...rest,
-            announcementBar: rest.announcementBar ? { ...initialCMS.announcementBar, ...rest.announcementBar } : initialCMS.announcementBar,
-            hero: rest.hero ? { ...initialCMS.hero, ...rest.hero } : initialCMS.hero,
-            editorialBanner: rest.editorialBanner ? { ...initialCMS.editorialBanner, ...rest.editorialBanner } : initialCMS.editorialBanner,
-            fonepaySettings: rest.fonepaySettings ? { ...initialCMS.fonepaySettings, ...rest.fonepaySettings } : initialCMS.fonepaySettings,
-            seo: rest.seo ? { ...initialCMS.seo, ...rest.seo } : initialCMS.seo,
-            deliveryRates: rates && rates.length > 0 ? rates : generateDefaultDeliveryRates(),
+            announcementBar: parseJSON(r.announcement_bar, initialCMS.announcementBar),
+            hero: parseJSON(r.hero, initialCMS.hero),
+            editorialBanner: parseJSON(r.editorial_banner, initialCMS.editorialBanner),
+            instagramImages: parseJSON(r.instagram_images, initialCMS.instagramImages),
+            fonepaySettings: parseJSON(r.fonepay_settings, initialCMS.fonepaySettings),
+            seo: parseJSON(r.seo, initialCMS.seo),
+            deliveryRates: rates,
           };
         } else {
+          // Auto-seed homepage CMS
+          console.log('[MySQL] CMS table empty. Auto-populating homepage CMS...');
+          await this.updateCMS(initialCMS);
           cms.deliveryRates = rates;
         }
 
@@ -350,24 +396,49 @@ class ServerDataStore {
         };
         return cms;
       } catch (err: any) {
-        console.error('[ServerDataStore fetchCMS Error]', err?.message || err);
+        console.error('[MySQL fetchCMS Error]', err?.message || err);
         return this.cmsCache.data || { ...initialCMS };
       }
     });
   }
 
   /**
-   * Fetch Orders from MongoDB
+   * Fetch Orders from MySQL
    */
   private async fetchOrders(): Promise<Order[]> {
     return this.runSingleFlight('fetch_orders', async () => {
       try {
-        await connectToDatabase();
-        const dbOrds = await OrderModel.find().sort({ createdAt: -1 }).lean();
-        const orders = (dbOrds || []).map((o: any) => {
-          const { _id, __v, ...rest } = o;
-          return rest as Order;
-        });
+        await initializeMySqlTables();
+        const rows: any[] = await executeQuery('SELECT * FROM orders ORDER BY created_at DESC');
+
+        const orders: Order[] = (rows || []).map((r: any) => ({
+          id: r.id,
+          orderNumber: r.order_number,
+          createdAt: r.created_at || new Date().toISOString(),
+          items: parseJSON(r.items, []),
+          subtotal: Number(r.subtotal),
+          discount: Number(r.discount || 0),
+          shipping: Number(r.shipping || 0),
+          total: Number(r.total),
+          paymentMethod: r.payment_method,
+          paymentStatus: r.payment_status || 'pending',
+          orderStatus: r.order_status || 'Pending',
+          customerName: r.customer_name,
+          customerEmail: r.customer_email,
+          customerMobile: r.customer_mobile,
+          shippingAddress: parseJSON(r.shipping_address, {
+            fullName: r.customer_name || '',
+            mobile: r.customer_mobile || '',
+            email: r.customer_email || '',
+            province: 'Bagmati',
+            district: 'Kathmandu',
+            city: 'Kathmandu',
+            streetAddress: 'Kathmandu Valley',
+          }),
+          estimatedDelivery: r.estimated_delivery || undefined,
+          trackingNumber: r.tracking_number || undefined,
+        }));
+
         this.ordersCache = {
           data: orders,
           fetchedAt: Date.now(),
@@ -376,24 +447,31 @@ class ServerDataStore {
         };
         return orders;
       } catch (err: any) {
-        console.error('[ServerDataStore fetchOrders Error]', err?.message || err);
+        console.error('[MySQL fetchOrders Error]', err?.message || err);
         return this.ordersCache.data || [];
       }
     });
   }
 
   /**
-   * Fetch Coupons from MongoDB
+   * Fetch Coupons from MySQL
    */
   private async fetchCoupons(): Promise<Coupon[]> {
     return this.runSingleFlight('fetch_coupons', async () => {
       try {
-        await connectToDatabase();
-        const dbCoups = await CouponModel.find().lean();
-        const coupons = (dbCoups || []).map((cp: any) => {
-          const { _id, __v, ...rest } = cp;
-          return rest as Coupon;
-        });
+        await initializeMySqlTables();
+        const rows: any[] = await executeQuery('SELECT * FROM coupons');
+
+        const coupons: Coupon[] = (rows || []).map((r: any) => ({
+          code: r.code,
+          discountType: r.discount_type,
+          discountValue: Number(r.discount_value),
+          minOrderValue: Number(r.min_order_value || 0),
+          maxDiscount: r.max_discount !== null ? Number(r.max_discount) : undefined,
+          expiryDate: r.expiry_date || undefined,
+          active: Boolean(r.active),
+        }));
+
         this.couponsCache = {
           data: coupons,
           fetchedAt: Date.now(),
@@ -402,20 +480,21 @@ class ServerDataStore {
         };
         return coupons;
       } catch (err: any) {
-        console.error('[ServerDataStore fetchCoupons Error]', err?.message || err);
+        console.error('[MySQL fetchCoupons Error]', err?.message || err);
         return this.couponsCache.data || [];
       }
     });
   }
 
   /**
-   * Fetch Users from MongoDB
+   * Fetch Users from MySQL
    */
   private async fetchUsers(): Promise<CustomerUser[]> {
     return this.runSingleFlight('fetch_users', async () => {
       try {
-        await connectToDatabase();
-        const dbUsers = await UserModel.find().lean();
+        await initializeMySqlTables();
+        const rows: any[] = await executeQuery('SELECT * FROM users');
+
         const defaultAdmin: CustomerUser[] = [
           {
             id: 'usr-admin-1',
@@ -426,12 +505,22 @@ class ServerDataStore {
             registrationDate: '2026-01-01',
           },
         ];
-        const users: CustomerUser[] = (dbUsers && dbUsers.length > 0)
-          ? dbUsers.map((u: any) => {
-              const { _id, __v, ...rest } = u;
-              return rest as CustomerUser;
-            })
-          : defaultAdmin;
+
+        let users: CustomerUser[] = (rows || []).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          email: r.email,
+          mobile: r.mobile || undefined,
+          role: r.role || 'CUSTOMER',
+          registrationDate: r.registration_date || new Date().toISOString(),
+          isBlocked: Boolean(r.is_blocked),
+          addresses: parseJSON(r.addresses, []),
+        }));
+
+        if (users.length === 0) {
+          await this.saveUser(defaultAdmin[0]);
+          users = defaultAdmin;
+        }
 
         this.usersCache = {
           data: users,
@@ -441,7 +530,7 @@ class ServerDataStore {
         };
         return users;
       } catch (err: any) {
-        console.error('[ServerDataStore fetchUsers Error]', err?.message || err);
+        console.error('[MySQL fetchUsers Error]', err?.message || err);
         return this.usersCache.data || [];
       }
     });
@@ -459,7 +548,6 @@ class ServerDataStore {
     const isHardExpired = (cache: EntityCache<any>) =>
       !cache.data || now - cache.fetchedAt > cache.hardTtlMs;
 
-    // Check if all entity caches are fully warm & fresh
     const allHot =
       !force &&
       !isSoftExpired(this.productsCache) &&
@@ -490,9 +578,6 @@ class ServerDataStore {
 
     this.metrics.misses++;
 
-    // Determine which entities need synchronous fetching vs background revalidation
-    const fetchPromises: Promise<any>[] = [];
-
     const getOrFetch = async <T>(
       cache: EntityCache<T>,
       fetcher: () => Promise<T>
@@ -501,10 +586,9 @@ class ServerDataStore {
         return await fetcher();
       }
       if (isSoftExpired(cache)) {
-        // Trigger background revalidation non-blocking
         this.metrics.revalidations++;
         fetcher().catch((e) =>
-          console.error('[SWR Background Revalidate Error]', e)
+          console.error('[MySQL SWR Background Revalidate Error]', e)
         );
       }
       return cache.data!;
@@ -525,7 +609,6 @@ class ServerDataStore {
       this.fetchCMS(deliveryRates)
     );
 
-    // Rebuild high-speed index maps
     this.rebuildIndexes(products, categories, coupons);
     this.metrics.lastWarmedAt = Date.now();
 
@@ -654,34 +737,40 @@ class ServerDataStore {
     };
   }
 
-  // --- EXISTING DATABASE MUTATION & INTERFACE METHODS ---
+  // --- DATABASE MUTATION METHODS FOR MYSQL ---
 
   private async syncInventoryDoc(prod: any) {
     try {
-      const conn = await connectToDatabase();
+      await initializeMySqlTables();
       const totalStock = prod.colors && prod.colors.length > 0
         ? prod.colors.reduce((sum: number, c: any) => sum + (typeof c.stock === 'number' ? c.stock : 0), 0)
         : (prod.sizes ? prod.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0);
 
-      const invItem = {
-        id: `inv-${prod.id}`,
-        productId: prod.id,
-        sku: prod.sku,
-        productName: prod.name,
-        category: prod.category,
-        totalStock,
-        isOutOfStock: totalStock <= 0,
-        colors: prod.colors || [],
-        sizes: prod.sizes || [],
-        updatedAt: new Date().toISOString(),
-      };
+      const invId = `inv-${prod.id}`;
+      const updatedAt = new Date().toISOString();
 
-      await InventoryModel.findOneAndUpdate({ productId: prod.id }, invItem, { upsert: true, new: true });
-      if (conn && conn.db) {
-        await conn.db.collection('inventory').updateOne({ productId: prod.id }, { $set: invItem }, { upsert: true });
-      }
+      await executeQuery(
+        `INSERT INTO inventory (id, product_id, sku, product_name, category, total_stock, is_out_of_stock, colors, sizes, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           sku=VALUES(sku), product_name=VALUES(product_name), category=VALUES(category),
+           total_stock=VALUES(total_stock), is_out_of_stock=VALUES(is_out_of_stock),
+           colors=VALUES(colors), sizes=VALUES(sizes), updated_at=VALUES(updated_at);`,
+        [
+          invId,
+          prod.id,
+          prod.sku || 'N/A',
+          prod.name,
+          prod.category || 'General',
+          totalStock,
+          totalStock <= 0 ? 1 : 0,
+          toJSON(prod.colors || []),
+          toJSON(prod.sizes || []),
+          updatedAt,
+        ]
+      );
     } catch (e) {
-      console.error('[MongoDB Atlas Inventory Sync Error]', e);
+      console.error('[MySQL Inventory Sync Error]', e);
     }
   }
 
@@ -690,18 +779,65 @@ class ServerDataStore {
     return data.products;
   }
 
-  async saveProduct(product: Product): Promise<Product> {
+  async saveProduct(rawProduct: Product): Promise<Product> {
+    const product = sanitizeObjectImages(rawProduct);
     this.invalidateCache('products');
     try {
-      const conn = await connectToDatabase();
-      await ProductModel.findOneAndUpdate({ id: product.id }, product, { upsert: true, new: true });
-      if (conn && conn.db) {
-        await conn.db.collection('products').updateOne({ id: product.id }, { $set: product }, { upsert: true });
-      }
+      await initializeMySqlTables();
+      await executeQuery(
+        `INSERT INTO products (
+          id, slug, name, description, details, fabric_care, category, subcategory,
+          collections, price, sale_price, discount_percentage, rating, review_count,
+          is_trending, is_new_arrival, is_best_seller, is_sale, is_out_of_stock,
+          colors, sizes, sku, reviews, inside_valley_fee, outside_valley_fee, is_free_delivery, seo, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          slug=VALUES(slug), name=VALUES(name), description=VALUES(description),
+          details=VALUES(details), fabric_care=VALUES(fabric_care), category=VALUES(category),
+          subcategory=VALUES(subcategory), collections=VALUES(collections), price=VALUES(price),
+          sale_price=VALUES(sale_price), discount_percentage=VALUES(discount_percentage),
+          rating=VALUES(rating), review_count=VALUES(review_count), is_trending=VALUES(is_trending),
+          is_new_arrival=VALUES(is_new_arrival), is_best_seller=VALUES(is_best_seller),
+          is_sale=VALUES(is_sale), is_out_of_stock=VALUES(is_out_of_stock), colors=VALUES(colors),
+          sizes=VALUES(sizes), sku=VALUES(sku), reviews=VALUES(reviews),
+          inside_valley_fee=VALUES(inside_valley_fee), outside_valley_fee=VALUES(outside_valley_fee),
+          is_free_delivery=VALUES(is_free_delivery), seo=VALUES(seo);`,
+        [
+          product.id,
+          product.slug,
+          product.name,
+          product.description || '',
+          toJSON(product.details || []),
+          product.fabricCare || '',
+          product.category,
+          product.subcategory || null,
+          toJSON(product.collections || []),
+          product.price,
+          product.salePrice ?? null,
+          product.discountPercentage ?? null,
+          product.rating || 4.8,
+          product.reviewCount || 0,
+          product.isTrending ? 1 : 0,
+          product.isNewArrival ? 1 : 0,
+          product.isBestSeller ? 1 : 0,
+          product.isSale ? 1 : 0,
+          product.isOutOfStock ? 1 : 0,
+          toJSON(product.colors || []),
+          toJSON(product.sizes || []),
+          product.sku,
+          toJSON(product.reviews || []),
+          product.insideValleyFee || 100,
+          product.outsideValleyFee || 200,
+          product.isFreeDelivery ? 1 : 0,
+          toJSON(product.seo || null),
+          product.createdAt || new Date().toISOString(),
+        ]
+      );
+
       await this.syncInventoryDoc(product);
-      console.log(`[MongoDB Atlas] Successfully saved product '${product.name}' (${product.id}) and synced to inventory collection`);
+      console.log(`[MySQL] Successfully saved product '${product.name}' (${product.id})`);
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Saving product ${product.id}:`, err?.message || err);
+      console.error(`[MySQL Error] Saving product ${product.id}:`, err?.message || err);
     }
     return product;
   }
@@ -709,17 +845,13 @@ class ServerDataStore {
   async deleteProduct(id: string): Promise<boolean> {
     this.invalidateCache('products');
     try {
-      const conn = await connectToDatabase();
-      const res = await ProductModel.deleteOne({ id });
-      await InventoryModel.deleteOne({ productId: id });
-      if (conn && conn.db) {
-        await conn.db.collection('products').deleteOne({ id });
-        await conn.db.collection('inventory').deleteOne({ productId: id });
-      }
-      console.log(`[MongoDB Atlas] Successfully deleted product ${id} from products and inventory`);
-      return res.deletedCount ? res.deletedCount > 0 : true;
+      await initializeMySqlTables();
+      await executeQuery('DELETE FROM products WHERE id = ?', [id]);
+      await executeQuery('DELETE FROM inventory WHERE product_id = ? OR id = ?', [id, `inv-${id}`]);
+      console.log(`[MySQL] Successfully deleted product ${id}`);
+      return true;
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Deleting product ${id}:`, err?.message || err);
+      console.error(`[MySQL Error] Deleting product ${id}:`, err?.message || err);
       return false;
     }
   }
@@ -727,11 +859,9 @@ class ServerDataStore {
   async updateInventory(productId: string, size: string, newStock: number): Promise<boolean> {
     this.invalidateCache('products');
     try {
-      const conn = await connectToDatabase();
-      const prodDoc = await ProductModel.findOne({ id: productId });
-      if (!prodDoc) return false;
+      const prod = await this.getProductById(productId);
+      if (!prod) return false;
 
-      const prod = prodDoc.toObject();
       const cleanStock = isNaN(Number(newStock)) ? 0 : Math.max(0, Math.min(999, Math.floor(Number(newStock))));
 
       if (prod.sizes && prod.sizes.length > 0) {
@@ -748,15 +878,11 @@ class ServerDataStore {
       const totalSizeStock = prod.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0);
       prod.isOutOfStock = totalSizeStock <= 0;
 
-      await ProductModel.findOneAndUpdate({ id: productId }, prod, { upsert: true });
-      if (conn && conn.db) {
-        await conn.db.collection('products').updateOne({ id: productId }, { $set: prod }, { upsert: true });
-      }
-      await this.syncInventoryDoc(prod);
-      console.log(`[MongoDB Atlas] Updated inventory for product ${productId} size '${size}' to ${cleanStock}`);
+      await this.saveProduct(prod);
+      console.log(`[MySQL] Updated inventory for product ${productId} size '${size}' to ${cleanStock}`);
       return true;
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Updating inventory for ${productId}:`, err?.message || err);
+      console.error(`[MySQL Error] Updating inventory for ${productId}:`, err?.message || err);
       return false;
     }
   }
@@ -764,11 +890,9 @@ class ServerDataStore {
   async updateColorStock(productId: string, colorName: string, newStock: number): Promise<boolean> {
     this.invalidateCache('products');
     try {
-      const conn = await connectToDatabase();
-      const prodDoc = await ProductModel.findOne({ id: productId });
-      if (!prodDoc) return false;
+      const prod = await this.getProductById(productId);
+      if (!prod) return false;
 
-      const prod = prodDoc.toObject();
       const cleanStock = isNaN(Number(newStock)) ? 0 : Math.max(0, Math.min(999, Math.floor(Number(newStock))));
 
       if (prod.colors && prod.colors.length > 0) {
@@ -782,15 +906,11 @@ class ServerDataStore {
       prod.sizes = [{ size: 'Free Size', stock: totalColorStock }];
       prod.isOutOfStock = totalColorStock <= 0;
 
-      await ProductModel.findOneAndUpdate({ id: productId }, prod, { upsert: true });
-      if (conn && conn.db) {
-        await conn.db.collection('products').updateOne({ id: productId }, { $set: prod }, { upsert: true });
-      }
-      await this.syncInventoryDoc(prod);
-      console.log(`[MongoDB Atlas] Updated color stock for product ${productId} color '${colorName}' to ${cleanStock}`);
+      await this.saveProduct(prod);
+      console.log(`[MySQL] Updated color stock for product ${productId} color '${colorName}' to ${cleanStock}`);
       return true;
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Updating color stock for ${productId}:`, err?.message || err);
+      console.error(`[MySQL Error] Updating color stock for ${productId}:`, err?.message || err);
       return false;
     }
   }
@@ -798,14 +918,26 @@ class ServerDataStore {
   async saveCategory(category: Category): Promise<Category> {
     this.invalidateCache('categories');
     try {
-      const conn = await connectToDatabase();
-      await CategoryModel.findOneAndUpdate({ id: category.id }, category, { upsert: true, new: true });
-      if (conn && conn.db) {
-        await conn.db.collection('categories').updateOne({ id: category.id }, { $set: category }, { upsert: true });
-      }
-      console.log(`[MongoDB Atlas] Successfully saved category '${category.name}' (${category.id})`);
+      await initializeMySqlTables();
+      await executeQuery(
+        `INSERT INTO categories (id, slug, name, description, image, subcategories, seo)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           slug=VALUES(slug), name=VALUES(name), description=VALUES(description),
+           image=VALUES(image), subcategories=VALUES(subcategories), seo=VALUES(seo);`,
+        [
+          category.id,
+          category.slug,
+          category.name,
+          category.description || '',
+          category.image || '',
+          toJSON(category.subcategories || []),
+          toJSON(category.seo || null),
+        ]
+      );
+      console.log(`[MySQL] Successfully saved category '${category.name}' (${category.id})`);
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Saving category '${category.name}':`, err?.message || err);
+      console.error(`[MySQL Error] Saving category '${category.name}':`, err?.message || err);
     }
     return category;
   }
@@ -813,15 +945,12 @@ class ServerDataStore {
   async deleteCategory(id: string): Promise<boolean> {
     this.invalidateCache('categories');
     try {
-      const conn = await connectToDatabase();
-      const res = await CategoryModel.deleteOne({ $or: [{ id }, { slug: id }] });
-      if (conn && conn.db) {
-        await conn.db.collection('categories').deleteOne({ $or: [{ id }, { slug: id }] });
-      }
-      console.log(`[MongoDB Atlas] Successfully deleted category ${id}`);
-      return res.deletedCount ? res.deletedCount > 0 : true;
+      await initializeMySqlTables();
+      await executeQuery('DELETE FROM categories WHERE id = ? OR slug = ?', [id, id]);
+      console.log(`[MySQL] Successfully deleted category ${id}`);
+      return true;
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Deleting category ${id}:`, err?.message || err);
+      console.error(`[MySQL Error] Deleting category ${id}:`, err?.message || err);
       return false;
     }
   }
@@ -829,14 +958,25 @@ class ServerDataStore {
   async saveCollection(collection: Collection): Promise<Collection> {
     this.invalidateCache('collections');
     try {
-      const conn = await connectToDatabase();
-      await CollectionModel.findOneAndUpdate({ id: collection.id }, collection, { upsert: true, new: true });
-      if (conn && conn.db) {
-        await conn.db.collection('collections').updateOne({ id: collection.id }, { $set: collection }, { upsert: true });
-      }
-      console.log(`[MongoDB Atlas] Successfully saved collection '${collection.name}' (${collection.id})`);
+      await initializeMySqlTables();
+      await executeQuery(
+        `INSERT INTO collections (id, slug, name, description, image, seo)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           slug=VALUES(slug), name=VALUES(name), description=VALUES(description),
+           image=VALUES(image), seo=VALUES(seo);`,
+        [
+          collection.id,
+          collection.slug,
+          collection.name,
+          collection.description || '',
+          collection.image || '',
+          toJSON(collection.seo || null),
+        ]
+      );
+      console.log(`[MySQL] Successfully saved collection '${collection.name}' (${collection.id})`);
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Saving collection '${collection.name}':`, err?.message || err);
+      console.error(`[MySQL Error] Saving collection '${collection.name}':`, err?.message || err);
     }
     return collection;
   }
@@ -844,15 +984,12 @@ class ServerDataStore {
   async deleteCollection(id: string): Promise<boolean> {
     this.invalidateCache('collections');
     try {
-      const conn = await connectToDatabase();
-      const res = await CollectionModel.deleteOne({ $or: [{ id }, { slug: id }] });
-      if (conn && conn.db) {
-        await conn.db.collection('collections').deleteOne({ $or: [{ id }, { slug: id }] });
-      }
-      console.log(`[MongoDB Atlas] Successfully deleted collection ${id}`);
-      return res.deletedCount ? res.deletedCount > 0 : true;
+      await initializeMySqlTables();
+      await executeQuery('DELETE FROM collections WHERE id = ? OR slug = ?', [id, id]);
+      console.log(`[MySQL] Successfully deleted collection ${id}`);
+      return true;
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Deleting collection ${id}:`, err?.message || err);
+      console.error(`[MySQL Error] Deleting collection ${id}:`, err?.message || err);
       return false;
     }
   }
@@ -862,14 +999,27 @@ class ServerDataStore {
     const cleanCode = coupon.code.trim().toUpperCase();
     const cleanCoupon = { ...coupon, code: cleanCode };
     try {
-      const conn = await connectToDatabase();
-      await CouponModel.findOneAndUpdate({ code: cleanCode }, cleanCoupon, { upsert: true, new: true });
-      if (conn && conn.db) {
-        await conn.db.collection('coupons').updateOne({ code: cleanCode }, { $set: cleanCoupon }, { upsert: true });
-      }
-      console.log(`[MongoDB Atlas] Successfully saved coupon ${cleanCode}`);
+      await initializeMySqlTables();
+      await executeQuery(
+        `INSERT INTO coupons (code, discount_type, discount_value, min_order_value, max_discount, expiry_date, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           discount_type=VALUES(discount_type), discount_value=VALUES(discount_value),
+           min_order_value=VALUES(min_order_value), max_discount=VALUES(max_discount),
+           expiry_date=VALUES(expiry_date), active=VALUES(active);`,
+        [
+          cleanCode,
+          cleanCoupon.discountType,
+          cleanCoupon.discountValue,
+          cleanCoupon.minOrderValue || 0,
+          cleanCoupon.maxDiscount ?? null,
+          cleanCoupon.expiryDate || null,
+          cleanCoupon.active ? 1 : 0,
+        ]
+      );
+      console.log(`[MySQL] Successfully saved coupon ${cleanCode}`);
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Saving coupon ${cleanCode}:`, err?.message || err);
+      console.error(`[MySQL Error] Saving coupon ${cleanCode}:`, err?.message || err);
     }
     return cleanCoupon;
   }
@@ -878,15 +1028,12 @@ class ServerDataStore {
     this.invalidateCache('coupons');
     const cleanCode = code.trim().toUpperCase();
     try {
-      const conn = await connectToDatabase();
-      const res = await CouponModel.deleteOne({ code: cleanCode });
-      if (conn && conn.db) {
-        await conn.db.collection('coupons').deleteOne({ code: cleanCode });
-      }
-      console.log(`[MongoDB Atlas] Successfully deleted coupon ${cleanCode}`);
-      return res.deletedCount ? res.deletedCount > 0 : true;
+      await initializeMySqlTables();
+      await executeQuery('DELETE FROM coupons WHERE code = ?', [cleanCode]);
+      console.log(`[MySQL] Successfully deleted coupon ${cleanCode}`);
+      return true;
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Deleting coupon ${cleanCode}:`, err?.message || err);
+      console.error(`[MySQL Error] Deleting coupon ${cleanCode}:`, err?.message || err);
       return false;
     }
   }
@@ -894,14 +1041,29 @@ class ServerDataStore {
   async saveUser(user: CustomerUser): Promise<CustomerUser> {
     this.invalidateCache('users');
     try {
-      const conn = await connectToDatabase();
-      await UserModel.findOneAndUpdate({ id: user.id }, user, { upsert: true, new: true });
-      if (conn && conn.db) {
-        await conn.db.collection('users').updateOne({ id: user.id }, { $set: user }, { upsert: true });
-      }
-      console.log(`[MongoDB Atlas] Successfully saved user ${user.email}`);
+      await initializeMySqlTables();
+      await executeQuery(
+        `INSERT INTO users (id, name, email, mobile, password, role, registration_date, is_blocked, addresses)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           name=VALUES(name), email=VALUES(email), mobile=VALUES(mobile),
+           role=VALUES(role), registration_date=VALUES(registration_date),
+           is_blocked=VALUES(is_blocked), addresses=VALUES(addresses);`,
+        [
+          user.id,
+          user.name,
+          user.email,
+          user.mobile || null,
+          (user as any).password || null,
+          user.role || 'CUSTOMER',
+          user.registrationDate || new Date().toISOString(),
+          user.isBlocked ? 1 : 0,
+          toJSON(user.addresses || []),
+        ]
+      );
+      console.log(`[MySQL] Successfully saved user ${user.email}`);
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Saving user ${user.email}:`, err?.message || err);
+      console.error(`[MySQL Error] Saving user ${user.email}:`, err?.message || err);
     }
     return user;
   }
@@ -909,15 +1071,12 @@ class ServerDataStore {
   async deleteUser(id: string): Promise<boolean> {
     this.invalidateCache('users');
     try {
-      const conn = await connectToDatabase();
-      const res = await UserModel.deleteOne({ $or: [{ id }, { email: id }] });
-      if (conn && conn.db) {
-        await conn.db.collection('users').deleteOne({ $or: [{ id }, { email: id }] });
-      }
-      console.log(`[MongoDB Atlas] Successfully deleted user ${id}`);
-      return res.deletedCount ? res.deletedCount > 0 : true;
+      await initializeMySqlTables();
+      await executeQuery('DELETE FROM users WHERE id = ? OR email = ?', [id, id]);
+      console.log(`[MySQL] Successfully deleted user ${id}`);
+      return true;
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Deleting user ${id}:`, err?.message || err);
+      console.error(`[MySQL Error] Deleting user ${id}:`, err?.message || err);
       return false;
     }
   }
@@ -925,15 +1084,12 @@ class ServerDataStore {
   async deleteOrder(id: string): Promise<boolean> {
     this.invalidateCache('orders');
     try {
-      const conn = await connectToDatabase();
-      const res = await OrderModel.deleteOne({ $or: [{ id }, { orderNumber: id }] });
-      if (conn && conn.db) {
-        await conn.db.collection('orders').deleteOne({ $or: [{ id }, { orderNumber: id }] });
-      }
-      console.log(`[MongoDB Atlas] Successfully deleted order ${id}`);
-      return res.deletedCount ? res.deletedCount > 0 : true;
+      await initializeMySqlTables();
+      await executeQuery('DELETE FROM orders WHERE id = ? OR order_number = ?', [id, id]);
+      console.log(`[MySQL] Successfully deleted order ${id}`);
+      return true;
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Deleting order ${id}:`, err?.message || err);
+      console.error(`[MySQL Error] Deleting order ${id}:`, err?.message || err);
       return false;
     }
   }
@@ -941,11 +1097,9 @@ class ServerDataStore {
   async deleteReview(productId: string, reviewId: string): Promise<boolean> {
     this.invalidateCache('products');
     try {
-      const conn = await connectToDatabase();
-      const prodDoc = await ProductModel.findOne({ $or: [{ id: productId }, { slug: productId }] });
-      if (!prodDoc) return false;
+      const prod = await this.getProductById(productId);
+      if (!prod) return false;
 
-      const prod = prodDoc.toObject();
       if (prod.reviews) {
         const initialLen = prod.reviews.length;
         prod.reviews = prod.reviews.filter((r: any) => r.id !== reviewId);
@@ -958,17 +1112,14 @@ class ServerDataStore {
           } else {
             prod.rating = 5.0;
           }
-          await ProductModel.findOneAndUpdate({ id: prod.id }, prod, { upsert: true });
-          if (conn && conn.db) {
-            await conn.db.collection('products').updateOne({ id: prod.id }, { $set: prod }, { upsert: true });
-          }
-          console.log(`[MongoDB Atlas] Deleted review ${reviewId} from product ${prod.id}`);
+          await this.saveProduct(prod);
+          console.log(`[MySQL] Deleted review ${reviewId} from product ${prod.id}`);
           return true;
         }
       }
       return false;
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Deleting review ${reviewId}:`, err?.message || err);
+      console.error(`[MySQL Error] Deleting review ${reviewId}:`, err?.message || err);
       return false;
     }
   }
@@ -977,21 +1128,32 @@ class ServerDataStore {
     this.invalidateCache('deliveryRates');
     this.invalidateCache('cms');
     try {
-      const conn = await connectToDatabase();
+      await initializeMySqlTables();
       for (const r of rates) {
-        await DeliveryRateModel.findOneAndUpdate({ district: r.district }, r, { upsert: true, new: true });
-        if (conn && conn.db) {
-          await conn.db.collection('delivery_rates').updateOne({ district: r.district }, { $set: r }, { upsert: true });
-        }
+        await executeQuery(
+          `INSERT INTO delivery_rates (
+            district, province, delivery_fee, enabled, home_delivery_fee, branch_delivery_fee, home_delivery_enabled, branch_delivery_enabled
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            province=VALUES(province), delivery_fee=VALUES(delivery_fee), enabled=VALUES(enabled),
+            home_delivery_fee=VALUES(home_delivery_fee), branch_delivery_fee=VALUES(branch_delivery_fee),
+            home_delivery_enabled=VALUES(home_delivery_enabled), branch_delivery_enabled=VALUES(branch_delivery_enabled);`,
+          [
+            r.district,
+            r.province,
+            r.deliveryFee,
+            r.enabled ? 1 : 0,
+            r.homeDeliveryFee ?? r.deliveryFee,
+            r.branchDeliveryFee ?? r.deliveryFee,
+            r.homeDeliveryEnabled ? 1 : 0,
+            r.branchDeliveryEnabled ? 1 : 0,
+          ]
+        );
       }
-      await CMSModel.findOneAndUpdate({ key: 'homepage' }, { $set: { deliveryRates: rates } }, { upsert: true });
-      if (conn && conn.db) {
-        await conn.db.collection('cms').updateOne({ key: 'homepage' }, { $set: { deliveryRates: rates } }, { upsert: true });
-      }
-      console.log(`[MongoDB Atlas] Successfully updated ${rates.length} delivery rates in delivery_rates collection`);
+      console.log(`[MySQL] Successfully updated ${rates.length} delivery rates`);
       return rates;
     } catch (err: any) {
-      console.error('[MongoDB Atlas Error] Updating delivery rates:', err?.message || err);
+      console.error('[MySQL Error] Updating delivery rates:', err?.message || err);
       return rates;
     }
   }
@@ -999,34 +1161,44 @@ class ServerDataStore {
   async updateCMS(newCms: Partial<HomepageCMS>): Promise<HomepageCMS> {
     this.invalidateCache('cms');
     try {
-      const conn = await connectToDatabase();
+      await initializeMySqlTables();
       if (newCms.deliveryRates && Array.isArray(newCms.deliveryRates) && newCms.deliveryRates.length > 0) {
         await this.updateDeliveryRates(newCms.deliveryRates);
       }
-      const existingCMSDoc = await CMSModel.findOne({ key: 'homepage' }).lean();
-      let currentCMS = { ...initialCMS };
-      if (existingCMSDoc) {
-        const { _id, __v, key, ...rest } = existingCMSDoc as any;
-        currentCMS = { ...currentCMS, ...rest };
-      }
+      const existingCMS = await this.fetchCMS();
       const updated: HomepageCMS = {
-        ...currentCMS,
+        ...existingCMS,
         ...newCms,
-        announcementBar: newCms.announcementBar ? { ...currentCMS.announcementBar, ...newCms.announcementBar } : currentCMS.announcementBar,
-        hero: newCms.hero ? { ...currentCMS.hero, ...newCms.hero } : currentCMS.hero,
-        editorialBanner: newCms.editorialBanner ? { ...currentCMS.editorialBanner, ...newCms.editorialBanner } : currentCMS.editorialBanner,
-        fonepaySettings: newCms.fonepaySettings ? { ...currentCMS.fonepaySettings, ...newCms.fonepaySettings } : currentCMS.fonepaySettings,
-        seo: newCms.seo ? { ...currentCMS.seo, ...newCms.seo } : currentCMS.seo,
-        deliveryRates: newCms.deliveryRates ? newCms.deliveryRates : currentCMS.deliveryRates,
+        announcementBar: newCms.announcementBar ? { ...existingCMS.announcementBar, ...newCms.announcementBar } : existingCMS.announcementBar,
+        hero: newCms.hero ? { ...existingCMS.hero, ...newCms.hero } : existingCMS.hero,
+        editorialBanner: newCms.editorialBanner ? { ...existingCMS.editorialBanner, ...newCms.editorialBanner } : existingCMS.editorialBanner,
+        fonepaySettings: newCms.fonepaySettings ? { ...existingCMS.fonepaySettings, ...newCms.fonepaySettings } : existingCMS.fonepaySettings,
+        seo: newCms.seo ? { ...existingCMS.seo, ...newCms.seo } : existingCMS.seo,
+        deliveryRates: newCms.deliveryRates ? newCms.deliveryRates : existingCMS.deliveryRates,
       };
-      await CMSModel.findOneAndUpdate({ key: 'homepage' }, { $set: updated }, { upsert: true, new: true });
-      if (conn && conn.db) {
-        await conn.db.collection('cms').updateOne({ key: 'homepage' }, { $set: updated }, { upsert: true });
-      }
-      console.log(`[MongoDB Atlas] Successfully updated CMS (rates count: ${updated.deliveryRates?.length || 0})`);
+
+      await executeQuery(
+        `INSERT INTO cms (\`key\`, announcement_bar, hero, editorial_banner, instagram_images, fonepay_settings, delivery_rates, seo)
+         VALUES ('homepage', ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           announcement_bar=VALUES(announcement_bar), hero=VALUES(hero),
+           editorial_banner=VALUES(editorial_banner), instagram_images=VALUES(instagram_images),
+           fonepay_settings=VALUES(fonepay_settings), delivery_rates=VALUES(delivery_rates), seo=VALUES(seo);`,
+        [
+          toJSON(updated.announcementBar),
+          toJSON(updated.hero),
+          toJSON(updated.editorialBanner),
+          toJSON(updated.instagramImages),
+          toJSON(updated.fonepaySettings),
+          toJSON(updated.deliveryRates),
+          toJSON(updated.seo),
+        ]
+      );
+
+      console.log(`[MySQL] Successfully updated CMS`);
       return updated;
     } catch (err: any) {
-      console.error('[MongoDB Atlas Error] Updating CMS:', err?.message || err);
+      console.error('[MySQL Error] Updating CMS:', err?.message || err);
       return { ...initialCMS, ...newCms };
     }
   }
@@ -1034,14 +1206,40 @@ class ServerDataStore {
   async createOrder(order: Order): Promise<Order> {
     this.invalidateCache('orders');
     try {
-      const conn = await connectToDatabase();
-      await OrderModel.findOneAndUpdate({ id: order.id }, order, { upsert: true, new: true });
-      if (conn && conn.db) {
-        await conn.db.collection('orders').updateOne({ id: order.id }, { $set: order }, { upsert: true });
-      }
-      console.log(`[MongoDB Atlas] Successfully created order ${order.orderNumber}`);
+      await initializeMySqlTables();
+      await executeQuery(
+        `INSERT INTO orders (
+          id, order_number, created_at, items, subtotal, discount, shipping, total,
+          payment_method, payment_status, order_status, customer_name, customer_email,
+          customer_mobile, shipping_address, estimated_delivery, tracking_number
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          payment_status=VALUES(payment_status), order_status=VALUES(order_status),
+          shipping_address=VALUES(shipping_address), estimated_delivery=VALUES(estimated_delivery),
+          tracking_number=VALUES(tracking_number);`,
+        [
+          order.id,
+          order.orderNumber,
+          order.createdAt || new Date().toISOString(),
+          toJSON(order.items || []),
+          order.subtotal,
+          order.discount || 0,
+          order.shipping || 0,
+          order.total,
+          order.paymentMethod,
+          order.paymentStatus || 'pending',
+          order.orderStatus || 'Pending',
+          order.customerName,
+          order.customerEmail,
+          order.customerMobile,
+          toJSON(order.shippingAddress || null),
+          order.estimatedDelivery || null,
+          order.trackingNumber || null,
+        ]
+      );
+      console.log(`[MySQL] Successfully created order ${order.orderNumber}`);
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Creating order ${order.orderNumber}:`, err?.message || err);
+      console.error(`[MySQL Error] Creating order ${order.orderNumber}:`, err?.message || err);
     }
     return order;
   }
@@ -1049,23 +1247,16 @@ class ServerDataStore {
   async updateOrderStatus(orderId: string, status: Order['orderStatus']): Promise<Order | undefined> {
     this.invalidateCache('orders');
     try {
-      const conn = await connectToDatabase();
-      const ordDoc = await OrderModel.findOne({ $or: [{ id: orderId }, { orderNumber: orderId }] });
-      if (ordDoc) {
-        ordDoc.orderStatus = status;
-        await ordDoc.save();
-        if (conn && conn.db) {
-          await conn.db.collection('orders').updateOne(
-            { $or: [{ id: orderId }, { orderNumber: orderId }] },
-            { $set: { orderStatus: status } }
-          );
-        }
-        console.log(`[MongoDB Atlas] Updated order status for ${ordDoc.orderNumber} to ${status}`);
-        const { _id, __v, ...rest } = ordDoc.toObject();
-        return rest as Order;
-      }
+      await initializeMySqlTables();
+      await executeQuery(
+        'UPDATE orders SET order_status = ? WHERE id = ? OR order_number = ?',
+        [status, orderId, orderId]
+      );
+      console.log(`[MySQL] Updated order status for ${orderId} to ${status}`);
+      const orders = await this.fetchOrders();
+      return orders.find((o) => o.id === orderId || o.orderNumber === orderId);
     } catch (err: any) {
-      console.error(`[MongoDB Atlas Error] Updating order status for ${orderId}:`, err?.message || err);
+      console.error(`[MySQL Error] Updating order status for ${orderId}:`, err?.message || err);
     }
     return undefined;
   }
@@ -1073,49 +1264,30 @@ class ServerDataStore {
   async syncFullData(fullData: Partial<DatabaseSchema>): Promise<DatabaseSchema> {
     this.invalidateCache('all');
     try {
-      const conn = await connectToDatabase();
+      await initializeMySqlTables();
       if (fullData.products && Array.isArray(fullData.products)) {
-        for (const p of fullData.products) {
-          await ProductModel.findOneAndUpdate({ id: p.id }, p, { upsert: true });
-          if (conn && conn.db) await conn.db.collection('products').updateOne({ id: p.id }, { $set: p }, { upsert: true });
-        }
+        for (const p of fullData.products) await this.saveProduct(p);
       }
       if (fullData.categories && Array.isArray(fullData.categories)) {
-        for (const c of fullData.categories) {
-          await CategoryModel.findOneAndUpdate({ id: c.id }, c, { upsert: true });
-          if (conn && conn.db) await conn.db.collection('categories').find();
-        }
+        for (const c of fullData.categories) await this.saveCategory(c);
       }
       if (fullData.collections && Array.isArray(fullData.collections)) {
-        for (const col of fullData.collections) {
-          await CollectionModel.findOneAndUpdate({ id: col.id }, col, { upsert: true });
-          if (conn && conn.db) await conn.db.collection('collections').updateOne({ id: col.id }, { $set: col }, { upsert: true });
-        }
+        for (const col of fullData.collections) await this.saveCollection(col);
       }
       if (fullData.cms) {
-        await CMSModel.findOneAndUpdate({ key: 'homepage' }, fullData.cms, { upsert: true });
-        if (conn && conn.db) await conn.db.collection('cms').updateOne({ key: 'homepage' }, { $set: fullData.cms }, { upsert: true });
+        await this.updateCMS(fullData.cms);
       }
       if (fullData.orders && Array.isArray(fullData.orders)) {
-        for (const o of fullData.orders) {
-          await OrderModel.findOneAndUpdate({ id: o.id }, o, { upsert: true });
-          if (conn && conn.db) await conn.db.collection('orders').updateOne({ id: o.id }, { $set: o }, { upsert: true });
-        }
+        for (const o of fullData.orders) await this.createOrder(o);
       }
       if (fullData.coupons && Array.isArray(fullData.coupons)) {
-        for (const cp of fullData.coupons) {
-          await CouponModel.findOneAndUpdate({ code: cp.code }, cp, { upsert: true });
-          if (conn && conn.db) await conn.db.collection('coupons').updateOne({ code: cp.code }, { $set: cp }, { upsert: true });
-        }
+        for (const cp of fullData.coupons) await this.saveCoupon(cp);
       }
       if (fullData.users && Array.isArray(fullData.users)) {
-        for (const u of fullData.users) {
-          await UserModel.findOneAndUpdate({ id: u.id }, u, { upsert: true });
-          if (conn && conn.db) await conn.db.collection('users').updateOne({ id: u.id }, { $set: u }, { upsert: true });
-        }
+        for (const u of fullData.users) await this.saveUser(u);
       }
     } catch (err: any) {
-      console.error('[MongoDB Atlas Error] Syncing full data:', err?.message || err);
+      console.error('[MySQL Error] Syncing full data:', err?.message || err);
     }
     return this.getFreshData(true);
   }

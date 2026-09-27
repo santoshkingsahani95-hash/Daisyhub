@@ -131,7 +131,7 @@ export function CacheDashboard() {
             </div>
             <h2 className="text-2xl font-bold text-white tracking-tight">Database Cache & Pre-Warming Engine</h2>
             <p className="text-sm text-neutral-400 mt-1">
-              Granular MongoDB object cache with SWR, single-flight query deduplication, and automated route crawler.
+              Granular MySQL object cache with SWR, single-flight query deduplication, and automated route crawler.
             </p>
           </div>
 
@@ -242,7 +242,7 @@ export function CacheDashboard() {
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <Database className="w-5 h-5 text-emerald-400" /> Database Entity Caches
             </h3>
-            <p className="text-xs text-neutral-400 mt-0.5">Real-time status of independent MongoDB object store memory pools</p>
+            <p className="text-xs text-neutral-400 mt-0.5">Real-time status of independent MySQL object store memory pools</p>
           </div>
           <button
             onClick={fetchStats}
