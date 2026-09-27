@@ -98,12 +98,12 @@ class DataStore {
       // Perform immediate sync with server API
       this.syncWithServer();
 
-      // Poll server every 2 seconds for real-time multi-device database sync
+      // Poll server every 5 seconds for real-time multi-device database sync
       setInterval(() => {
         if (!document.hidden) {
           this.syncWithServer();
         }
-      }, 2000);
+      }, 5000);
 
       // Also sync when tab regains focus or becomes visible
       window.addEventListener('focus', () => this.syncWithServer());
@@ -125,11 +125,16 @@ class DataStore {
         let changed = false;
 
         if (sData.products && Array.isArray(sData.products)) {
-          const newProdsStr = JSON.stringify(sData.products);
-          if (JSON.stringify(this.products) !== newProdsStr) {
-            this.products = sData.products;
-            localStorage.setItem('ace_db_products', newProdsStr);
-            changed = true;
+          // Safeguard: Never overwrite existing products with an empty list during temporary network/DB glitches
+          if (sData.products.length === 0 && this.products.length > 0) {
+            console.warn('[DataStore] Received empty products from server sync, ignoring to preserve client state.');
+          } else {
+            const newProdsStr = JSON.stringify(sData.products);
+            if (JSON.stringify(this.products) !== newProdsStr) {
+              this.products = sData.products;
+              localStorage.setItem('ace_db_products', newProdsStr);
+              changed = true;
+            }
           }
         }
 

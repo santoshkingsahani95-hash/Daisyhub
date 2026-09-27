@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { InventoryModel, ProductModel } from '@/models';
+import { serverDb } from '@/lib/server-db';
 
 // Force dynamic server rendering for inventory API route
 export const dynamic = 'force-dynamic';
@@ -12,10 +13,7 @@ export async function GET() {
     const dbName = conn?.connection?.db?.databaseName || 'ace-garment';
     const collectionName = 'inventory';
 
-    console.log('[Inventory API] Connecting to database:', dbName);
-    console.log('[Inventory API] Using collection:', collectionName);
-
-    // 1. Fetch all raw inventory documents from MongoDB Atlas
+    // 1. Fetch raw inventory documents from MongoDB Atlas
     let rawInventory = await InventoryModel.find({}).sort({ updatedAt: -1, createdAt: -1 }).lean();
 
     // Fallback directly to native driver if Mongoose model returns empty
@@ -23,56 +21,55 @@ export async function GET() {
       rawInventory = await conn.connection.db.collection(collectionName).find({}).toArray();
     }
 
-    const docCount = rawInventory ? rawInventory.length : 0;
-    console.log('[Inventory API] Inventory count:', docCount);
+    let docCount = rawInventory ? rawInventory.length : 0;
 
-    if (docCount > 0) {
-      const sample = rawInventory[0];
-      console.log('[Inventory API] Inventory sample product:', sample?.productName || sample?.name, '| SKU:', sample?.sku);
-    }
-
-    // 2. If inventory is empty, auto-sync from products collection to populate inventory
-    if (docCount === 0 && conn && conn.connection && conn.connection.db) {
-      console.log('[Inventory API] Inventory collection empty. Checking products collection for auto-sync...');
+    // 2. If inventory is empty, auto-sync from products collection in 1 fast bulk operation
+    if (docCount === 0) {
+      console.log('[Inventory API] Inventory collection empty. Auto-syncing from products collection...');
       const products = await ProductModel.find({}).lean();
       if (products && products.length > 0) {
-        for (const prod of products) {
+        const bulkOps = products.map((prod: any) => {
           const totalStock = prod.colors && prod.colors.length > 0
             ? prod.colors.reduce((sum: number, c: any) => sum + (typeof c.stock === 'number' ? c.stock : 0), 0)
             : (prod.sizes ? prod.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0);
 
-          const invDoc = {
-            id: `inv-${prod.id}`,
-            productId: prod.id,
-            sku: prod.sku,
-            productName: prod.name,
-            category: prod.category,
-            totalStock,
-            isOutOfStock: totalStock <= 0,
-            colors: prod.colors || [],
-            sizes: prod.sizes || [],
-            createdAt: prod.createdAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+          return {
+            updateOne: {
+              filter: { productId: prod.id },
+              update: {
+                $set: {
+                  id: `inv-${prod.id}`,
+                  productId: prod.id,
+                  sku: prod.sku,
+                  productName: prod.name,
+                  category: prod.category,
+                  totalStock,
+                  isOutOfStock: totalStock <= 0,
+                  colors: prod.colors || [],
+                  sizes: prod.sizes || [],
+                  createdAt: prod.createdAt || new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
+              },
+              upsert: true,
+            },
           };
+        });
 
-          await InventoryModel.findOneAndUpdate({ productId: prod.id }, invDoc, { upsert: true, new: true });
-        }
+        await InventoryModel.bulkWrite(bulkOps);
         rawInventory = await InventoryModel.find({}).sort({ updatedAt: -1, createdAt: -1 }).lean();
+        docCount = rawInventory.length;
       }
     }
 
-    // 3. Fetch products to enrich inventory with product image thumbnails if color images are missing
+    // 3. Retrieve fast cached product map via serverDb (prevents hitting database twice)
+    const freshData = await serverDb.getFreshData();
     const productsMap = new Map<string, any>();
-    try {
-      const allProds = await ProductModel.find({}).lean();
-      (allProds || []).forEach((p: any) => {
-        if (p.id) productsMap.set(p.id, p);
-      });
-    } catch (e) {
-      console.warn('[Inventory API] Warning fetching products map for images:', e);
-    }
+    (freshData.products || []).forEach((p: any) => {
+      if (p.id) productsMap.set(p.id, p);
+    });
 
-    // 4. Safely map and serialize MongoDB documents (converting ObjectId to String)
+    // 4. Safely map and serialize MongoDB documents
     const formattedInventory = (rawInventory || []).map((item: any) => {
       const matchedProd = productsMap.get(item.productId) || productsMap.get(item.id);
       const prodImages = matchedProd?.colors?.[0]?.images || [];
@@ -153,6 +150,7 @@ export async function POST(request: Request) {
     const conn = await connectToDatabase();
     const body = await request.json();
     const { action } = body;
+    serverDb.invalidateCache();
 
     switch (action) {
       case 'updateColorStock': {
@@ -254,3 +252,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

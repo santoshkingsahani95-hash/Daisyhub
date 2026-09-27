@@ -1,5 +1,5 @@
 import { Product, Category, Collection, Order, Coupon, HomepageCMS, CustomerUser, DistrictDeliveryRate } from '@/types';
-import { initialCMS } from './seed-data';
+import { seedProducts, initialCategories, initialCollections, initialCMS } from './seed-data';
 import { generateDefaultDeliveryRates } from './nepal-locations';
 import { connectToDatabase } from './mongodb';
 import {
@@ -26,7 +26,20 @@ interface DatabaseSchema {
 }
 
 class ServerDataStore {
-  public async getFreshData(): Promise<DatabaseSchema> {
+  private cache: DatabaseSchema | null = null;
+  private lastFetchTime = 0;
+  private readonly CACHE_TTL = 3000; // 3 seconds server memory cache
+
+  public invalidateCache() {
+    this.cache = null;
+    this.lastFetchTime = 0;
+  }
+
+  public async getFreshData(force = false): Promise<DatabaseSchema> {
+    if (!force && this.cache && Date.now() - this.lastFetchTime < this.CACHE_TTL) {
+      return this.cache;
+    }
+
     try {
       const conn = await connectToDatabase();
       let [dbProds, dbCats, dbCols, cmsDoc, dbOrds, dbCoups, dbUsers, dbRates] = await Promise.all([
@@ -53,46 +66,38 @@ class ServerDataStore {
         dbRates = await conn.db.collection('delivery_rates').find({}).toArray();
       }
 
-      // If delivery_rates collection in MongoDB Atlas is empty, initialize all 77 Nepal districts
+      // If delivery_rates collection in MongoDB Atlas is empty, initialize all 77 Nepal districts in 1 bulk operation
       if (!dbRates || dbRates.length === 0) {
         const defaultRates = generateDefaultDeliveryRates();
-        for (const rate of defaultRates) {
-          await DeliveryRateModel.findOneAndUpdate({ district: rate.district }, rate, { upsert: true });
-          if (conn && conn.db) {
-            await conn.db.collection('delivery_rates').updateOne({ district: rate.district }, { $set: rate }, { upsert: true });
-          }
+        try {
+          await DeliveryRateModel.insertMany(defaultRates, { ordered: false });
+        } catch (e) {
+          // ignore duplicate key warning
         }
         dbRates = await DeliveryRateModel.find().lean();
       }
 
       if (!cmsDoc) {
         await CMSModel.findOneAndUpdate({ key: 'homepage' }, initialCMS, { upsert: true });
-        if (conn && conn.db) {
-          await conn.db.collection('cms').updateOne(
-            { key: 'homepage' },
-            { $set: initialCMS },
-            { upsert: true }
-          );
-        }
         cmsDoc = await CMSModel.findOne({ key: 'homepage' }).lean();
       }
 
-      const products = dbProds.map((p: any) => {
+      const products = (dbProds || []).map((p: any) => {
         const { _id, __v, ...rest } = p;
         return rest as Product;
       });
 
-      const categories = dbCats.map((c: any) => {
+      const categories = (dbCats || []).map((c: any) => {
         const { _id, __v, ...rest } = c;
         return rest as Category;
       });
 
-      const collections = dbCols.map((c: any) => {
+      const collections = (dbCols || []).map((c: any) => {
         const { _id, __v, ...rest } = c;
         return rest as Collection;
       });
 
-      const deliveryRates: DistrictDeliveryRate[] = dbRates.map((r: any) => {
+      const deliveryRates: DistrictDeliveryRate[] = (dbRates || []).map((r: any) => {
         const { _id, __v, ...rest } = r;
         const fee = typeof rest.deliveryFee === 'number' ? rest.deliveryFee : (typeof rest.homeDeliveryFee === 'number' ? rest.homeDeliveryFee : 150);
         const isEn = typeof rest.enabled === 'boolean' ? rest.enabled : (typeof rest.homeDeliveryEnabled === 'boolean' ? rest.homeDeliveryEnabled : true);
@@ -125,12 +130,12 @@ class ServerDataStore {
         cms.deliveryRates = deliveryRates;
       }
 
-      const orders = dbOrds.map((o: any) => {
+      const orders = (dbOrds || []).map((o: any) => {
         const { _id, __v, ...rest } = o;
         return rest as Order;
       });
 
-      const coupons = dbCoups.map((cp: any) => {
+      const coupons = (dbCoups || []).map((cp: any) => {
         const { _id, __v, ...rest } = cp;
         return rest as Coupon;
       });
@@ -151,22 +156,34 @@ class ServerDataStore {
             },
           ];
 
-      return {
-        products,
-        categories,
-        collections,
+      // CRITICAL FIX: Prevent returning empty products array on temporary connection issues
+      const finalProducts = (products && products.length > 0)
+        ? products
+        : (this.cache?.products && this.cache.products.length > 0 ? this.cache.products : seedProducts);
+
+      const result: DatabaseSchema = {
+        products: finalProducts,
+        categories: categories && categories.length > 0 ? categories : initialCategories,
+        collections: collections && collections.length > 0 ? collections : initialCollections,
         cms,
         orders,
         coupons,
         users,
         version: Date.now(),
       };
+
+      this.cache = result;
+      this.lastFetchTime = Date.now();
+      return result;
     } catch (err: any) {
       console.error('[ServerDataStore getFreshData Error]', err?.message || err);
+      if (this.cache) {
+        return this.cache;
+      }
       return {
-        products: [],
-        categories: [],
-        collections: [],
+        products: seedProducts || [],
+        categories: initialCategories || [],
+        collections: initialCollections || [],
         cms: { ...initialCMS },
         orders: [],
         coupons: [],
@@ -211,6 +228,7 @@ class ServerDataStore {
   }
 
   async saveProduct(product: Product): Promise<Product> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       await ProductModel.findOneAndUpdate({ id: product.id }, product, { upsert: true, new: true });
@@ -226,6 +244,7 @@ class ServerDataStore {
   }
 
   async deleteProduct(id: string): Promise<boolean> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       const res = await ProductModel.deleteOne({ id });
@@ -243,6 +262,7 @@ class ServerDataStore {
   }
 
   async updateInventory(productId: string, size: string, newStock: number): Promise<boolean> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       const prodDoc = await ProductModel.findOne({ id: productId });
@@ -279,6 +299,7 @@ class ServerDataStore {
   }
 
   async updateColorStock(productId: string, colorName: string, newStock: number): Promise<boolean> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       const prodDoc = await ProductModel.findOne({ id: productId });
@@ -312,6 +333,7 @@ class ServerDataStore {
   }
 
   async saveCategory(category: Category): Promise<Category> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       await CategoryModel.findOneAndUpdate({ id: category.id }, category, { upsert: true, new: true });
@@ -326,6 +348,7 @@ class ServerDataStore {
   }
 
   async deleteCategory(id: string): Promise<boolean> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       const res = await CategoryModel.deleteOne({ $or: [{ id }, { slug: id }] });
@@ -341,6 +364,7 @@ class ServerDataStore {
   }
 
   async saveCollection(collection: Collection): Promise<Collection> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       await CollectionModel.findOneAndUpdate({ id: collection.id }, collection, { upsert: true, new: true });
@@ -355,6 +379,7 @@ class ServerDataStore {
   }
 
   async deleteCollection(id: string): Promise<boolean> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       const res = await CollectionModel.deleteOne({ $or: [{ id }, { slug: id }] });
@@ -370,6 +395,7 @@ class ServerDataStore {
   }
 
   async saveCoupon(coupon: Coupon): Promise<Coupon> {
+    this.invalidateCache();
     const cleanCode = coupon.code.trim().toUpperCase();
     const cleanCoupon = { ...coupon, code: cleanCode };
     try {
@@ -386,6 +412,7 @@ class ServerDataStore {
   }
 
   async deleteCoupon(code: string): Promise<boolean> {
+    this.invalidateCache();
     const cleanCode = code.trim().toUpperCase();
     try {
       const conn = await connectToDatabase();
@@ -402,6 +429,7 @@ class ServerDataStore {
   }
 
   async saveUser(user: CustomerUser): Promise<CustomerUser> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       await UserModel.findOneAndUpdate({ id: user.id }, user, { upsert: true, new: true });
@@ -416,6 +444,7 @@ class ServerDataStore {
   }
 
   async deleteUser(id: string): Promise<boolean> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       const res = await UserModel.deleteOne({ $or: [{ id }, { email: id }] });
@@ -431,6 +460,7 @@ class ServerDataStore {
   }
 
   async deleteOrder(id: string): Promise<boolean> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       const res = await OrderModel.deleteOne({ $or: [{ id }, { orderNumber: id }] });
@@ -446,6 +476,7 @@ class ServerDataStore {
   }
 
   async deleteReview(productId: string, reviewId: string): Promise<boolean> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       const prodDoc = await ProductModel.findOne({ $or: [{ id: productId }, { slug: productId }] });
@@ -480,6 +511,7 @@ class ServerDataStore {
   }
 
   async updateDeliveryRates(rates: DistrictDeliveryRate[]): Promise<DistrictDeliveryRate[]> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       for (const r of rates) {
@@ -501,6 +533,7 @@ class ServerDataStore {
   }
 
   async updateCMS(newCms: Partial<HomepageCMS>): Promise<HomepageCMS> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       if (newCms.deliveryRates && Array.isArray(newCms.deliveryRates) && newCms.deliveryRates.length > 0) {
@@ -535,6 +568,7 @@ class ServerDataStore {
   }
 
   async createOrder(order: Order): Promise<Order> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       await OrderModel.findOneAndUpdate({ id: order.id }, order, { upsert: true, new: true });
@@ -549,6 +583,7 @@ class ServerDataStore {
   }
 
   async updateOrderStatus(orderId: string, status: Order['orderStatus']): Promise<Order | undefined> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       const ordDoc = await OrderModel.findOne({ $or: [{ id: orderId }, { orderNumber: orderId }] });
@@ -572,6 +607,7 @@ class ServerDataStore {
   }
 
   async syncFullData(fullData: Partial<DatabaseSchema>): Promise<DatabaseSchema> {
+    this.invalidateCache();
     try {
       const conn = await connectToDatabase();
       if (fullData.products && Array.isArray(fullData.products)) {
@@ -617,7 +653,7 @@ class ServerDataStore {
     } catch (err: any) {
       console.error('[MongoDB Atlas Error] Syncing full data:', err?.message || err);
     }
-    return this.getFreshData();
+    return this.getFreshData(true);
   }
 }
 
