@@ -218,7 +218,7 @@ class ServerDataStore {
         return products;
       } catch (err: any) {
         console.error('[MySQL fetchProducts Error]', err?.message || err);
-        return this.productsCache.data || seedProducts;
+        return this.productsCache.data || [];
       }
     });
   }
@@ -782,6 +782,19 @@ class ServerDataStore {
   async saveProduct(rawProduct: Product): Promise<Product> {
     const product = sanitizeObjectImages(rawProduct);
     this.invalidateCache('products');
+
+    // Update in-memory product cache immediately for instant response
+    if (this.productsCache.data) {
+      const idx = this.productsCache.data.findIndex((p) => p.id === product.id);
+      if (idx >= 0) {
+        this.productsCache.data[idx] = product;
+      } else {
+        this.productsCache.data.unshift(product);
+      }
+    } else {
+      this.productsCache.data = [product];
+    }
+
     try {
       await initializeMySqlTables();
       await executeQuery(
@@ -835,6 +848,7 @@ class ServerDataStore {
       );
 
       await this.syncInventoryDoc(product);
+      await this.syncGalleryDocs(product);
       console.log(`[MySQL] Successfully saved product '${product.name}' (${product.id})`);
     } catch (err: any) {
       console.error(`[MySQL Error] Saving product ${product.id}:`, err?.message || err);
@@ -842,12 +856,44 @@ class ServerDataStore {
     return product;
   }
 
+  private async syncGalleryDocs(prod: any) {
+    try {
+      await initializeMySqlTables();
+      await executeQuery('DELETE FROM photo_gallery WHERE product_id = ?', [prod.id]);
+      if (prod.colors && Array.isArray(prod.colors) && prod.colors.length > 0) {
+        let sortOrder = 0;
+        for (const c of prod.colors) {
+          if (c.images && Array.isArray(c.images) && c.images.length > 0) {
+            for (let i = 0; i < c.images.length; i++) {
+              const imgUrl = c.images[i];
+              sortOrder++;
+              const galleryId = `gal-${prod.id}-${sortOrder}`;
+              await executeQuery(
+                `INSERT INTO photo_gallery (id, product_id, color_name, color_code, image_url, is_main, sort_order)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                   image_url=VALUES(image_url), color_name=VALUES(color_name), color_code=VALUES(color_code);`,
+                [galleryId, prod.id, c.name || 'Default', c.code || '#111111', imgUrl, i === 0 && sortOrder === 1 ? 1 : 0, sortOrder]
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[MySQL Gallery Sync Error]', e);
+    }
+  }
+
   async deleteProduct(id: string): Promise<boolean> {
     this.invalidateCache('products');
+    if (this.productsCache.data) {
+      this.productsCache.data = this.productsCache.data.filter((p) => p.id !== id);
+    }
     try {
       await initializeMySqlTables();
       await executeQuery('DELETE FROM products WHERE id = ?', [id]);
       await executeQuery('DELETE FROM inventory WHERE product_id = ? OR id = ?', [id, `inv-${id}`]);
+      await executeQuery('DELETE FROM photo_gallery WHERE product_id = ?', [id]);
       console.log(`[MySQL] Successfully deleted product ${id}`);
       return true;
     } catch (err: any) {
@@ -915,8 +961,21 @@ class ServerDataStore {
     }
   }
 
-  async saveCategory(category: Category): Promise<Category> {
+  async saveCategory(rawCategory: Category): Promise<Category> {
+    const category = sanitizeObjectImages(rawCategory);
     this.invalidateCache('categories');
+
+    if (this.categoriesCache.data) {
+      const idx = this.categoriesCache.data.findIndex((c) => c.id === category.id || c.slug === category.slug);
+      if (idx >= 0) {
+        this.categoriesCache.data[idx] = category;
+      } else {
+        this.categoriesCache.data.unshift(category);
+      }
+    } else {
+      this.categoriesCache.data = [category];
+    }
+
     try {
       await initializeMySqlTables();
       await executeQuery(
@@ -944,6 +1003,9 @@ class ServerDataStore {
 
   async deleteCategory(id: string): Promise<boolean> {
     this.invalidateCache('categories');
+    if (this.categoriesCache.data) {
+      this.categoriesCache.data = this.categoriesCache.data.filter((c) => c.id !== id && c.slug !== id);
+    }
     try {
       await initializeMySqlTables();
       await executeQuery('DELETE FROM categories WHERE id = ? OR slug = ?', [id, id]);

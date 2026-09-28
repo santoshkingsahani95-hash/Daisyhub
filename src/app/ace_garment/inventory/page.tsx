@@ -160,25 +160,38 @@ export default function AdminInventoryPage() {
     },
   ]);
 
-  // Fetch Inventory directly from MongoDB Atlas API endpoint
+  // Fetch Inventory directly from MySQL Relational Database API endpoint
   const fetchInventory = useCallback(async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     try {
       setIsLoading(true);
       setError(null);
-      const res = await fetch('/api/inventory', { cache: 'no-store' });
+      const res = await fetch('/api/inventory', {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
       if (!res.ok) {
         throw new Error(`Server returned status ${res.status} (${res.statusText})`);
       }
       const data = await res.json();
       if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch inventory from MongoDB Atlas');
+        throw new Error(data.error || 'Failed to fetch inventory from MySQL Database');
       }
 
       setInventoryItems(data.data || []);
       setCategories(db.getCategories());
     } catch (err: any) {
-      console.error('[Inventory Page] Error loading MongoDB inventory:', err);
-      setError(err?.message || 'Failed to connect to MongoDB Atlas inventory collection.');
+      clearTimeout(timeoutId);
+      console.error('[Inventory Page] Error loading MySQL inventory:', err);
+      if (err.name === 'AbortError') {
+        setError('Inventory request timed out. Please check your MySQL database connection.');
+      } else {
+        setError(err?.message || 'Failed to connect to MySQL Database inventory table.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -217,7 +230,7 @@ export default function AdminInventoryPage() {
       })
     );
 
-    // 2. Persist to MongoDB Atlas via API
+    // 2. Persist to MySQL Database via API
     try {
       const res = await fetch('/api/inventory', {
         method: 'POST',
@@ -231,7 +244,7 @@ export default function AdminInventoryPage() {
       });
 
       if (!res.ok) {
-        console.error('[Inventory Page] Failed to persist stock to MongoDB Atlas');
+        console.error('[Inventory Page] Failed to persist stock to MySQL Database');
       }
     } catch (err) {
       console.error('[Inventory Page] Error persisting stock update:', err);
@@ -240,12 +253,12 @@ export default function AdminInventoryPage() {
     // Also update client store for syncing
     db.updateColorStock(productId, colorName, newStock);
 
-    setUpdateMsg(`Stock for "${colorName}" updated in MongoDB Atlas.`);
+    setUpdateMsg(`Stock for "${colorName}" updated in MySQL Database.`);
     setTimeout(() => setUpdateMsg(''), 3000);
   };
 
   const handleDeleteItem = async (productId: string, prodName: string) => {
-    if (!confirm(`Are you sure you want to delete "${prodName}" from inventory in MongoDB Atlas?`)) {
+    if (!confirm(`Are you sure you want to delete "${prodName}" from inventory in MySQL Database?`)) {
       return;
     }
 
@@ -258,7 +271,7 @@ export default function AdminInventoryPage() {
       });
 
       db.deleteProduct(productId);
-      setUpdateMsg(`Product "${prodName}" deleted from MongoDB Atlas.`);
+      setUpdateMsg(`Product "${prodName}" deleted from MySQL Database.`);
       setTimeout(() => setUpdateMsg(''), 3000);
     } catch (err) {
       console.error('[Inventory Page] Error deleting item:', err);
@@ -352,20 +365,30 @@ export default function AdminInventoryPage() {
     db.saveProduct(newProd);
     setIsAddModalOpen(false);
     fetchInventory();
-    setUpdateMsg(`New inventory item "${newProd.name}" added to MongoDB Atlas!`);
+    setUpdateMsg(`New inventory item "${newProd.name}" added to MySQL Database!`);
     setTimeout(() => setUpdateMsg(''), 4000);
   };
 
   // Image Upload Helper
-  const handleFileUpload = (file: File, callback: (dataUrl: string) => void) => {
+  const handleFileUpload = async (file: File, callback: (url: string) => void) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        callback(e.target.result as string);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          callback(data.url);
+          return;
+        }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (e) {
+      console.warn('[Inventory Upload Error] Failed to upload image via API:', e);
+    }
   };
 
   const handleEditColorChange = (index: number, field: keyof ColorOption, value: any) => {
@@ -406,12 +429,12 @@ export default function AdminInventoryPage() {
               INVENTORY MANAGER
             </h1>
             <span className="bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-300">
-              <Database size={12} /> MongoDB Atlas Live
+              <Database size={12} /> MySQL Live
             </span>
           </div>
           <p className="text-xs text-brand-muted mt-1">
-            Real-time stock levels, SKU tracking and multi-color variant management connected to database{' '}
-            <code className="bg-brand-cream px-1 py-0.5 rounded font-bold text-brand-dark">ace-garment</code> collection{' '}
+            Real-time stock levels, SKU tracking and multi-color variant management connected to MySQL database{' '}
+            <code className="bg-brand-cream px-1 py-0.5 rounded font-bold text-brand-dark">daisyhub_daisyhubb</code> table{' '}
             <code className="bg-brand-cream px-1 py-0.5 rounded font-bold text-brand-dark">inventory</code>.
           </p>
         </div>
@@ -426,7 +449,7 @@ export default function AdminInventoryPage() {
             onClick={fetchInventory}
             disabled={isLoading}
             className="p-2.5 bg-brand-cream hover:bg-brand-border text-brand-dark rounded border border-brand-border flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95"
-            title="Refresh Inventory from MongoDB Atlas"
+            title="Refresh Inventory from MySQL Database"
           >
             <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             <span className="hidden sm:inline">Refresh</span>
@@ -446,7 +469,7 @@ export default function AdminInventoryPage() {
         <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs">
           <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">TOTAL PRODUCTS</span>
           <span className="text-2xl font-serif-title font-bold text-brand-dark">{totalRecords}</span>
-          <span className="text-[10px] text-emerald-600 block mt-0.5">Documents in MongoDB</span>
+          <span className="text-[10px] text-emerald-600 block mt-0.5">Records in MySQL</span>
         </div>
         <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs">
           <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">TOTAL STOCK UNITS</span>
@@ -534,14 +557,14 @@ export default function AdminInventoryPage() {
           <RefreshCw size={36} className="animate-spin m-auto text-brand-gold" />
           <div>
             <h3 className="font-serif-title text-lg font-bold text-brand-dark">Loading Inventory Records</h3>
-            <p className="text-xs text-brand-muted mt-1">Connecting to MongoDB Atlas database &quot;ace-garment.inventory&quot;...</p>
+            <p className="text-xs text-brand-muted mt-1">Connecting to MySQL database &quot;daisyhub_daisyhubb.inventory&quot;...</p>
           </div>
         </div>
       ) : error ? (
         <div className="bg-rose-50 border border-rose-200 rounded-lg p-6 space-y-3">
           <div className="flex items-center gap-2 text-rose-800 font-bold">
             <AlertTriangle size={20} />
-            <span>MongoDB Atlas Connection / Database Error</span>
+            <span>MySQL Database Connection Error</span>
           </div>
           <p className="text-xs text-rose-700 font-mono bg-rose-100/70 p-3 rounded">{error}</p>
           <button
@@ -558,7 +581,7 @@ export default function AdminInventoryPage() {
           <p className="text-xs text-brand-muted max-w-md mx-auto">
             {searchQuery || statusFilter !== 'all'
               ? 'No items match your active search filter or status selection. Try clearing filters.'
-              : 'MongoDB Atlas inventory collection is currently empty.'}
+              : 'MySQL inventory table is currently empty.'}
           </p>
           {(searchQuery || statusFilter !== 'all') && (
             <button
@@ -866,7 +889,7 @@ export default function AdminInventoryPage() {
               <div>
                 <span className="text-[10px] text-brand-gold font-bold uppercase tracking-widest block">INVENTORY ENTRY</span>
                 <h3 className="font-serif-title text-xl font-bold text-brand-dark uppercase tracking-wider">
-                  ADD NEW INVENTORY ITEM TO MONGODB ATLAS
+                  ADD NEW INVENTORY ITEM TO MYSQL DATABASE
                 </h3>
               </div>
               <button onClick={() => setIsAddModalOpen(false)} className="p-1 hover:bg-brand-cream rounded-full">
@@ -954,7 +977,7 @@ export default function AdminInventoryPage() {
                   type="submit"
                   className="px-7 py-2.5 bg-brand-dark text-white font-bold uppercase tracking-widest rounded shadow"
                 >
-                  SAVE ITEM TO MONGODB
+                  SAVE ITEM TO MYSQL
                 </button>
               </div>
             </form>

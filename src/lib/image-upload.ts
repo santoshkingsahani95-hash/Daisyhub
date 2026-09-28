@@ -1,54 +1,95 @@
+import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
 import path from 'path';
 
 const DEFAULT_FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop';
 
+// Configure Cloudinary from environment variables
+const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'acegarment';
+const apiKey = process.env.CLOUDINARY_API_KEY;
+const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+if (cloudName && apiKey && apiSecret && apiSecret !== 'your_cloudinary_api_secret') {
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+    secure: true,
+  });
+}
+
 /**
- * Saves a base64 data URL as a static file in public/uploads and returns the relative URL (/uploads/filename)
+ * Saves a Buffer or Base64 image to local public/uploads directory
+ */
+export function saveBufferLocally(buffer: Buffer, originalName?: string): string {
+  try {
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const ext = originalName ? path.extname(originalName) || '.jpg' : '.jpg';
+    const fileName = `img_${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`;
+    const filePath = path.join(uploadsDir, fileName);
+    fs.writeFileSync(filePath, buffer);
+    return `/uploads/${fileName}`;
+  } catch (e) {
+    console.error('[Local File Save Error]', e);
+    return DEFAULT_FALLBACK_IMAGE;
+  }
+}
+
+/**
+ * Uploads an image Buffer to Cloudinary (or falls back to local storage)
+ */
+export async function uploadImageToCloudinary(buffer: Buffer, originalName?: string): Promise<string> {
+  if (cloudName && apiKey && apiSecret && apiSecret !== 'your_cloudinary_api_secret') {
+    try {
+      return await new Promise<string>((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'ace_garment_products',
+            resource_type: 'image',
+          },
+          (error, result) => {
+            if (error || !result) {
+              reject(error || new Error('Cloudinary upload failed'));
+            } else {
+              resolve(result.secure_url);
+            }
+          }
+        );
+        uploadStream.end(buffer);
+      });
+    } catch (err) {
+      console.warn('[Cloudinary Upload Failed, using local storage fallback]', err);
+    }
+  }
+
+  return saveBufferLocally(buffer, originalName);
+}
+
+/**
+ * Saves a base64 data URL to Cloudinary or local storage and returns the image URL
  */
 export function saveBase64Image(dataUrl: string): string {
   if (!dataUrl || typeof dataUrl !== 'string') {
     return DEFAULT_FALLBACK_IMAGE;
   }
-
-  // If already a regular URL or relative path, return as is
   if (!dataUrl.startsWith('data:image/')) {
     return dataUrl;
   }
 
   try {
-    const matches = dataUrl.match(/^data:image\/([a-zA-Z0-9\+\-]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      console.warn('[ImageUpload] Invalid base64 data URL format, using fallback.');
-      return DEFAULT_FALLBACK_IMAGE;
+    const matches = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+    if (matches) {
+      const buffer = Buffer.from(matches[2], 'base64');
+      return saveBufferLocally(buffer);
     }
-
-    const mimeType = matches[1].toLowerCase();
-    const base64Data = matches[2];
-
-    let ext = '.jpg';
-    if (mimeType.includes('png')) ext = '.png';
-    else if (mimeType.includes('webp')) ext = '.webp';
-    else if (mimeType.includes('gif')) ext = '.gif';
-    else if (mimeType.includes('svg')) ext = '.svg';
-
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    const filename = `img_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
-    const filePath = path.join(uploadDir, filename);
-
-    const buffer = Buffer.from(base64Data, 'base64');
-    fs.writeFileSync(filePath, buffer);
-
-    console.log(`[ImageUpload] Extracted & saved base64 image -> /uploads/${filename} (${(buffer.length / 1024).toFixed(1)} KB)`);
-    return `/uploads/${filename}`;
-  } catch (error) {
-    console.error('[ImageUpload Error] Failed to save base64 image to disk:', error);
-    return DEFAULT_FALLBACK_IMAGE;
+  } catch (e) {
+    console.error('[saveBase64Image Error]', e);
   }
+
+  return DEFAULT_FALLBACK_IMAGE;
 }
 
 /**
@@ -78,3 +119,4 @@ export function sanitizeObjectImages<T>(obj: T): T {
 
   return obj;
 }
+

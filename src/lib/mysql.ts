@@ -12,11 +12,115 @@ let sqliteDb: any = null;
 let useMySql = false;
 let isInitialized = false;
 
+import fs from 'fs';
+
+const DB_FILE = path.join(process.cwd(), 'database_store.json');
+
+function loadLocalStore(): Record<string, any[]> {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const content = fs.readFileSync(DB_FILE, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch (e) {
+    console.warn('[Local Store Load Error]', e);
+  }
+  return {};
+}
+
+function saveLocalStore(store: Record<string, any[]>) {
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(store, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[Local Store Save Error]', e);
+  }
+}
+
+const localStore: Record<string, any[]> = loadLocalStore();
+
 function runFallbackQuery<T = any>(sql: string, params: any[] = []): Promise<T> {
-  const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
-  if (isSelect) {
+  const cleanSql = sql.trim();
+  const upperSql = cleanSql.toUpperCase();
+
+  // 1. CREATE TABLE
+  if (upperSql.startsWith('CREATE TABLE')) {
+    const match = cleanSql.match(/CREATE TABLE (?:IF NOT EXISTS )?`?([a-zA-Z0-9_]+)`?/i);
+    if (match && match[1]) {
+      const tableName = match[1].toLowerCase();
+      if (!localStore[tableName]) {
+        localStore[tableName] = [];
+        saveLocalStore(localStore);
+      }
+    }
+    return Promise.resolve({ affectedRows: 0, insertId: 0 } as unknown as T);
+  }
+
+  // 2. SELECT
+  if (upperSql.startsWith('SELECT')) {
+    const fromMatch = cleanSql.match(/FROM `?([a-zA-Z0-9_]+)`?/i);
+    if (fromMatch && fromMatch[1]) {
+      const tableName = fromMatch[1].toLowerCase();
+      let rows = localStore[tableName] || [];
+
+      // Filter by key = ? (for CMS table)
+      if (cleanSql.includes('`key` = ?') || cleanSql.includes('key = ?')) {
+        const keyVal = params[0];
+        rows = rows.filter((r) => r.key === keyVal);
+      }
+      return Promise.resolve(rows as unknown as T);
+    }
     return Promise.resolve([] as unknown as T);
   }
+
+  // 3. INSERT INTO ... ON DUPLICATE KEY UPDATE
+  if (upperSql.startsWith('INSERT INTO')) {
+    const tableMatch = cleanSql.match(/INSERT INTO `?([a-zA-Z0-9_]+)`?\s*\(([\s\S]+?)\)\s*VALUES/i);
+    if (tableMatch) {
+      const tableName = tableMatch[1].toLowerCase();
+      const cols = tableMatch[2].split(',').map((c) => c.trim().replace(/[`"'\s]/g, ''));
+      
+      const row: Record<string, any> = {};
+      cols.forEach((col, idx) => {
+        row[col] = params[idx] !== undefined ? params[idx] : null;
+      });
+
+      if (!localStore[tableName]) {
+        localStore[tableName] = [];
+      }
+
+      const tableData = localStore[tableName];
+      const pkField = cols.includes('id') ? 'id' : (cols.includes('code') ? 'code' : (cols.includes('district') ? 'district' : 'key'));
+      const pkValue = row[pkField];
+
+      const existingIdx = pkValue ? tableData.findIndex((r) => r[pkField] === pkValue) : -1;
+      if (existingIdx >= 0) {
+        tableData[existingIdx] = { ...tableData[existingIdx], ...row };
+      } else {
+        tableData.unshift(row);
+      }
+
+      saveLocalStore(localStore);
+      return Promise.resolve({ affectedRows: 1, insertId: 1 } as unknown as T);
+    }
+  }
+
+  // 4. DELETE FROM
+  if (upperSql.startsWith('DELETE FROM')) {
+    const tableMatch = cleanSql.match(/DELETE FROM `?([a-zA-Z0-9_]+)`?/i);
+    if (tableMatch) {
+      const tableName = tableMatch[1].toLowerCase();
+      if (localStore[tableName]) {
+        const pkVal = params[0];
+        const secondPkVal = params[1];
+        localStore[tableName] = localStore[tableName].filter(
+          (r) => r.id !== pkVal && r.code !== pkVal && r.product_id !== pkVal && r.id !== secondPkVal && r.product_id !== secondPkVal
+        );
+        saveLocalStore(localStore);
+      }
+      return Promise.resolve({ affectedRows: 1, insertId: 0 } as unknown as T);
+    }
+  }
+
   return Promise.resolve({ affectedRows: 0, insertId: 0 } as unknown as T);
 }
 
@@ -68,7 +172,7 @@ export function parseJSON<T = any>(val: any, fallback: T): T {
  * Test SQL Database connections and auto-create all 9 tables
  */
 export async function initializeMySqlTables(): Promise<boolean> {
-  if (isInitialized && useMySql) return true;
+  if (isInitialized) return useMySql;
 
   // 1. Try connecting to Remote MySQL
   try {
@@ -83,13 +187,13 @@ export async function initializeMySqlTables(): Promise<boolean> {
         connectionLimit: 10,
         queueLimit: 0,
         enableKeepAlive: true,
-        connectTimeout: 5000,
+        connectTimeout: 2000,
       });
     }
 
     const conn = await Promise.race([
       pool.getConnection(),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('MySQL Connect Timeout')), 5000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('MySQL Connect Timeout')), 2000)),
     ]);
     conn.release();
     useMySql = true;
@@ -97,6 +201,7 @@ export async function initializeMySqlTables(): Promise<boolean> {
     console.log(`✅ Connected to Remote MySQL (${MYSQL_HOST}:${MYSQL_PORT})! Database: ${MYSQL_DATABASE}`);
   } catch (e: any) {
     useMySql = false;
+    isInitialized = true;
     console.warn(`⚠️ [MySQL Connection Warning] Could not connect directly to MySQL server (${MYSQL_HOST}:${MYSQL_PORT}): ${e?.message || e}`);
     console.warn(`👉 IMPORTANT: If cPanel is blocking port 3306 from your PC, open cPanel -> 'Remote MySQL' -> Add '%' to allow connection.`);
     console.log(`⚡ Using Local SQL Engine (database.sqlite) as temporary fallback.`);
@@ -110,12 +215,12 @@ export async function initializeMySqlTables(): Promise<boolean> {
         id VARCHAR(100) PRIMARY KEY,
         slug VARCHAR(255) NOT NULL UNIQUE,
         name VARCHAR(255) NOT NULL,
-        description TEXT,
-        details TEXT,
-        fabric_care TEXT,
+        description LONGTEXT,
+        details LONGTEXT,
+        fabric_care LONGTEXT,
         category VARCHAR(100) NOT NULL,
         subcategory VARCHAR(100),
-        collections TEXT,
+        collections LONGTEXT,
         price DECIMAL(10, 2) NOT NULL,
         sale_price DECIMAL(10, 2),
         discount_percentage INT,
@@ -126,14 +231,14 @@ export async function initializeMySqlTables(): Promise<boolean> {
         is_best_seller TINYINT(1) DEFAULT 0,
         is_sale TINYINT(1) DEFAULT 0,
         is_out_of_stock TINYINT(1) DEFAULT 0,
-        colors TEXT,
-        sizes TEXT,
+        colors LONGTEXT,
+        sizes LONGTEXT,
         sku VARCHAR(100) NOT NULL,
-        reviews TEXT,
+        reviews LONGTEXT,
         inside_valley_fee DECIMAL(10,2) DEFAULT 100.00,
         outside_valley_fee DECIMAL(10,2) DEFAULT 200.00,
         is_free_delivery TINYINT(1) DEFAULT 0,
-        seo TEXT,
+        seo LONGTEXT,
         created_at VARCHAR(100),
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -145,10 +250,10 @@ export async function initializeMySqlTables(): Promise<boolean> {
         id VARCHAR(100) PRIMARY KEY,
         slug VARCHAR(255) NOT NULL UNIQUE,
         name VARCHAR(255) NOT NULL,
-        description TEXT,
-        image VARCHAR(500),
-        subcategories TEXT,
-        seo TEXT,
+        description LONGTEXT,
+        image LONGTEXT,
+        subcategories LONGTEXT,
+        seo LONGTEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -159,9 +264,9 @@ export async function initializeMySqlTables(): Promise<boolean> {
         id VARCHAR(100) PRIMARY KEY,
         slug VARCHAR(255) NOT NULL UNIQUE,
         name VARCHAR(255) NOT NULL,
-        description TEXT,
-        image VARCHAR(500),
-        seo TEXT,
+        description LONGTEXT,
+        image LONGTEXT,
+        seo LONGTEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -172,7 +277,7 @@ export async function initializeMySqlTables(): Promise<boolean> {
         id VARCHAR(100) PRIMARY KEY,
         order_number VARCHAR(100) NOT NULL UNIQUE,
         created_at VARCHAR(100),
-        items TEXT NOT NULL,
+        items LONGTEXT NOT NULL,
         subtotal DECIMAL(10, 2) NOT NULL,
         discount DECIMAL(10, 2) DEFAULT 0.00,
         shipping DECIMAL(10, 2) DEFAULT 0.00,
@@ -183,7 +288,7 @@ export async function initializeMySqlTables(): Promise<boolean> {
         customer_name VARCHAR(255) NOT NULL,
         customer_email VARCHAR(255) NOT NULL,
         customer_mobile VARCHAR(50) NOT NULL,
-        shipping_address TEXT,
+        shipping_address LONGTEXT,
         estimated_delivery VARCHAR(100),
         tracking_number VARCHAR(100),
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -208,13 +313,13 @@ export async function initializeMySqlTables(): Promise<boolean> {
     await executeQuery(`
       CREATE TABLE IF NOT EXISTS cms (
         \`key\` VARCHAR(50) PRIMARY KEY,
-        announcement_bar TEXT,
-        hero TEXT,
-        editorial_banner TEXT,
-        instagram_images TEXT,
-        fonepay_settings TEXT,
-        delivery_rates TEXT,
-        seo TEXT,
+        announcement_bar LONGTEXT,
+        hero LONGTEXT,
+        editorial_banner LONGTEXT,
+        instagram_images LONGTEXT,
+        fonepay_settings LONGTEXT,
+        delivery_rates LONGTEXT,
+        seo LONGTEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -230,7 +335,7 @@ export async function initializeMySqlTables(): Promise<boolean> {
         role VARCHAR(20) DEFAULT 'CUSTOMER',
         registration_date VARCHAR(100),
         is_blocked TINYINT(1) DEFAULT 0,
-        addresses TEXT,
+        addresses LONGTEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -245,29 +350,28 @@ export async function initializeMySqlTables(): Promise<boolean> {
         category VARCHAR(100),
         total_stock INT DEFAULT 0,
         is_out_of_stock TINYINT(1) DEFAULT 0,
-        colors TEXT,
-        sizes TEXT,
+        colors LONGTEXT,
+        sizes LONGTEXT,
         updated_at VARCHAR(100)
       );
     `);
 
-    // 9. Delivery Rates Table
+    // 10. Photo Gallery Table
     await executeQuery(`
-      CREATE TABLE IF NOT EXISTS delivery_rates (
-        district VARCHAR(100) PRIMARY KEY,
-        province VARCHAR(100) NOT NULL,
-        delivery_fee DECIMAL(10, 2) NOT NULL DEFAULT 180.00,
-        enabled TINYINT(1) DEFAULT 1,
-        home_delivery_fee DECIMAL(10, 2),
-        branch_delivery_fee DECIMAL(10, 2),
-        home_delivery_enabled TINYINT(1),
-        branch_delivery_enabled TINYINT(1),
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      CREATE TABLE IF NOT EXISTS photo_gallery (
+        id VARCHAR(100) PRIMARY KEY,
+        product_id VARCHAR(100) NOT NULL,
+        color_name VARCHAR(100),
+        color_code VARCHAR(50),
+        image_url LONGTEXT NOT NULL,
+        is_main TINYINT(1) DEFAULT 0,
+        sort_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
     isInitialized = true;
-    console.log(`✅ All 9 SQL Database tables initialized successfully.`);
+    console.log(`✅ All 10 SQL Database tables initialized successfully.`);
     return true;
   } catch (err: any) {
     console.error('❌ SQL Database DDL Table Initialization Error:', err?.message || err);

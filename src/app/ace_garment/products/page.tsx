@@ -14,41 +14,25 @@ export default function AdminProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  const handleFileUpload = (file: File, callback: (dataUrl: string) => void) => {
+  const handleFileUpload = async (file: File, callback: (url: string) => void) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const rawUrl = e.target?.result as string;
-      if (!rawUrl) return;
-      const img = new window.Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        const maxDim = 800;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          callback(data.url);
+          return;
         }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          callback(canvas.toDataURL('image/jpeg', 0.85));
-        } else {
-          callback(rawUrl);
-        }
-      };
-      img.onerror = () => callback(rawUrl);
-      img.src = rawUrl;
-    };
-    reader.readAsDataURL(file);
+      }
+    } catch (e) {
+      console.warn('[Products Upload Error] Failed to upload image via API:', e);
+    }
   };
 
   // Form State
@@ -174,7 +158,20 @@ export default function AdminProductsPage() {
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this product?')) {
       db.deleteProduct(id);
-      setTimeout(() => fetchFreshProducts(), 500);
+      try {
+        const res = await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'deleteProduct', id }),
+        });
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.data && Array.isArray(result.data.products)) {
+            setProducts(result.data.products);
+          }
+        }
+      } catch (e) {}
+      fetchFreshProducts();
     }
   };
 
@@ -261,9 +258,28 @@ export default function AdminProductsPage() {
       isFreeDelivery: formData.isFreeDelivery,
     };
 
+    // 1. Save to local store
     db.saveProduct(newProd);
+
+    // 2. Directly POST to /api/db and await MySQL save completion
+    try {
+      const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'saveProduct', product: newProd }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        if (result.success && result.data && Array.isArray(result.data.products)) {
+          setProducts(result.data.products);
+        }
+      }
+    } catch (err) {
+      console.error('[Products Page] Error saving product to MySQL:', err);
+    }
+
     setIsModalOpen(false);
-    setTimeout(() => fetchFreshProducts(), 500);
+    fetchFreshProducts();
   };
 
   return (

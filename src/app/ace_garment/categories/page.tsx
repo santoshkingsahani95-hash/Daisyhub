@@ -19,40 +19,24 @@ export default function AdminCategoriesPage() {
   const [image, setImage] = useState('');
   const [subcategoriesInput, setSubcategoriesInput] = useState('');
 
-  const compressAndSetImage = (file: File) => {
+  const compressAndSetImage = async (file: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const rawUrl = e.target?.result as string;
-      const img = new window.Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        const maxDim = 800;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          setImage(data.url);
         }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          setImage(canvas.toDataURL('image/jpeg', 0.85));
-        } else {
-          setImage(rawUrl);
-        }
-      };
-      img.onerror = () => setImage(rawUrl);
-      img.src = rawUrl;
-    };
-    reader.readAsDataURL(file);
+      }
+    } catch (e) {
+      console.warn('[Categories Upload Error] Failed to upload image via API:', e);
+    }
   };
 
   useEffect(() => {

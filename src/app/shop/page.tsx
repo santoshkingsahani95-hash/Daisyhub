@@ -12,7 +12,7 @@ import { QuickAddModal } from '@/components/product/quick-add-modal';
 import { SizeGuideModal } from '@/components/product/size-guide-modal';
 import { MiniCart } from '@/components/cart/mini-cart';
 import { SearchOverlay } from '@/components/layout/search-overlay';
-import { db } from '@/lib/db';
+import { db, matchCategory } from '@/lib/db';
 import { Product, Category } from '@/types';
 
 function ShopContent() {
@@ -119,7 +119,7 @@ function ShopContent() {
       } else if (selectedCategory === 'best-sellers') {
         list = list.filter((p) => p.isBestSeller || p.reviewCount > 30 || p.collections?.includes('best-sellers'));
       } else {
-        list = list.filter((p) => db.getProductsByCategory(selectedCategory).some((cp) => cp.id === p.id));
+        list = list.filter((p) => matchCategory(p.category, selectedCategory));
       }
     }
 

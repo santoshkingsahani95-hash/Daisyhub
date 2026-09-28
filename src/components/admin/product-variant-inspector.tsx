@@ -68,22 +68,16 @@ export const ProductVariantInspector: React.FC<ProductVariantInspectorProps> = (
         method: 'POST',
         body: formData,
       });
-      const data = await res.json();
-      if (data.success && data.url) {
-        callback(data.url);
-        return;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          callback(data.url);
+          return;
+        }
       }
     } catch (e) {
-      console.warn('Upload endpoint failed, falling back to local file reader');
+      console.warn('[Product Variant Inspector Upload Error]', e);
     }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        callback(e.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleAddImage = (imageUrl: string) => {

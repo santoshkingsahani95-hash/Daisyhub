@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@types/nodemailer": "^8.0.2",
+    "cloudinary": "^2.11.0",
     "clsx": "^2.1.0",
     "framer-motion": "^11.0.8",
     "jsqr": "^1.4.0",

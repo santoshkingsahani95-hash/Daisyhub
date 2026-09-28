@@ -12,7 +12,7 @@ export async function GET() {
     await initializeMySqlTables();
 
     // 1. Fetch raw inventory documents from MySQL
-    const rawInventory: any[] = await executeQuery('SELECT * FROM inventory ORDER BY updated_at DESC');
+    let rawInventory: any[] = await executeQuery('SELECT * FROM inventory ORDER BY updated_at DESC');
 
     let docCount = rawInventory ? rawInventory.length : 0;
 
@@ -47,6 +47,8 @@ export async function GET() {
             ]
           );
         }
+        // Re-fetch raw inventory after sync
+        rawInventory = await executeQuery('SELECT * FROM inventory ORDER BY updated_at DESC');
       }
     }
 
@@ -56,6 +58,27 @@ export async function GET() {
     (freshData.products || []).forEach((p: any) => {
       if (p.id) productsMap.set(p.id, p);
     });
+
+    // If rawInventory is still empty, synthesize inventory items directly from freshData.products!
+    if ((!rawInventory || rawInventory.length === 0) && freshData.products && freshData.products.length > 0) {
+      rawInventory = freshData.products.map((prod: any) => {
+        const totalStock = prod.colors && prod.colors.length > 0
+          ? prod.colors.reduce((sum: number, c: any) => sum + (typeof c.stock === 'number' ? c.stock : 0), 0)
+          : (prod.sizes ? prod.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0);
+        return {
+          id: `inv-${prod.id}`,
+          product_id: prod.id,
+          sku: prod.sku || 'N/A',
+          product_name: prod.name,
+          category: prod.category || 'General',
+          total_stock: totalStock,
+          is_out_of_stock: totalStock <= 0 ? 1 : 0,
+          colors: JSON.stringify(prod.colors || []),
+          sizes: JSON.stringify(prod.sizes || []),
+          updated_at: prod.createdAt || new Date().toISOString()
+        };
+      });
+    }
 
     // 4. Safely map and serialize MySQL inventory records
     const formattedInventory = (rawInventory || []).map((item: any) => {

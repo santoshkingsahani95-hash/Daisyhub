@@ -153,3 +153,18 @@ CREATE TABLE IF NOT EXISTS delivery_rates (
   branch_delivery_enabled TINYINT(1),
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 10. Photo Gallery Table
+CREATE TABLE IF NOT EXISTS photo_gallery (
+  id VARCHAR(100) PRIMARY KEY,
+  product_id VARCHAR(100) NOT NULL,
+  color_name VARCHAR(100),
+  color_code VARCHAR(50),
+  image_url LONGTEXT NOT NULL,
+  is_main TINYINT(1) DEFAULT 0,
+  sort_order INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_gallery_prod_id (product_id),
+  INDEX idx_gallery_color (color_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

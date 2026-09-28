@@ -136,15 +136,25 @@ export default function AdminCMSPage() {
     setTimeout(() => setSaveSuccess(''), 3500);
   };
 
-  const handleFileUpload = (file: File, callback: (dataUrl: string) => void) => {
+  const handleFileUpload = async (file: File, callback: (dataUrl: string) => void) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        callback(e.target.result as string);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          callback(data.url);
+          return;
+        }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (e) {
+      console.warn('[CMS Upload Error] Failed to upload image via API:', e);
+    }
   };
 
   // --- PRODUCT MANAGEMENT ---
