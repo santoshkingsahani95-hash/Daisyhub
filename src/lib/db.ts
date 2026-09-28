@@ -868,7 +868,6 @@ class DataStore {
     }
     this.users = usersList;
     this.saveAndBroadcast('ace_db_users', this.users);
-    postApiAction('saveUser', { user });
     return user;
   }
 
@@ -877,7 +876,6 @@ class DataStore {
     const initialLen = usersList.length;
     this.users = usersList.filter((u) => u.id !== id && u.email.toLowerCase() !== id.toLowerCase());
     this.saveAndBroadcast('ace_db_users', this.users);
-    postApiAction('deleteUser', { id });
     return this.users.length < initialLen;
   }
 

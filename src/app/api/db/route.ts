@@ -56,7 +56,7 @@ function mapProduct(r: any): Product {
 }
 
 async function fetchAllData() {
-  const [prodRows, catRows, colRows, rateRows, orderRows, coupRows, userRows, cmsRow] =
+  const [prodRows, catRows, colRows, rateRows, orderRows, coupRows, cmsRow] =
     await Promise.all([
       prisma.product.findMany({ orderBy: { createdAt: 'desc' } }),
       prisma.category.findMany(),
@@ -64,7 +64,6 @@ async function fetchAllData() {
       prisma.deliveryRate.findMany(),
       prisma.order.findMany({ orderBy: { createdAt: 'desc' } }),
       prisma.coupon.findMany(),
-      prisma.user.findMany({ orderBy: { registrationDate: 'desc' } }),
       prisma.cms.findUnique({ where: { key: 'homepage' } }),
     ]);
 
@@ -141,16 +140,7 @@ async function fetchAllData() {
     active: Boolean(r.active),
   }));
 
-  const users: CustomerUser[] = userRows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    email: r.email,
-    mobile: r.mobile || undefined,
-    role: (r.role as any) || 'CUSTOMER',
-    registrationDate: r.registrationDate || new Date().toISOString(),
-    isBlocked: Boolean(r.isBlocked),
-    addresses: Array.isArray(r.addresses) ? (r.addresses as any) : [],
-  }));
+  const users: CustomerUser[] = [];
 
   const cms: HomepageCMS = cmsRow
     ? {
@@ -344,40 +334,7 @@ export async function POST(request: Request) {
         break;
       }
 
-      case 'saveUser': {
-        const { user } = body;
-        if (user && user.id) {
-          await prisma.user.upsert({
-            where: { id: user.id },
-            update: {
-              name: user.name,
-              email: user.email,
-              mobile: user.mobile || null,
-              role: user.role || 'CUSTOMER',
-              isBlocked: !!user.isBlocked,
-              addresses: (user.addresses || []) as any,
-            },
-            create: {
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              mobile: user.mobile || null,
-              role: user.role || 'CUSTOMER',
-              isBlocked: !!user.isBlocked,
-              addresses: (user.addresses || []) as any,
-            },
-          });
-        }
-        break;
-      }
 
-      case 'deleteUser': {
-        const { id } = body;
-        if (id) {
-          await prisma.user.deleteMany({ where: { OR: [{ id }, { email: id }] } });
-        }
-        break;
-      }
 
       case 'deleteOrder': {
         const { id } = body;

@@ -12,7 +12,22 @@ export default function AdminCustomersPage() {
   const [msg, setMsg] = useState('');
 
   const loadUsers = () => {
-    setUsers([...db.getUsers()]);
+    const orders = db.getOrders();
+    const customerMap = new Map<string, CustomerUser>();
+    for (const ord of orders) {
+      const key = (ord.customerEmail || ord.customerMobile || ord.id).toLowerCase().trim();
+      if (!customerMap.has(key)) {
+        customerMap.set(key, {
+          id: `cust-${key.replace(/[^a-z0-9]/g, '-')}`,
+          name: ord.customerName || 'Guest Customer',
+          email: ord.customerEmail || 'N/A',
+          mobile: ord.customerMobile || 'N/A',
+          role: 'CUSTOMER',
+          registrationDate: ord.createdAt ? ord.createdAt.split('T')[0] : 'N/A',
+        });
+      }
+    }
+    setUsers(Array.from(customerMap.values()));
   };
 
   useEffect(() => {

@@ -326,11 +326,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
 
           <Link
-            href="/account"
+            href="/track-order"
             className="flex items-center gap-2 px-4 py-2.5 text-xs text-white/70 hover:text-white transition-colors"
           >
-            <UserIcon size={16} />
-            <span>Customer Account View</span>
+            <Truck size={16} />
+            <span>Order Tracking View</span>
           </Link>
 
           <button

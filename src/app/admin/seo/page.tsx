@@ -557,7 +557,7 @@ export default function SEOManagementPage() {
               <span className="font-bold block uppercase tracking-wider">ACTIVE TECHNICAL DIRECTIVES:</span>
               <ul className="list-disc pl-4 space-y-1 text-brand-muted">
                 <li><strong>Dynamic XML Sitemap:</strong> Renders dynamically at <code>/sitemap.xml</code> with all categories and products.</li>
-                <li><strong>Robots Directives:</strong> Renders at <code>/robots.txt</code>; prevents search bots from indexing <code>/admin</code>, <code>/account</code>, <code>/cart</code>, <code>/checkout</code>.</li>
+                <li><strong>Robots Directives:</strong> Renders at <code>/robots.txt</code>; prevents search bots from indexing <code>/admin</code>, <code>/cart</code>, <code>/checkout</code>.</li>
                 <li><strong>JSON-LD Schemas:</strong> Automatically injects Organization, LocalBusiness, Product, and BreadcrumbList structured data.</li>
               </ul>
             </div>

@@ -15,7 +15,7 @@ import { NEPAL_PROVINCES, generateDefaultDeliveryRates } from '@/lib/nepal-locat
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, clearCart, user, directCheckoutItem, clearDirectCheckoutItem } = useStore();
+  const { cart, clearCart, directCheckoutItem, clearDirectCheckoutItem } = useStore();
 
   // Active checkout items: Use directCheckoutItem for "Buy It Now", otherwise use bag cart items
   const checkoutItems = directCheckoutItem ? [directCheckoutItem] : cart;
@@ -23,9 +23,9 @@ export default function CheckoutPage() {
   const [deliveryRates, setDeliveryRates] = useState<DistrictDeliveryRate[]>([]);
 
   const [formData, setFormData] = useState({
-    fullName: user ? user.name : '',
-    email: user ? user.email : '',
-    mobile: user ? user.mobile || '' : '',
+    fullName: '',
+    email: '',
+    mobile: '',
     province: 'Bagmati Province',
     district: 'Kathmandu',
     city: 'Kathmandu',
@@ -55,17 +55,7 @@ export default function CheckoutPage() {
     };
   }, []);
 
-  // Autofill user details when authenticated
-  useEffect(() => {
-    if (user) {
-      setFormData((prev) => ({
-        ...prev,
-        fullName: prev.fullName || user.name || '',
-        email: prev.email || user.email || '',
-        mobile: prev.mobile || user.mobile || '',
-      }));
-    }
-  }, [user]);
+
 
   // Cascading Province -> Available Districts list
   const activeProvinceObj = NEPAL_PROVINCES.find((p) => p.name === formData.province) || NEPAL_PROVINCES[0];
@@ -432,31 +422,14 @@ export default function CheckoutPage() {
           </h1>
         </div>
 
-        {/* Guest Checkout vs Account Banner */}
-        <div className="mb-8 p-4 bg-white rounded-lg border border-brand-border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          {user ? (
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-              <span>
-                Logged in as <strong className="text-brand-dark font-semibold">{user.name}</strong> ({user.email}). Order will automatically sync to your saved account history.
-              </span>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 text-brand-dark">
-                <span className="px-2 py-0.5 bg-brand-cream text-brand-dark font-bold rounded text-[10px] uppercase font-mono border border-brand-border">
-                  GUEST CHECKOUT ACTIVE
-                </span>
-                <span>No login required! Enter your email below to receive live delivery tracking & link future orders.</span>
-              </div>
-              <Link
-                href="/login"
-                className="text-xs font-bold text-brand-gold hover:underline whitespace-nowrap uppercase tracking-wider shrink-0"
-              >
-                Sign In (Optional) →
-              </Link>
-            </>
-          )}
+        {/* Guest Checkout Banner */}
+        <div className="mb-8 p-3.5 bg-brand-cream/60 border border-brand-border rounded-lg text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2 text-brand-dark">
+            <span className="px-2 py-0.5 bg-brand-dark text-white font-bold rounded text-[10px] uppercase font-mono">
+              GUEST CHECKOUT
+            </span>
+            <span className="text-brand-muted">No login required! Provide your details below for delivery tracking & order confirmation.</span>
+          </div>
         </div>
 
         <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-10">

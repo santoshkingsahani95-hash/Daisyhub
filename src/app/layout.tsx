@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { AuthProvider } from '@/components/providers/auth-provider';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://daisyhub.com';
 
@@ -136,9 +135,7 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        {children}
       </body>
     </html>
   );

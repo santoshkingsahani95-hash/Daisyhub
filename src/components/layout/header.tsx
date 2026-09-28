@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, ShoppingBag, Heart, User, Menu, Shield, LogOut } from 'lucide-react';
+import { Search, ShoppingBag, Heart, Truck, Menu } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { MegaMenu } from './mega-menu';
 import { MobileDrawer } from './mobile-drawer';
@@ -13,7 +13,7 @@ export const Header: React.FC = () => {
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  const { getCartItemCount, wishlist, openSearch, toggleMiniCart, user, logout } = useStore();
+  const { getCartItemCount, wishlist, openSearch, toggleMiniCart } = useStore();
   const cartCount = getCartItemCount();
 
   useEffect(() => {
@@ -106,72 +106,16 @@ export const Header: React.FC = () => {
               <Search size={20} />
             </button>
 
-            {/* Account & Panel Menu */}
-            <div className="relative group hidden md:block">
-              <Link
-                href={isMounted && user ? '/account' : '/login'}
-                className="p-1.5 flex items-center gap-1 hover:text-brand-gold transition-colors"
-                aria-label="Account"
-                title={isMounted && user ? `Account (${user.name})` : 'Sign In'}
-              >
-                <User size={20} />
-              </Link>
-
-              {/* Hover Dropdown Menu */}
-              {isMounted && (
-                <div className="absolute right-0 top-full pt-2 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  <div className="bg-white border border-brand-border rounded-lg shadow-xl p-3 text-xs space-y-2">
-                    {user ? (
-                      <>
-                        <div className="pb-2 border-b border-brand-border">
-                          <span className="font-bold text-brand-dark block truncate">{user.name}</span>
-                          <span className="text-[10px] text-brand-muted block truncate font-mono">{user.email}</span>
-                        </div>
-
-                        <div className="space-y-1 pt-1">
-                          <Link
-                            href="/account"
-                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-brand-cream text-brand-dark font-medium"
-                          >
-                            <User size={14} />
-                            <span>My Account & Orders</span>
-                          </Link>
-
-                          <button
-                            onClick={logout}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-rose-50 text-rose-600 font-medium transition-colors cursor-pointer text-left"
-                          >
-                            <LogOut size={14} />
-                            <span>Log Out</span>
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="pb-2 border-b border-brand-border space-y-1">
-                          <span className="font-bold text-brand-dark block">WELCOME TO DAISY HUB</span>
-                          <p className="text-[10px] text-brand-muted leading-tight">Optional login to sync orders & saved preferences.</p>
-                        </div>
-                        <div className="space-y-1 pt-1">
-                          <Link
-                            href="/login"
-                            className="block w-full py-2 text-center bg-brand-dark text-white font-bold text-xs uppercase tracking-wider rounded hover:bg-brand-dark/90"
-                          >
-                            Sign In
-                          </Link>
-                          <Link
-                            href="/register"
-                            className="block w-full py-1.5 text-center text-brand-dark font-semibold text-xs hover:underline"
-                          >
-                            Create Account
-                          </Link>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Track Order Direct Link */}
+            <Link
+              href="/track-order"
+              className="p-1.5 flex items-center gap-1 hover:text-brand-gold transition-colors text-xs font-semibold uppercase tracking-wider"
+              aria-label="Track Order"
+              title="Track Order"
+            >
+              <Truck size={20} />
+              <span className="hidden lg:inline text-[11px] font-sans">Track Order</span>
+            </Link>
 
             <Link
               href="/wishlist"

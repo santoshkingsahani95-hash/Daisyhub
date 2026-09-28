@@ -117,20 +117,6 @@ model Cms {
   @@map("cms")
 }
 
-model User {
-  id               String   @id @db.VarChar(100)
-  name             String   @db.VarChar(255)
-  email            String   @unique @db.VarChar(255)
-  mobile           String?  @db.VarChar(50)
-  password         String?  @db.VarChar(255)
-  role             String   @default("CUSTOMER") @db.VarChar(20)
-  registrationDate String?  @map("registration_date") @db.VarChar(100)
-  isBlocked        Boolean  @default(false) @map("is_blocked")
-  addresses        Json?
-  createdAt        DateTime @default(now()) @map("created_at")
-
-  @@map("users")
-}
 
 model Inventory {
   id           String  @id @db.VarChar(100)

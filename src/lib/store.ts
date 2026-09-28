@@ -120,10 +120,9 @@ interface StoreState {
   openSearch: () => void;
   closeSearch: () => void;
 
-  // Customer Auth
+  // Admin Auth Session
   user: CustomerUser | null;
   setUser: (user: CustomerUser | null) => void;
-  switchRole: (role: 'ADMIN' | 'CUSTOMER') => void;
   logout: () => void;
 }
 
@@ -297,35 +296,13 @@ export const useStore = create<StoreState>()(
       openSearch: () => set({ isSearchOpen: true }),
       closeSearch: () => set({ isSearchOpen: false }),
 
-      // Customer Auth
+      // Admin Session Auth
       user: null,
 
       setUser: (user) => set({ user }),
 
-      switchRole: (role) => {
-        const currentUser = get().user;
-        if (currentUser) {
-          set({ user: { ...currentUser, role } });
-        } else {
-          set({
-            user: {
-              id: `user-${Date.now()}`,
-              name: role === 'ADMIN' ? 'Admin Manager' : 'Customer',
-              email: role === 'ADMIN' ? 'admin@daisyhub.com' : 'customer@daisyhub.com',
-              role,
-              registrationDate: new Date().toISOString(),
-            },
-          });
-        }
-      },
-
       logout: () => {
         set({ user: null });
-        if (typeof window !== 'undefined') {
-          import('next-auth/react').then(({ signOut }) => {
-            signOut({ redirect: false }).catch(() => {});
-          });
-        }
       },
     }),
     {

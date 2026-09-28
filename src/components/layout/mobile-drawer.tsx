@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { X, ChevronDown, User, Heart, Search, ShoppingBag, Shield, LogOut } from 'lucide-react';
+import { X, ChevronDown, Heart, Search, ShoppingBag, Truck } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { db } from '@/lib/db';
 import { Category } from '@/types';
@@ -16,7 +16,7 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) =
   const [clothingExpanded, setClothingExpanded] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const { wishlist, user, logout, openSearch } = useStore();
+  const { wishlist, openSearch } = useStore();
 
   useEffect(() => {
     setIsMounted(true);
@@ -136,45 +136,16 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) =
           </nav>
         </div>
 
-        {/* Bottom User Controls */}
+        {/* Bottom Quick Controls */}
         <div className="p-5 border-t border-brand-border bg-brand-cream/50 space-y-3">
-          {isMounted && user ? (
-            <div className="space-y-2">
-              <div className="pb-2 border-b border-brand-border/60">
-                <span className="font-bold text-brand-dark text-xs block">{user.name}</span>
-                <span className="text-[10px] text-brand-muted font-mono">{user.email}</span>
-              </div>
-
-              <Link
-                href="/account"
-                onClick={onClose}
-                className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-brand-dark py-1.5 hover:opacity-80"
-              >
-                <User size={18} />
-                <span>My Account & Orders</span>
-              </Link>
-
-              <button
-                onClick={() => {
-                  logout();
-                  onClose();
-                }}
-                className="w-full flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-rose-600 py-1.5 hover:opacity-80 text-left"
-              >
-                <LogOut size={18} />
-                <span>Sign Out</span>
-              </button>
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              onClick={onClose}
-              className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-brand-dark py-2 hover:opacity-80"
-            >
-              <User size={18} />
-              <span>SIGN IN / REGISTER (OPTIONAL)</span>
-            </Link>
-          )}
+          <Link
+            href="/track-order"
+            onClick={onClose}
+            className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-brand-dark py-2 hover:opacity-80"
+          >
+            <Truck size={18} />
+            <span>TRACK MY ORDER</span>
+          </Link>
 
           <Link
             href="/wishlist"
