@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
-import { getProducts, getCategories } from '@/lib/db-queries';
+import { GET as getProductsApi } from '@/app/api/products/route';
+import { GET as getCategoriesApi } from '@/app/api/categories/route';
 import { ShopClient } from './shop-client';
 
 export const dynamic = 'force-dynamic';
@@ -11,11 +12,18 @@ export const metadata: Metadata = {
 };
 
 export default async function ShopPage() {
-  const [products, categories] = await Promise.all([
-    getProducts(),
-    getCategories(),
+  const [prodsRes, catsRes] = await Promise.all([
+    getProductsApi(new Request('http://localhost/api/products')),
+    getCategoriesApi(new Request('http://localhost/api/categories')),
   ]);
+
+  const [prodsData, catsData] = await Promise.all([
+    prodsRes.json(),
+    catsRes.json(),
+  ]);
+
+  const products = prodsData.products || [];
+  const categories = catsData.categories || [];
 
   return <ShopClient initialProducts={products} initialCategories={categories} />;
 }
-

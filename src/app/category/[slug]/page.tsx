@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
-import { getCategoryBySlug, getProducts } from '@/lib/db-queries';
+import { GET as getCategoryApi } from '@/app/api/categories/[slug]/route';
+import { GET as getProductsApi } from '@/app/api/products/route';
 import { CategoryClientView } from './category-client';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +11,10 @@ interface CategoryPageProps {
 }
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
-  const category = await getCategoryBySlug(params.slug);
+  const catRes = await getCategoryApi(new Request(`http://localhost/api/categories/${params.slug}`), { params });
+  const catData = await catRes.json().catch(() => ({}));
+  const category = catData.category || catData.data;
+
   const title = category?.name
     ? `${category.name} | Daisy Hub Luxury Garments`
     : params.slug === 'new-arrivals'
@@ -27,15 +31,25 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const slug = params.slug || 'dresses';
-  const category = await getCategoryBySlug(slug);
-  const products = await getProducts({ category: slug });
+
+  const [catRes, prodsRes] = await Promise.all([
+    getCategoryApi(new Request(`http://localhost/api/categories/${slug}`), { params: { slug } }),
+    getProductsApi(new Request(`http://localhost/api/products?category=${encodeURIComponent(slug)}`)),
+  ]);
+
+  const [catData, prodsData] = await Promise.all([
+    catRes.json().catch(() => ({})),
+    prodsRes.json().catch(() => ({})),
+  ]);
+
+  const category = catData.category || catData.data || null;
+  const products = prodsData.products || [];
 
   return (
     <CategoryClientView
       slug={slug}
-      initialCategory={category || null}
+      initialCategory={category}
       initialProducts={products}
     />
   );
 }
-

@@ -1,5 +1,5 @@
 import { Product, Category, Collection, Order, Coupon, HomepageCMS, CustomerUser, ProductReview, ColorOption, SEOMetadata, AdminCredentials, DistrictDeliveryRate } from '@/types';
-import { DEFAULT_CMS } from '@/server/config/defaults';
+import { DEFAULT_CMS } from '@/lib/defaults';
 import { generateDefaultDeliveryRates } from './nepal-locations';
 
 // Category matching helper supporting unlimited products per category and flexible singular/plural/alias matching

@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import {
-  getCategoryBySlug,
-  getCategoryById,
-  saveCategory,
-  deleteCategory,
-  getProducts,
-} from '@/lib/db-queries';
+import { prisma } from '@/lib/prisma';
+import { DEFAULT_CATEGORIES } from '@/lib/defaults';
+import { sanitizeObjectImages } from '@/lib/image-upload';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -25,8 +21,25 @@ export async function GET(
   { params }: { params: { slug: string } }
 ) {
   try {
-    const slug = params.slug;
-    const category = (await getCategoryBySlug(slug)) || (await getCategoryById(slug));
+    const slug = params.slug.toLowerCase().trim();
+    let row = await prisma.category.findFirst({
+      where: { OR: [{ slug }, { id: slug }] },
+    });
+
+    let category: any = null;
+    if (row) {
+      category = {
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        description: row.description || '',
+        image: row.image || '',
+        subcategories: Array.isArray(row.subcategories) ? (row.subcategories as any) : [],
+        seo: (row.seo as any) ?? undefined,
+      };
+    } else {
+      category = DEFAULT_CATEGORIES.find((c) => c.slug === slug || c.id === slug) || null;
+    }
 
     if (!category) {
       return NextResponse.json(
@@ -35,16 +48,8 @@ export async function GET(
       );
     }
 
-    const { searchParams } = new URL(request.url);
-    const includeProducts = searchParams.get('includeProducts') === 'true';
-
-    let products: any[] = [];
-    if (includeProducts) {
-      products = await getProducts({ category: category.slug });
-    }
-
     return NextResponse.json(
-      { success: true, category, products, data: category },
+      { success: true, category, data: category },
       { headers: NO_CACHE_HEADERS }
     );
   } catch (error: any) {
@@ -65,21 +70,40 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const existing = (await getCategoryBySlug(params.slug)) || (await getCategoryById(params.slug));
+    const slug = params.slug.toLowerCase().trim();
 
-    const categoryData = {
+    const existing = await prisma.category.findFirst({
+      where: { OR: [{ slug }, { id: slug }] },
+    });
+
+    const categoryData = await sanitizeObjectImages({
       id: existing ? existing.id : `cat-${Date.now()}`,
-      slug: params.slug,
+      slug,
       ...body,
-    };
+    });
 
-    const saved = await saveCategory(categoryData);
+    await prisma.category.deleteMany({
+      where: { OR: [{ id: categoryData.id }, { slug: categoryData.slug }] },
+    });
+
+    await prisma.category.create({
+      data: {
+        id: categoryData.id,
+        slug: categoryData.slug,
+        name: categoryData.name,
+        description: categoryData.description || '',
+        image: categoryData.image || '',
+        subcategories: (categoryData.subcategories || []) as any,
+        seo: (categoryData.seo ?? null) as any,
+      },
+    });
+
     revalidatePath('/');
     revalidatePath('/shop');
     revalidatePath('/category/[slug]', 'page');
 
     return NextResponse.json(
-      { success: true, category: saved, data: saved },
+      { success: true, category: categoryData, data: categoryData },
       { headers: NO_CACHE_HEADERS }
     );
   } catch (error: any) {
@@ -99,13 +123,17 @@ export async function DELETE(
   { params }: { params: { slug: string } }
 ) {
   try {
-    const success = await deleteCategory(params.slug);
+    const slug = params.slug.toLowerCase().trim();
+    await prisma.category.deleteMany({
+      where: { OR: [{ id: slug }, { slug }] },
+    });
+
     revalidatePath('/');
     revalidatePath('/shop');
     revalidatePath('/category/[slug]', 'page');
 
     return NextResponse.json(
-      { success, message: success ? `Category ${params.slug} deleted` : `Failed to delete category ${params.slug}` },
+      { success: true, message: `Category ${params.slug} deleted` },
       { headers: NO_CACHE_HEADERS }
     );
   } catch (error: any) {
@@ -116,4 +144,3 @@ export async function DELETE(
     );
   }
 }
-

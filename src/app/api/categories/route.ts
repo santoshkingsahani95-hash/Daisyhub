@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import {
-  getCategories,
-  getCategoryBySlug,
-  getCategoryById,
-  saveCategory,
-  deleteCategory,
-  getProducts,
-} from '@/lib/db-queries';
+import { prisma } from '@/lib/prisma';
+import { Category } from '@/types';
+import { DEFAULT_CATEGORIES } from '@/lib/defaults';
+import { sanitizeObjectImages } from '@/lib/image-upload';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -18,41 +14,144 @@ const NO_CACHE_HEADERS = {
   'Expires': '0',
 };
 
+// -------------------------------------------------------------
+// Direct Database Queries & Mutations (Internal)
+// -------------------------------------------------------------
+
+async function queryCategories(): Promise<Category[]> {
+  try {
+    const rows = await prisma.category.findMany();
+    let categories: Category[] = rows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      name: r.name,
+      description: r.description || '',
+      image: r.image || '',
+      subcategories: Array.isArray(r.subcategories) ? (r.subcategories as any) : [],
+      seo: (r.seo as any) ?? undefined,
+    }));
+
+    if (categories.length === 0 && DEFAULT_CATEGORIES.length > 0) {
+      for (const c of DEFAULT_CATEGORIES) {
+        await saveCategoryToDb(c);
+      }
+      categories = DEFAULT_CATEGORIES;
+    }
+
+    return categories;
+  } catch (error) {
+    console.error('[queryCategories Error]', error);
+    return DEFAULT_CATEGORIES;
+  }
+}
+
+async function queryCategoryBySlug(slug: string): Promise<Category | null> {
+  try {
+    const cleanSlug = slug.toLowerCase().trim();
+    const row = await prisma.category.findFirst({ where: { slug: cleanSlug } });
+    if (!row) {
+      const fallback = DEFAULT_CATEGORIES.find((c) => c.slug === cleanSlug);
+      return fallback || null;
+    }
+    return {
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      description: row.description || '',
+      image: row.image || '',
+      subcategories: Array.isArray(row.subcategories) ? (row.subcategories as any) : [],
+      seo: (row.seo as any) ?? undefined,
+    };
+  } catch (error) {
+    console.error('[queryCategoryBySlug Error]', error);
+    return null;
+  }
+}
+
+async function queryCategoryById(id: string): Promise<Category | null> {
+  try {
+    const row = await prisma.category.findFirst({ where: { id } });
+    if (!row) return null;
+    return {
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      description: row.description || '',
+      image: row.image || '',
+      subcategories: Array.isArray(row.subcategories) ? (row.subcategories as any) : [],
+      seo: (row.seo as any) ?? undefined,
+    };
+  } catch (error) {
+    console.error('[queryCategoryById Error]', error);
+    return null;
+  }
+}
+
+async function saveCategoryToDb(rawCategory: Category): Promise<Category> {
+  const category = await sanitizeObjectImages(rawCategory);
+  try {
+    await prisma.category.deleteMany({
+      where: { OR: [{ id: category.id }, { slug: category.slug }] },
+    });
+    await prisma.category.create({
+      data: {
+        id: category.id,
+        slug: category.slug,
+        name: category.name,
+        description: category.description || '',
+        image: category.image || '',
+        subcategories: (category.subcategories || []) as any,
+        seo: (category.seo ?? null) as any,
+      },
+    });
+  } catch (error) {
+    console.error('[saveCategoryToDb Error]', error);
+  }
+  return category;
+}
+
+async function deleteCategoryFromDb(idOrSlug: string): Promise<boolean> {
+  try {
+    await prisma.category.deleteMany({
+      where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
+    });
+    return true;
+  } catch (error) {
+    console.error('[deleteCategoryFromDb Error]', error);
+    return false;
+  }
+}
+
+// -------------------------------------------------------------
+// Route Handlers (Next.js App Router API)
+// -------------------------------------------------------------
+
 /**
  * GET /api/categories
- * Query Params:
- * - slug: string (optional - return single category by slug)
- * - id: string (optional - return single category by id)
- * - includeProducts: boolean (optional - attach products to category)
  */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug');
     const id = searchParams.get('id');
-    const includeProducts = searchParams.get('includeProducts') === 'true';
 
     if (slug) {
-      const category = await getCategoryBySlug(slug);
-      if (!category) {
-        return NextResponse.json({ success: false, error: 'Category not found' }, { status: 404, headers: NO_CACHE_HEADERS });
-      }
-      let products: any[] = [];
-      if (includeProducts) {
-        products = await getProducts({ category: slug });
-      }
-      return NextResponse.json({ success: true, category, products, data: category }, { headers: NO_CACHE_HEADERS });
-    }
-
-    if (id) {
-      const category = await getCategoryById(id);
+      const category = await queryCategoryBySlug(slug);
       if (!category) {
         return NextResponse.json({ success: false, error: 'Category not found' }, { status: 404, headers: NO_CACHE_HEADERS });
       }
       return NextResponse.json({ success: true, category, data: category }, { headers: NO_CACHE_HEADERS });
     }
 
-    const categories = await getCategories();
+    if (id) {
+      const category = await queryCategoryById(id);
+      if (!category) {
+        return NextResponse.json({ success: false, error: 'Category not found' }, { status: 404, headers: NO_CACHE_HEADERS });
+      }
+      return NextResponse.json({ success: true, category, data: category }, { headers: NO_CACHE_HEADERS });
+    }
+
+    const categories = await queryCategories();
     return NextResponse.json(
       {
         success: true,
@@ -73,7 +172,6 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/categories
- * Create or Update a category
  */
 export async function POST(request: Request) {
   try {
@@ -97,10 +195,9 @@ export async function POST(request: Request) {
       seo: category.seo || undefined,
     };
 
-    const saved = await saveCategory(categoryToSave);
-    const categories = await getCategories();
+    const saved = await saveCategoryToDb(categoryToSave);
+    const categories = await queryCategories();
 
-    // Invalidate Next.js page caches immediately
     revalidatePath('/');
     revalidatePath('/shop');
     revalidatePath('/category/[slug]', 'page');
@@ -138,10 +235,9 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const success = await deleteCategory(id);
-    const categories = await getCategories();
+    const success = await deleteCategoryFromDb(id);
+    const categories = await queryCategories();
 
-    // Invalidate Next.js page caches immediately
     revalidatePath('/');
     revalidatePath('/shop');
     revalidatePath('/category/[slug]', 'page');

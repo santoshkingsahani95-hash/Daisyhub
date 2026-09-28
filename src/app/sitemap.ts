@@ -1,13 +1,29 @@
 import { MetadataRoute } from 'next';
-import { getProducts, getCategories } from '@/lib/db-queries';
+import { GET as getProductsApi } from '@/app/api/products/route';
+import { GET as getCategoriesApi } from '@/app/api/categories/route';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
-  const [categories, products] = await Promise.all([
-    getCategories().catch(() => []),
-    getProducts().catch(() => []),
-  ]);
+  let categories: any[] = [];
+  let products: any[] = [];
+
+  try {
+    const [catsRes, prodsRes] = await Promise.all([
+      getCategoriesApi(new Request('http://localhost/api/categories')),
+      getProductsApi(new Request('http://localhost/api/products')),
+    ]);
+
+    const [catsData, prodsData] = await Promise.all([
+      catsRes.json().catch(() => ({})),
+      prodsRes.json().catch(() => ({})),
+    ]);
+
+    categories = catsData.categories || [];
+    products = prodsData.products || [];
+  } catch (e) {
+    console.error('[Sitemap Error]', e);
+  }
 
   // Static routes
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -44,7 +60,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // Category routes
-  const categoryRoutes: MetadataRoute.Sitemap = categories.map((cat) => ({
+  const categoryRoutes: MetadataRoute.Sitemap = categories.map((cat: any) => ({
     url: `${baseUrl}/category/${cat.slug}`,
     lastModified: new Date(),
     changeFrequency: 'weekly',
@@ -60,12 +76,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.85,
   }));
 
-  // Product routes
-  const productRoutes: MetadataRoute.Sitemap = products.map((prod) => ({
+  // Individual product routes
+  const productRoutes: MetadataRoute.Sitemap = products.map((prod: any) => ({
     url: `${baseUrl}/product/${prod.slug}`,
-    lastModified: new Date(prod.createdAt || Date.now()),
-    changeFrequency: 'weekly',
-    priority: 0.8,
+    lastModified: prod.createdAt ? new Date(prod.createdAt) : new Date(),
+    changeFrequency: 'daily',
+    priority: 0.7,
   }));
 
   return [...staticRoutes, ...categoryRoutes, ...collectionRoutes, ...productRoutes];

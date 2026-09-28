@@ -5,7 +5,9 @@ import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
 import { ProductShelf } from '@/components/product/product-shelf';
 import { CategoryGrid } from '@/components/category/category-grid';
-import { getCMS, getProducts, getCategories } from '@/lib/db-queries';
+import { GET as getCmsApi } from '@/app/api/cms/route';
+import { GET as getProductsApi } from '@/app/api/products/route';
+import { GET as getCategoriesApi } from '@/app/api/categories/route';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,11 +19,21 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const [cms, allProducts, categories] = await Promise.all([
-    getCMS(),
-    getProducts(),
-    getCategories(),
+  const [cmsRes, prodsRes, catsRes] = await Promise.all([
+    getCmsApi(),
+    getProductsApi(new Request('http://localhost/api/products')),
+    getCategoriesApi(new Request('http://localhost/api/categories')),
   ]);
+
+  const [cmsData, prodsData, catsData] = await Promise.all([
+    cmsRes.json(),
+    prodsRes.json(),
+    catsRes.json(),
+  ]);
+
+  const cms = cmsData.cms || cmsData.data || {};
+  const allProducts: any[] = prodsData.products || [];
+  const categories: any[] = catsData.categories || [];
 
   const trendingProducts = allProducts.filter((p) => p.isTrending).slice(0, 8);
   const newArrivals = allProducts
@@ -63,21 +75,23 @@ export default async function HomePage() {
         {/* New Arrivals Shelf */}
         <ProductShelf
           title="NEW ARRIVALS"
-          eyebrow="FRESH DROPS"
-          subtitle="Fresh pieces you'll want to wear on repeat."
+          eyebrow="JUST DROPPED"
+          icon={<Sparkles size={14} />}
           viewAllLink="/category/new-arrivals"
-          viewAllLabel="VIEW ALL NEW ARRIVALS"
+          viewAllLabel="EXPLORE NEW ARRIVALS"
           products={newArrivals}
+          className="border-b border-brand-border"
         />
 
         {/* Best Sellers Shelf */}
         <ProductShelf
           title="BEST SELLERS"
           eyebrow="CUSTOMER FAVORITES"
+          icon={<Sparkles size={14} />}
           viewAllLink="/category/best-sellers"
           viewAllLabel="SHOP BEST SELLERS"
           products={bestSellers}
-          className="bg-brand-cream/30 border-t border-brand-border"
+          className="bg-brand-cream/40"
         />
       </main>
 

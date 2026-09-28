@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { getProductBySlug, getProductById } from '@/lib/db-queries';
+import { GET as getProductApi } from '@/app/api/products/[id]/route';
 import { ProductDetailClient } from './product-client';
 
 export const dynamic = 'force-dynamic';
@@ -10,9 +10,11 @@ interface ProductDetailPageProps {
 }
 
 export async function generateMetadata({ params }: ProductDetailPageProps): Promise<Metadata> {
-  const product =
-    (await getProductBySlug(params.slug)) ||
-    (await getProductById(params.slug));
+  const res = await getProductApi(new Request(`http://localhost/api/products/${params.slug}`), {
+    params: { id: params.slug },
+  });
+  const data = await res.json().catch(() => ({}));
+  const product = data.product || data.data;
 
   return {
     title: product ? `${product.name} | Daisy Hub Luxury Garments` : 'Product Details | Daisy Hub',
@@ -28,10 +30,11 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
 }
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
-  const product =
-    (await getProductBySlug(params.slug)) ||
-    (await getProductById(params.slug));
+  const res = await getProductApi(new Request(`http://localhost/api/products/${params.slug}`), {
+    params: { id: params.slug },
+  });
+  const data = await res.json().catch(() => ({}));
+  const product = data.product || data.data || null;
 
-  return <ProductDetailClient initialProduct={product || null} slug={params.slug} />;
+  return <ProductDetailClient initialProduct={product} slug={params.slug} />;
 }
-
