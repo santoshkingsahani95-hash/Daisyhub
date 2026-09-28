@@ -111,6 +111,12 @@ async function saveProductToDb(rawProduct: Product): Promise<Product> {
       where: { OR: [{ id: product.id }, { slug: product.slug }] },
     });
 
+    const totalStock = typeof product.stockQuantity === 'number'
+      ? product.stockQuantity
+      : (product.colors && product.colors.length > 0
+          ? product.colors.reduce((sum: number, c: any) => sum + (typeof c.stock === 'number' ? c.stock : 0), 0)
+          : (product.sizes ? product.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0));
+
     await prisma.product.create({
       data: {
         id: product.id,
@@ -131,7 +137,8 @@ async function saveProductToDb(rawProduct: Product): Promise<Product> {
         isNewArrival: !!product.isNewArrival,
         isBestSeller: !!product.isBestSeller,
         isSale: !!product.isSale,
-        isOutOfStock: !!product.isOutOfStock,
+        isOutOfStock: product.isOutOfStock !== undefined ? !!product.isOutOfStock : totalStock <= 0,
+        stockQuantity: totalStock,
         colors: (product.colors || []) as any,
         sizes: (product.sizes || []) as any,
         sku: product.sku,
@@ -141,34 +148,6 @@ async function saveProductToDb(rawProduct: Product): Promise<Product> {
         isFreeDelivery: !!product.isFreeDelivery,
         seo: (product.seo ?? null) as any,
         createdAt: product.createdAt || new Date().toISOString(),
-      },
-    });
-
-    // Sync inventory doc
-    const totalStock = product.colors && product.colors.length > 0
-      ? product.colors.reduce((sum: number, c: any) => sum + (typeof c.stock === 'number' ? c.stock : 0), 0)
-      : (product.sizes ? product.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0);
-
-    await prisma.inventory.upsert({
-      where: { id: `inv-${product.id}` },
-      update: {
-        totalStock,
-        isOutOfStock: totalStock <= 0,
-        colors: (product.colors || []) as any,
-        sizes: (product.sizes || []) as any,
-        updatedAt: new Date().toISOString(),
-      },
-      create: {
-        id: `inv-${product.id}`,
-        productId: product.id,
-        sku: product.sku || 'N/A',
-        productName: product.name,
-        category: product.category || 'General',
-        totalStock,
-        isOutOfStock: totalStock <= 0,
-        colors: (product.colors || []) as any,
-        sizes: (product.sizes || []) as any,
-        updatedAt: new Date().toISOString(),
       },
     });
 
@@ -207,7 +186,6 @@ async function saveProductToDb(rawProduct: Product): Promise<Product> {
 async function deleteProductFromDb(id: string): Promise<boolean> {
   try {
     await prisma.product.deleteMany({ where: { id } });
-    await prisma.inventory.deleteMany({ where: { OR: [{ productId: id }, { id: `inv-${id}` }] } });
     await prisma.photoGallery.deleteMany({ where: { productId: id } });
     return true;
   } catch (error) {

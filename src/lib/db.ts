@@ -111,7 +111,25 @@ async function postApiAction(action: string, payload: Record<string, any> = {}) 
       return;
     }
 
-    // Fallback to /api/db for any other actions (e.g., syncFull, updateInventory)
+    if (action === 'updateInventory') {
+      await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateSizeStock', ...payload }),
+        cache: 'no-store',
+      });
+      return;
+    }
+    if (action === 'updateColorStock') {
+      await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateColorStock', ...payload }),
+        cache: 'no-store',
+      });
+      return;
+    }
+
     const res = await fetch('/api/db', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -313,7 +331,7 @@ class DataStore {
               createdAt: p.createdAt || new Date().toISOString(),
             }));
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     return this.products;
@@ -388,6 +406,8 @@ class DataStore {
 
     const totalSizeStock = prod.sizes.reduce((sum, s) => sum + (s.stock || 0), 0);
     prod.isOutOfStock = totalSizeStock <= 0;
+    prod.stockQuantity = totalSizeStock;
+    prod.totalStock = totalSizeStock;
 
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
@@ -410,6 +430,8 @@ class DataStore {
     const totalColorStock = prod.colors ? prod.colors.reduce((acc, c) => acc + (typeof c.stock === 'number' ? c.stock : 0), 0) : 0;
     prod.sizes = [{ size: 'Free Size', stock: totalColorStock }];
     prod.isOutOfStock = totalColorStock <= 0;
+    prod.stockQuantity = totalColorStock;
+    prod.totalStock = totalColorStock;
 
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
@@ -439,7 +461,7 @@ class DataStore {
       if (stored) {
         try {
           this.categories = JSON.parse(stored);
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     return this.categories;
@@ -515,7 +537,7 @@ class DataStore {
       if (stored) {
         try {
           this.collections = JSON.parse(stored);
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     return this.collections;
@@ -566,13 +588,13 @@ class DataStore {
       if (stored) {
         try {
           this.cms = JSON.parse(stored);
-        } catch (e) {}
+        } catch (e) { }
       }
       const storedFonepay = localStorage.getItem('ace_db_fonepay_settings') || sessionStorage.getItem('ace_db_fonepay_settings');
       if (storedFonepay) {
         try {
           this.cms.fonepaySettings = JSON.parse(storedFonepay);
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     if (!this.cms.deliveryRates || this.cms.deliveryRates.length === 0) {
@@ -587,7 +609,7 @@ class DataStore {
     if (newCms.fonepaySettings) {
       try {
         localStorage.setItem('ace_db_fonepay_settings', JSON.stringify(newCms.fonepaySettings));
-      } catch (e) {}
+      } catch (e) { }
     }
     this.saveAndBroadcast('ace_db_cms', this.cms);
     postApiAction('updateCMS', { cms: this.cms });
@@ -622,7 +644,7 @@ class DataStore {
           if (Array.isArray(parsed)) {
             this.orders = parsed;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     return this.orders;
@@ -677,9 +699,9 @@ class DataStore {
               total: order.total,
               paymentMethod: order.paymentMethod,
             }),
-          }).catch(() => {});
+          }).catch(() => { });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     return order;
@@ -729,7 +751,7 @@ class DataStore {
       if (stored) {
         try {
           this.users = JSON.parse(stored);
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     return this.users;
@@ -769,7 +791,7 @@ class DataStore {
       if (stored) {
         try {
           return JSON.parse(stored);
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     return {

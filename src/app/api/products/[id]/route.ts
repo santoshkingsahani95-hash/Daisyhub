@@ -158,7 +158,6 @@ export async function DELETE(
   try {
     const id = params.id;
     await prisma.product.deleteMany({ where: { id } });
-    await prisma.inventory.deleteMany({ where: { OR: [{ productId: id }, { id: `inv-${id}` }] } });
     await prisma.photoGallery.deleteMany({ where: { productId: id } });
 
     revalidatePath('/');

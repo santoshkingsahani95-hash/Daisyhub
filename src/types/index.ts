@@ -56,6 +56,8 @@ export interface Product {
   isBestSeller?: boolean;
   isSale?: boolean;
   isOutOfStock?: boolean;
+  stockQuantity?: number;
+  totalStock?: number;
   colors: ColorOption[];
   sizes: SizeVariant[];
   variants?: ProductVariant[];

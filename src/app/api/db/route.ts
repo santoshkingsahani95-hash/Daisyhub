@@ -44,6 +44,8 @@ function mapProduct(r: any): Product {
     isBestSeller: Boolean(r.isBestSeller),
     isSale: Boolean(r.isSale),
     isOutOfStock: Boolean(r.isOutOfStock),
+    stockQuantity: r.stockQuantity !== null && r.stockQuantity !== undefined ? Number(r.stockQuantity) : 0,
+    totalStock: r.stockQuantity !== null && r.stockQuantity !== undefined ? Number(r.stockQuantity) : 0,
     insideValleyFee: r.insideValleyFee !== null && r.insideValleyFee !== undefined ? Number(r.insideValleyFee) : undefined,
     outsideValleyFee: r.outsideValleyFee !== null && r.outsideValleyFee !== undefined ? Number(r.outsideValleyFee) : undefined,
     isFreeDelivery: Boolean(r.isFreeDelivery),
@@ -206,6 +208,11 @@ export async function POST(request: Request) {
               isBestSeller: !!sanitized.isBestSeller,
               isSale: !!sanitized.isSale,
               isOutOfStock: !!sanitized.isOutOfStock,
+              stockQuantity: typeof sanitized.stockQuantity === 'number'
+                ? sanitized.stockQuantity
+                : (sanitized.colors && sanitized.colors.length > 0
+                    ? sanitized.colors.reduce((sum: number, c: any) => sum + (typeof c.stock === 'number' ? c.stock : 0), 0)
+                    : (sanitized.sizes ? sanitized.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0)),
               colors: (sanitized.colors || []) as any,
               sizes: (sanitized.sizes || []) as any,
               sku: sanitized.sku,
@@ -225,7 +232,6 @@ export async function POST(request: Request) {
         const { id } = body;
         if (id) {
           await prisma.product.deleteMany({ where: { id } });
-          await prisma.inventory.deleteMany({ where: { OR: [{ productId: id }, { id: `inv-${id}` }] } });
           await prisma.photoGallery.deleteMany({ where: { productId: id } });
         }
         break;

@@ -26,6 +26,7 @@ model Product {
   isBestSeller       Boolean  @default(false) @map("is_best_seller")
   isSale             Boolean  @default(false) @map("is_sale")
   isOutOfStock       Boolean  @default(false) @map("is_out_of_stock")
+  stockQuantity      Int      @default(0) @map("stock_quantity")
   colors             Json?
   sizes              Json?
   sku                String   @db.VarChar(100)
@@ -106,21 +107,6 @@ model Cms {
 }
 
 
-model Inventory {
-  id           String  @id @db.VarChar(100)
-  productId    String  @map("product_id") @db.VarChar(100)
-  sku          String  @db.VarChar(100)
-  productName  String  @map("product_name") @db.VarChar(255)
-  category     String? @db.VarChar(100)
-  totalStock   Int     @default(0) @map("total_stock")
-  isOutOfStock Boolean @default(false) @map("is_out_of_stock")
-  colors       Json?
-  sizes        Json?
-  updatedAt    String? @map("updated_at") @db.VarChar(100)
-
-  @@index([productId])
-  @@map("inventory")
-}
 
 model DeliveryRate {
   district               String   @id @db.VarChar(100)
