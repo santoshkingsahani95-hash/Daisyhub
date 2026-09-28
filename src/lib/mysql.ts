@@ -11,6 +11,7 @@ let pool: mysql.Pool | null = null;
 let sqliteDb: any = null;
 let useMySql = false;
 let isInitialized = false;
+let initPromise: Promise<boolean> | null = null;
 
 import fs from 'fs';
 
@@ -173,8 +174,10 @@ export function parseJSON<T = any>(val: any, fallback: T): T {
  */
 export async function initializeMySqlTables(): Promise<boolean> {
   if (isInitialized) return useMySql;
+  if (initPromise) return initPromise;
 
-  // 1. Try connecting to Remote MySQL
+  initPromise = (async () => {
+    // 1. Try connecting to Remote MySQL
   try {
     if (!pool) {
       pool = mysql.createPool({
@@ -187,13 +190,13 @@ export async function initializeMySqlTables(): Promise<boolean> {
         connectionLimit: 10,
         queueLimit: 0,
         enableKeepAlive: true,
-        connectTimeout: 2000,
+        connectTimeout: 1000,
       });
     }
 
     const conn = await Promise.race([
       pool.getConnection(),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('MySQL Connect Timeout')), 2000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('MySQL Connect Timeout')), 1000)),
     ]);
     conn.release();
     useMySql = true;
@@ -373,6 +376,9 @@ export async function initializeMySqlTables(): Promise<boolean> {
     console.error('❌ SQL Database DDL Table Initialization Error:', err?.message || err);
     return false;
   }
+  })();
+
+  return initPromise;
 }
 
 export function isMySqlConnected(): boolean {
