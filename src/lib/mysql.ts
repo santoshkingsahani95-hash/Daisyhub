@@ -147,10 +147,13 @@ export async function executeQuery<T = any>(sql: string, params: any[] = []): Pr
       let paramIndex = 1;
       const pgSql = cleanSql.replace(/\?/g, () => `$${paramIndex++}`);
       
-      const rows = await neonSql(pgSql, params);
+      const result = typeof neonSql.query === 'function' 
+        ? await neonSql.query(pgSql, params)
+        : await neonSql(pgSql, params);
+      const rows = result && typeof result === 'object' && 'rows' in result ? result.rows : result;
       return rows as T;
     } catch (e: any) {
-      console.warn('[Neon Query Exec Fallback]', e?.message || e);
+      return await runFallbackQuery<T>(sql, params);
     }
   }
 

@@ -1,79 +1,55 @@
-const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
-const testProduct = {
-  id: `prod-test-${Date.now()}`,
-  slug: `test-product-${Date.now()}`,
-  name: `Test Garment ${new Date().toLocaleTimeString()}`,
-  description: 'Test product creation verification',
-  details: ['100% Organic Cotton', 'Premium Quality'],
-  fabricCare: 'Hand wash cold',
-  category: 'tops',
-  collections: ['new-arrivals'],
-  price: 1500,
-  salePrice: 1200,
-  discountPercentage: 20,
-  rating: 5.0,
-  reviewCount: 1,
-  isTrending: true,
-  isNewArrival: true,
-  isBestSeller: false,
-  isSale: true,
-  isOutOfStock: false,
-  colors: [
-    {
-      name: 'Black',
-      code: '#111111',
-      images: ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000'],
-      sizes: [{ size: 'Free Size', stock: 25 }],
-    },
-  ],
-  sizes: [{ size: 'Free Size', stock: 25 }],
-  sku: `SKU-${Date.now()}`,
-  reviews: [],
-  insideValleyFee: 100,
-  outsideValleyFee: 200,
-  isFreeDelivery: false,
-};
-
-const postData = JSON.stringify({
-  action: 'saveProduct',
-  product: testProduct,
-});
-
-const req = http.request(
-  'http://localhost:3000/api/db',
-  {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(postData),
-    },
-  },
-  (res) => {
-    let body = '';
-    res.on('data', (chunk) => (body += chunk));
-    res.on('end', () => {
-      console.log('STATUS:', res.statusCode);
-      try {
-        const parsed = JSON.parse(body);
-        console.log('API RESPONSE SUCCESS:', parsed.success);
-        console.log('TOTAL PRODUCTS AFTER ADD:', parsed.data?.products?.length || 0);
-        const added = parsed.data?.products?.find((p) => p.id === testProduct.id);
-        if (added) {
-          console.log('✅ TEST PRODUCT SUCCESSFULLY CREATED AND RETURNED:', added.name);
-        } else {
-          console.log('⚠️ Product not found in returned list');
-        }
-      } catch (e) {
-        console.error('Response parse error:', body);
+try {
+  const envPath = path.join(process.cwd(), '.env.local');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+        const [k, ...v] = trimmed.split('=');
+        process.env[k.trim()] = v.join('=').trim();
       }
     });
   }
-);
+} catch (e) {}
 
-req.on('error', (err) => {
-  console.error('HTTP Request Error (Is localhost:3000 running?):', err.message);
-});
+const { initializeMySqlTables, executeQuery } = require('../lib/mysql');
 
-req.write(postData);
-req.end();
+async function testAddProduct() {
+  console.log('🚀 Initializing database tables...');
+  await initializeMySqlTables();
+
+  const testProduct = {
+    id: `prod_test_${Date.now()}`,
+    slug: `test-product-${Date.now()}`,
+    name: 'Test Ace Garment Silk Top',
+    description: 'High quality test top',
+    category: 'tops',
+    price: 2499,
+    salePrice: 1999,
+    sku: `SKU-${Date.now()}`,
+  };
+
+  console.log('🚀 Testing fast product save...');
+  const startTime = Date.now();
+
+  try {
+    await executeQuery(`DELETE FROM products WHERE id = ? OR slug = ?`, [testProduct.id, testProduct.slug]);
+    await executeQuery(
+      `INSERT INTO products (id, slug, name, description, category, price, sale_price, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [testProduct.id, testProduct.slug, testProduct.name, testProduct.description, testProduct.category, testProduct.price, testProduct.salePrice, testProduct.sku]
+    );
+
+    const fetchRes = await executeQuery(`SELECT * FROM products WHERE id = ?`, [testProduct.id]);
+    const duration = Date.now() - startTime;
+
+    console.log(`✅ SUCCESS! Product added and retrieved in ${duration}ms!`);
+    console.log('Saved Product Details:', fetchRes[0]);
+  } catch (err) {
+    console.error('❌ Failed to add test product:', err);
+  }
+}
+
+testAddProduct();

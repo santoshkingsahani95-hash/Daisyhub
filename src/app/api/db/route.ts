@@ -170,9 +170,21 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
 
-    const updatedData = await serverDb.getFreshData();
+    let responseData: any = null;
+    if (['saveProduct', 'deleteProduct'].includes(action)) {
+      responseData = { products: await serverDb.fetchProducts() };
+    } else if (['saveCategory', 'deleteCategory'].includes(action)) {
+      responseData = { categories: await serverDb.fetchCategories() };
+    } else if (['saveCollection', 'deleteCollection'].includes(action)) {
+      responseData = { collections: await serverDb.fetchCollections() };
+    } else if (action === 'updateCMS') {
+      responseData = { cms: await serverDb.fetchCMS() };
+    } else {
+      responseData = await serverDb.getFreshData();
+    }
+
     return NextResponse.json(
-      { success: true, data: updatedData },
+      { success: true, data: responseData },
       {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

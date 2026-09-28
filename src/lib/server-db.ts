@@ -160,7 +160,7 @@ class ServerDataStore {
   /**
    * Fetch Products from MySQL with automatic seed fallback
    */
-  private async fetchProducts(): Promise<Product[]> {
+  public async fetchProducts(): Promise<Product[]> {
     return this.runSingleFlight('fetch_products', async () => {
       try {
         await initializeMySqlTables();
@@ -217,7 +217,7 @@ class ServerDataStore {
   /**
    * Fetch Categories from MySQL with fallback
    */
-  private async fetchCategories(): Promise<Category[]> {
+  public async fetchCategories(): Promise<Category[]> {
     return this.runSingleFlight('fetch_categories', async () => {
       try {
         await initializeMySqlTables();
@@ -262,7 +262,7 @@ class ServerDataStore {
   /**
    * Fetch Collections from MySQL
    */
-  private async fetchCollections(): Promise<Collection[]> {
+  public async fetchCollections(): Promise<Collection[]> {
     return this.runSingleFlight('fetch_collections', async () => {
       try {
         await initializeMySqlTables();
@@ -351,7 +351,7 @@ class ServerDataStore {
   /**
    * Fetch CMS from MySQL
    */
-  private async fetchCMS(deliveryRates?: DistrictDeliveryRate[]): Promise<HomepageCMS> {
+  public async fetchCMS(deliveryRates?: DistrictDeliveryRate[]): Promise<HomepageCMS> {
     return this.runSingleFlight('fetch_cms', async () => {
       try {
         await initializeMySqlTables();
@@ -788,24 +788,14 @@ class ServerDataStore {
 
     try {
       await initializeMySqlTables();
+      await executeQuery(`DELETE FROM products WHERE id = ? OR slug = ?`, [product.id, product.slug]);
       await executeQuery(
         `INSERT INTO products (
           id, slug, name, description, details, fabric_care, category, subcategory,
           collections, price, sale_price, discount_percentage, rating, review_count,
           is_trending, is_new_arrival, is_best_seller, is_sale, is_out_of_stock,
           colors, sizes, sku, reviews, inside_valley_fee, outside_valley_fee, is_free_delivery, seo, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          slug=VALUES(slug), name=VALUES(name), description=VALUES(description),
-          details=VALUES(details), fabric_care=VALUES(fabric_care), category=VALUES(category),
-          subcategory=VALUES(subcategory), collections=VALUES(collections), price=VALUES(price),
-          sale_price=VALUES(sale_price), discount_percentage=VALUES(discount_percentage),
-          rating=VALUES(rating), review_count=VALUES(review_count), is_trending=VALUES(is_trending),
-          is_new_arrival=VALUES(is_new_arrival), is_best_seller=VALUES(is_best_seller),
-          is_sale=VALUES(is_sale), is_out_of_stock=VALUES(is_out_of_stock), colors=VALUES(colors),
-          sizes=VALUES(sizes), sku=VALUES(sku), reviews=VALUES(reviews),
-          inside_valley_fee=VALUES(inside_valley_fee), outside_valley_fee=VALUES(outside_valley_fee),
-          is_free_delivery=VALUES(is_free_delivery), seo=VALUES(seo);`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           product.id,
           product.slug,
@@ -970,12 +960,10 @@ class ServerDataStore {
 
     try {
       await initializeMySqlTables();
+      await executeQuery(`DELETE FROM categories WHERE id = ? OR slug = ?`, [category.id, category.slug]);
       await executeQuery(
         `INSERT INTO categories (id, slug, name, description, image, subcategories, seo)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           slug=VALUES(slug), name=VALUES(name), description=VALUES(description),
-           image=VALUES(image), subcategories=VALUES(subcategories), seo=VALUES(seo);`,
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           category.id,
           category.slug,
@@ -1014,12 +1002,10 @@ class ServerDataStore {
     this.invalidateCache('collections');
     try {
       await initializeMySqlTables();
+      await executeQuery(`DELETE FROM collections WHERE id = ? OR slug = ?`, [collection.id, collection.slug]);
       await executeQuery(
         `INSERT INTO collections (id, slug, name, description, image, seo)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           slug=VALUES(slug), name=VALUES(name), description=VALUES(description),
-           image=VALUES(image), seo=VALUES(seo);`,
+         VALUES (?, ?, ?, ?, ?, ?)`,
         [
           collection.id,
           collection.slug,
@@ -1233,13 +1219,10 @@ class ServerDataStore {
         deliveryRates: newCms.deliveryRates ? newCms.deliveryRates : existingCMS.deliveryRates,
       };
 
+      await executeQuery(`DELETE FROM cms WHERE key = ?`, ['homepage']);
       await executeQuery(
-        `INSERT INTO cms (\`key\`, announcement_bar, hero, editorial_banner, instagram_images, fonepay_settings, delivery_rates, seo)
-         VALUES ('homepage', ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           announcement_bar=VALUES(announcement_bar), hero=VALUES(hero),
-           editorial_banner=VALUES(editorial_banner), instagram_images=VALUES(instagram_images),
-           fonepay_settings=VALUES(fonepay_settings), delivery_rates=VALUES(delivery_rates), seo=VALUES(seo);`,
+        `INSERT INTO cms (key, announcement_bar, hero, editorial_banner, instagram_images, fonepay_settings, delivery_rates, seo)
+         VALUES ('homepage', ?, ?, ?, ?, ?, ?, ?)`,
         [
           toJSON(updated.announcementBar),
           toJSON(updated.hero),
@@ -1263,16 +1246,13 @@ class ServerDataStore {
     this.invalidateCache('orders');
     try {
       await initializeMySqlTables();
+      await executeQuery(`DELETE FROM orders WHERE id = ? OR order_number = ?`, [order.id, order.orderNumber]);
       await executeQuery(
         `INSERT INTO orders (
           id, order_number, created_at, items, subtotal, discount, shipping, total,
           payment_method, payment_status, order_status, customer_name, customer_email,
           customer_mobile, shipping_address, estimated_delivery, tracking_number
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          payment_status=VALUES(payment_status), order_status=VALUES(order_status),
-          shipping_address=VALUES(shipping_address), estimated_delivery=VALUES(estimated_delivery),
-          tracking_number=VALUES(tracking_number);`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           order.id,
           order.orderNumber,
