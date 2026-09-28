@@ -153,7 +153,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'Nepal Delivery Rates', href: '/admin/delivery', icon: Truck },
     { label: 'Fonepay QR Settings', href: '/admin/fonepay', icon: QrCode },
     { label: 'Homepage CMS', href: '/admin/cms', icon: Sliders },
-    { label: 'Coupons', href: '/admin/coupons', icon: Tag },
     { label: 'Reviews', href: '/admin/reviews', icon: Star },
     { label: 'Registered Customers', href: '/admin/customers', icon: UserIcon },
     { label: 'SEO & Search Engine', href: '/admin/seo', icon: Globe },

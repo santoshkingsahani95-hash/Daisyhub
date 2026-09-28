@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { CustomerUser, Product, Category, Collection, Order, Coupon, HomepageCMS, DistrictDeliveryRate } from '@/types';
+import { CustomerUser, Product, Category, Collection, Order, HomepageCMS, DistrictDeliveryRate } from '@/types';
 import { DEFAULT_CATEGORIES, DEFAULT_COLLECTIONS, DEFAULT_CMS } from '@/lib/defaults';
 import { generateDefaultDeliveryRates } from '@/lib/nepal-locations';
 import { sanitizeObjectImages } from '@/lib/image-upload';
@@ -56,14 +56,13 @@ function mapProduct(r: any): Product {
 }
 
 async function fetchAllData() {
-  const [prodRows, catRows, colRows, rateRows, orderRows, coupRows, cmsRow] =
+  const [prodRows, catRows, colRows, rateRows, orderRows, cmsRow] =
     await Promise.all([
       prisma.product.findMany({ orderBy: { createdAt: 'desc' } }),
       prisma.category.findMany(),
       prisma.collection.findMany(),
       prisma.deliveryRate.findMany(),
       prisma.order.findMany({ orderBy: { createdAt: 'desc' } }),
-      prisma.coupon.findMany(),
       prisma.cms.findUnique({ where: { key: 'homepage' } }),
     ]);
 
@@ -130,16 +129,6 @@ async function fetchAllData() {
     trackingNumber: r.trackingNumber || undefined,
   }));
 
-  const coupons: Coupon[] = coupRows.map((r) => ({
-    code: r.code,
-    discountType: r.discountType as any,
-    discountValue: Number(r.discountValue),
-    minOrderValue: Number(r.minOrderValue || 0),
-    maxDiscount: r.maxDiscount ? Number(r.maxDiscount) : undefined,
-    expiryDate: r.expiryDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-    active: Boolean(r.active),
-  }));
-
   const users: CustomerUser[] = [];
 
   const cms: HomepageCMS = cmsRow
@@ -160,7 +149,6 @@ async function fetchAllData() {
     collections,
     cms,
     orders,
-    coupons,
     users,
     version: Date.now(),
   };
@@ -298,41 +286,7 @@ export async function POST(request: Request) {
         break;
       }
 
-      case 'saveCoupon': {
-        const { coupon } = body;
-        if (coupon && coupon.code) {
-          const cleanCode = coupon.code.trim().toUpperCase();
-          await prisma.coupon.upsert({
-            where: { code: cleanCode },
-            update: {
-              discountType: coupon.discountType,
-              discountValue: coupon.discountValue,
-              minOrderValue: coupon.minOrderValue || 0,
-              maxDiscount: coupon.maxDiscount ?? null,
-              expiryDate: coupon.expiryDate || null,
-              active: !!coupon.active,
-            },
-            create: {
-              code: cleanCode,
-              discountType: coupon.discountType,
-              discountValue: coupon.discountValue,
-              minOrderValue: coupon.minOrderValue || 0,
-              maxDiscount: coupon.maxDiscount ?? null,
-              expiryDate: coupon.expiryDate || null,
-              active: !!coupon.active,
-            },
-          });
-        }
-        break;
-      }
 
-      case 'deleteCoupon': {
-        const { code } = body;
-        if (code) {
-          await prisma.coupon.deleteMany({ where: { code: code.trim().toUpperCase() } });
-        }
-        break;
-      }
 
 
 

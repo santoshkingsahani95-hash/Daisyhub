@@ -35,8 +35,6 @@ export default function CheckoutPage() {
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('fonepay');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [couponCode, setCouponCode] = useState('');
-  const [couponStatus, setCouponStatus] = useState<{ valid: boolean; discountAmount: number; message: string } | null>(null);
 
   // Sync delivery rates dynamically from DB
   useEffect(() => {
@@ -99,7 +97,7 @@ export default function CheckoutPage() {
   const [wsSocket, setWsSocket] = useState<WebSocket | null>(null);
 
   const subtotal = checkoutItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const discount = couponStatus?.valid ? couponStatus.discountAmount : 0;
+  const discount = 0;
 
   // Dynamic delivery fee calculation based on District
   const allProdsForShipping = db.getProducts();
@@ -127,13 +125,6 @@ export default function CheckoutPage() {
     } else {
       setFormData({ ...formData, [name]: value });
     }
-  };
-
-  const handleApplyCoupon = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!couponCode.trim()) return;
-    const res = db.validateCoupon(couponCode, subtotal);
-    setCouponStatus(res);
   };
 
   // Sync Fonepay Settings dynamically with DB updates & Admin Panel
@@ -649,46 +640,12 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {/* Coupon Input Form */}
-              <div className="space-y-2 border-t border-brand-border pt-4">
-                <label className="text-xs font-semibold text-brand-dark flex items-center gap-1">
-                  <Tag size={12} /> PROMO / COUPON CODE
-                </label>
-                <div className="flex">
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    placeholder="e.g. WELCOME10 or ACE500"
-                    className="bg-brand-cream/60 border border-brand-border text-xs px-3 py-2 flex-1 rounded-l uppercase font-mono focus:outline-none focus:border-brand-dark"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleApplyCoupon}
-                    className="bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-r uppercase tracking-wider hover:bg-brand-dark/90"
-                  >
-                    APPLY
-                  </button>
-                </div>
-                {couponStatus && (
-                  <p className={`text-[11px] font-medium ${couponStatus.valid ? 'text-emerald-600' : 'text-brand-sale'}`}>
-                    {couponStatus.message}
-                  </p>
-                )}
-              </div>
-
               {/* Totals */}
               <div className="space-y-2 text-xs border-t border-brand-border pt-4">
                 <div className="flex justify-between text-brand-muted">
                   <span>Subtotal</span>
                   <span className="font-bold text-brand-dark">NPR {subtotal.toLocaleString()}</span>
                 </div>
-                {discount > 0 && (
-                  <div className="flex justify-between text-emerald-600 font-bold">
-                    <span>Coupon Discount</span>
-                    <span>- NPR {discount.toLocaleString()}</span>
-                  </div>
-                )}
                 <div className="flex justify-between text-brand-muted">
                   <span>Delivery Charge</span>
                   <span>{shipping === 0 ? 'FREE' : `NPR ${shipping}`}</span>

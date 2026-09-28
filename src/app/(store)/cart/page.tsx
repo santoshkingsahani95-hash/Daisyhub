@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, CheckCircle, Tag } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, CheckCircle } from 'lucide-react';
 import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
@@ -12,20 +12,10 @@ import { db } from '@/lib/db';
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, getCartTotal, clearDirectCheckoutItem } = useStore();
-  const [couponCode, setCouponCode] = useState('');
-  const [couponStatus, setCouponStatus] = useState<{ valid: boolean; discountAmount: number; message: string } | null>(null);
 
   const subtotal = getCartTotal();
-  const discount = couponStatus?.valid ? couponStatus.discountAmount : 0;
   const shipping = subtotal >= 3000 || subtotal === 0 ? 0 : 150;
-  const total = Math.max(0, subtotal - discount + shipping);
-
-  const handleApplyCoupon = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!couponCode.trim()) return;
-    const res = db.validateCoupon(couponCode, subtotal);
-    setCouponStatus(res);
-  };
+  const total = Math.max(0, subtotal + shipping);
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -129,53 +119,19 @@ export default function CartPage() {
               </div>
             </div>
 
-            {/* Right: Summary Card & Coupon */}
+            {/* Right: Summary Card */}
             <div className="lg:col-span-4 space-y-6">
               <div className="bg-brand-cream/60 p-6 rounded-lg border border-brand-border space-y-6">
                 <h3 className="font-serif-title text-lg font-bold text-brand-dark uppercase tracking-wider">
                   ORDER SUMMARY
                 </h3>
 
-                {/* Coupon Input Form */}
-                <form onSubmit={handleApplyCoupon} className="space-y-2">
-                  <label className="text-xs font-semibold text-brand-dark flex items-center gap-1">
-                    <Tag size={12} /> PROMO / COUPON CODE
-                  </label>
-                  <div className="flex">
-                    <input
-                      type="text"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
-                      placeholder="e.g. WELCOME10 or ACE500"
-                      className="bg-white border border-brand-border text-xs px-3 py-2.5 flex-1 rounded-l uppercase font-mono focus:outline-none focus:border-brand-dark"
-                    />
-                    <button
-                      type="submit"
-                      className="bg-brand-dark text-white text-xs font-bold px-4 py-2.5 rounded-r uppercase tracking-wider hover:bg-brand-dark/90"
-                    >
-                      APPLY
-                    </button>
-                  </div>
-                  {couponStatus && (
-                    <p className={`text-[11px] font-medium ${couponStatus.valid ? 'text-emerald-600' : 'text-brand-sale'}`}>
-                      {couponStatus.message}
-                    </p>
-                  )}
-                </form>
-
                 {/* Price Breakdown */}
-                <div className="space-y-3 text-xs border-t border-brand-border pt-4">
+                <div className="space-y-3 text-xs pt-1">
                   <div className="flex justify-between text-brand-muted">
                     <span>Subtotal</span>
                     <span className="font-bold text-brand-dark">NPR {subtotal.toLocaleString()}</span>
                   </div>
-
-                  {discount > 0 && (
-                    <div className="flex justify-between text-emerald-600 font-bold">
-                      <span>Coupon Discount</span>
-                      <span>- NPR {discount.toLocaleString()}</span>
-                    </div>
-                  )}
 
                   <div className="flex justify-between text-brand-muted">
                     <span>Estimated Shipping</span>

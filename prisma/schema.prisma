@@ -90,18 +90,6 @@ model Order {
   @@map("orders")
 }
 
-model Coupon {
-  code           String   @id @db.VarChar(50)
-  discountType   String   @map("discount_type") @db.VarChar(20)
-  discountValue  Decimal  @map("discount_value") @db.Decimal(10, 2)
-  minOrderValue  Decimal  @default(0.00) @map("min_order_value") @db.Decimal(10, 2)
-  maxDiscount    Decimal? @map("max_discount") @db.Decimal(10, 2)
-  expiryDate     String?  @map("expiry_date") @db.VarChar(50)
-  active         Boolean  @default(true)
-  createdAt      DateTime @default(now()) @map("created_at")
-
-  @@map("coupons")
-}
 
 model Cms {
   key              String   @id @db.VarChar(50)

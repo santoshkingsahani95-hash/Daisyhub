@@ -837,7 +837,7 @@ export default function AdminOrdersPage() {
 
                 {Boolean(selectedOrder.discount) && (
                   <div className="flex justify-between text-emerald-700 font-medium">
-                    <span>Coupon Discount</span>
+                    <span>Discount</span>
                     <span className="font-mono font-semibold">- NPR {(selectedOrder.discount || 0).toLocaleString()}</span>
                   </div>
                 )}

@@ -163,15 +163,6 @@ export interface Order {
   trackingNumber?: string;
 }
 
-export interface Coupon {
-  code: string;
-  discountType: 'percentage' | 'fixed';
-  discountValue: number;
-  minOrderValue: number;
-  maxDiscount?: number;
-  expiryDate: string;
-  active: boolean;
-}
 
 export interface DistrictDeliveryRate {
   district: string;

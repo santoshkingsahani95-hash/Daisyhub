@@ -1,4 +1,4 @@
-import { Product, Category, Collection, Order, Coupon, HomepageCMS, CustomerUser, ProductReview, ColorOption, SEOMetadata, AdminCredentials, DistrictDeliveryRate } from '@/types';
+import { Product, Category, Collection, Order, HomepageCMS, CustomerUser, ProductReview, ColorOption, SEOMetadata, AdminCredentials, DistrictDeliveryRate } from '@/types';
 import { DEFAULT_CMS } from '@/lib/defaults';
 import { generateDefaultDeliveryRates } from './nepal-locations';
 
@@ -84,22 +84,7 @@ async function postApiAction(action: string, payload: Record<string, any> = {}) 
       });
       return;
     }
-    if (action === 'saveCoupon' && payload.coupon) {
-      await fetch('/api/coupons', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload.coupon),
-        cache: 'no-store',
-      });
-      return;
-    }
-    if (action === 'deleteCoupon' && payload.code) {
-      await fetch(`/api/coupons?code=${encodeURIComponent(payload.code)}`, {
-        method: 'DELETE',
-        cache: 'no-store',
-      });
-      return;
-    }
+
     if (action === 'saveCollection' && payload.collection) {
       await fetch('/api/collections', {
         method: 'POST',
@@ -162,7 +147,6 @@ class DataStore {
   private collections: Collection[] = [];
   private cms: HomepageCMS = { ...DEFAULT_CMS };
   private orders: Order[] = [];
-  private coupons: Coupon[] = [];
   private newsletterSubscribers: string[] = [];
   private users: CustomerUser[] = [
     {
@@ -259,14 +243,7 @@ class DataStore {
           }
         }
 
-        if (sData.coupons && Array.isArray(sData.coupons)) {
-          const newCoupStr = JSON.stringify(sData.coupons);
-          if (JSON.stringify(this.coupons) !== newCoupStr) {
-            this.coupons = sData.coupons;
-            localStorage.setItem('ace_db_coupons', newCoupStr);
-            changed = true;
-          }
-        }
+
 
         if (sData.users && Array.isArray(sData.users)) {
           const newUsersStr = JSON.stringify(sData.users);
@@ -305,9 +282,6 @@ class DataStore {
 
       const storedOrders = localStorage.getItem('ace_db_orders') || sessionStorage.getItem('ace_db_orders');
       if (storedOrders) this.orders = JSON.parse(storedOrders);
-
-      const storedCoupons = localStorage.getItem('ace_db_coupons') || sessionStorage.getItem('ace_db_coupons');
-      if (storedCoupons) this.coupons = JSON.parse(storedCoupons);
 
       const storedUsers = localStorage.getItem('ace_db_users') || sessionStorage.getItem('ace_db_users');
       if (storedUsers) this.users = JSON.parse(storedUsers);
@@ -732,104 +706,7 @@ class DataStore {
     return this.orders.length < initialLen;
   }
 
-  // Coupons
-  getCoupons(): Coupon[] {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('ace_db_coupons') || sessionStorage.getItem('ace_db_coupons');
-      if (stored) {
-        try {
-          this.coupons = JSON.parse(stored);
-        } catch (e) {}
-      }
-    }
-    return this.coupons;
-  }
 
-  validateCoupon(code: string, subtotal: number): { valid: boolean; discountAmount: number; message: string } {
-    const coupons = this.getCoupons();
-    const cleanCode = code.trim().toUpperCase();
-    const coupon = coupons.find((c) => c.code.trim().toUpperCase() === cleanCode && c.active);
-
-    if (!coupon) {
-      return { valid: false, discountAmount: 0, message: 'Invalid or inactive coupon code.' };
-    }
-
-    if (coupon.expiryDate) {
-      const expiry = new Date(coupon.expiryDate);
-      expiry.setHours(23, 59, 59, 999);
-      if (new Date() > expiry) {
-        return { valid: false, discountAmount: 0, message: `Coupon '${coupon.code}' expired on ${coupon.expiryDate}.` };
-      }
-    }
-
-    if (subtotal < coupon.minOrderValue) {
-      return {
-        valid: false,
-        discountAmount: 0,
-        message: `Minimum order value of NPR ${coupon.minOrderValue.toLocaleString()} required for this coupon.`,
-      };
-    }
-
-    let discount = 0;
-    if (coupon.discountType === 'percentage') {
-      discount = (subtotal * coupon.discountValue) / 100;
-      if (coupon.maxDiscount && discount > coupon.maxDiscount) {
-        discount = coupon.maxDiscount;
-      }
-    } else {
-      discount = coupon.discountValue;
-    }
-
-    return {
-      valid: true,
-      discountAmount: Math.round(discount),
-      message: `Coupon applied successfully! Saved NPR ${Math.round(discount).toLocaleString()}`,
-    };
-  }
-
-  addCoupon(coupon: Coupon): Coupon {
-    const coupons = this.getCoupons();
-    const cleanCode = coupon.code.trim().toUpperCase();
-    const existingIdx = coupons.findIndex((c) => c.code.trim().toUpperCase() === cleanCode);
-    const cleanCoupon: Coupon = { ...coupon, code: cleanCode };
-
-    if (existingIdx >= 0) {
-      coupons[existingIdx] = cleanCoupon;
-    } else {
-      coupons.push(cleanCoupon);
-    }
-
-    this.coupons = coupons;
-    this.saveAndBroadcast('ace_db_coupons', this.coupons);
-    postApiAction('saveCoupon', { coupon: cleanCoupon });
-    return cleanCoupon;
-  }
-
-  deleteCoupon(code: string): boolean {
-    const coupons = this.getCoupons();
-    const cleanCode = code.trim().toUpperCase();
-    const filtered = coupons.filter((c) => c.code.trim().toUpperCase() !== cleanCode);
-    if (filtered.length !== coupons.length) {
-      this.coupons = filtered;
-      this.saveAndBroadcast('ace_db_coupons', this.coupons);
-      postApiAction('deleteCoupon', { code: cleanCode });
-      return true;
-    }
-    return false;
-  }
-
-  toggleCouponStatus(code: string): Coupon | undefined {
-    const coupons = this.getCoupons();
-    const cleanCode = code.trim().toUpperCase();
-    const found = coupons.find((c) => c.code.trim().toUpperCase() === cleanCode);
-    if (found) {
-      found.active = !found.active;
-      this.coupons = coupons;
-      this.saveAndBroadcast('ace_db_coupons', this.coupons);
-      postApiAction('saveCoupon', { coupon: found });
-    }
-    return found;
-  }
 
   // Newsletter
   addNewsletterSubscriber(email: string): { success: boolean; message: string } {
