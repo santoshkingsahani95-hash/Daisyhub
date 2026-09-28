@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { uploadImageToCloudinary, saveBase64Image } from '@/lib/image-upload';
+import { saveBufferLocally, saveBase64Image } from '@/lib/image-upload';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -19,22 +19,23 @@ export async function POST(request: Request) {
 
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
-      const url = await uploadImageToCloudinary(buffer, file.name);
+      const url = saveBufferLocally(buffer, file.name, file.type);
 
-      console.log(`[Upload API] Image uploaded successfully -> ${url}`);
+      console.log(`[Upload API] Image saved to public/uploads -> ${url}`);
       return NextResponse.json({ success: true, url });
     }
 
-    // Handle JSON Payload
+    // Handle JSON Payload (Base64 data or data URL)
     const body = await request.json();
-    const { base64Data, image } = body;
+    const { base64Data, image, fileName } = body;
     const targetData = base64Data || image;
 
     if (!targetData) {
       return NextResponse.json({ success: false, error: 'Missing image data' }, { status: 400 });
     }
 
-    const savedUrl = await saveBase64Image(targetData);
+    const savedUrl = await saveBase64Image(targetData, fileName);
+    console.log(`[Upload API] Image saved to public/uploads -> ${savedUrl}`);
     return NextResponse.json({ success: true, url: savedUrl });
   } catch (error: any) {
     console.error('[Upload API Error]', error);
