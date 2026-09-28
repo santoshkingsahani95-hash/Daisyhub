@@ -43,13 +43,13 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
+        token.id = `usr-google-${user.id}`;
       }
       return token;
     },
     async session({ session, token }) {
       if (session?.user) {
-        (session.user as any).id = token.sub || token.id;
+        (session.user as any).id = token.id || (token.sub ? `usr-google-${token.sub}` : `usr-${Date.now()}`);
         (session.user as any).role = 'CUSTOMER';
       }
       return session;

@@ -55,6 +55,18 @@ export default function CheckoutPage() {
     };
   }, []);
 
+  // Autofill user details when authenticated
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        fullName: prev.fullName || user.name || '',
+        email: prev.email || user.email || '',
+        mobile: prev.mobile || user.mobile || '',
+      }));
+    }
+  }, [user]);
+
   // Cascading Province -> Available Districts list
   const activeProvinceObj = NEPAL_PROVINCES.find((p) => p.name === formData.province) || NEPAL_PROVINCES[0];
   const availableDistricts = activeProvinceObj.districts;

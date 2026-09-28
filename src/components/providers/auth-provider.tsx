@@ -25,6 +25,8 @@ function SessionSync() {
         db.saveUser(googleUser);
         setUser(googleUser);
       }
+    } else if (status === 'unauthenticated') {
+      lastSyncedEmail.current = null;
     }
   }, [session, status, user, setUser]);
 

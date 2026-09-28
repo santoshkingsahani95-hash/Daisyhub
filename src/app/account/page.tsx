@@ -20,6 +20,7 @@ import {
   Phone,
   Mail,
   Plus,
+  Loader2,
 } from 'lucide-react';
 import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
@@ -27,10 +28,12 @@ import { Footer } from '@/components/layout/footer';
 import { useStore } from '@/lib/store';
 import { db } from '@/lib/db';
 import { Order, Address } from '@/types';
+import { useSession } from 'next-auth/react';
 
 export default function AccountPage() {
   const router = useRouter();
   const { user, setUser, logout, wishlist } = useStore();
+  const { status } = useSession();
   const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'profile' | 'addresses' | 'security'>('orders');
   const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -186,6 +189,19 @@ export default function AccountPage() {
       window.removeEventListener('storage', handleDbUpdate);
     };
   }, [user]);
+
+  if (!user && status === 'loading') {
+    return (
+      <div className="min-h-screen flex flex-col bg-brand-cream/30">
+        <AnnouncementBar />
+        <Header />
+        <main className="flex-1 flex items-center justify-center p-16">
+          <Loader2 className="w-8 h-8 animate-spin text-brand-dark" />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   if (!user) {
     return (
