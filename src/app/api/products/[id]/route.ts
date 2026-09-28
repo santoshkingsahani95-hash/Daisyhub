@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { productService } from '@/server/services';
+import { revalidatePath } from 'next/cache';
+import { getProductById, getProductBySlug, saveProduct, deleteProduct } from '@/lib/db-queries';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -19,9 +20,9 @@ export async function GET(
 ) {
   try {
     const id = params.id;
-    let product = await productService.getProductById(id);
+    let product = await getProductById(id);
     if (!product) {
-      product = await productService.getProductBySlug(id);
+      product = await getProductBySlug(id);
     }
 
     if (!product) {
@@ -55,7 +56,13 @@ export async function PUT(
     const body = await request.json();
     const productData = { ...body, id: params.id };
 
-    const saved = await productService.saveProduct(productData);
+    const saved = await saveProduct(productData);
+
+    revalidatePath('/');
+    revalidatePath('/shop');
+    revalidatePath('/category/[slug]', 'page');
+    revalidatePath('/product/[slug]', 'page');
+
     return NextResponse.json(
       { success: true, product: saved, data: saved },
       { headers: NO_CACHE_HEADERS }
@@ -78,7 +85,12 @@ export async function DELETE(
 ) {
   try {
     const id = params.id;
-    const success = await productService.deleteProduct(id);
+    const success = await deleteProduct(id);
+
+    revalidatePath('/');
+    revalidatePath('/shop');
+    revalidatePath('/category/[slug]', 'page');
+
     return NextResponse.json(
       { success, message: success ? `Product ${id} deleted` : `Failed to delete product ${id}` },
       { headers: NO_CACHE_HEADERS }

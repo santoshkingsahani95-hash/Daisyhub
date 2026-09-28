@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { productService, categoryService } from '@/server/services';
+import { getProducts, getCategories } from '@/lib/db-queries';
 import { ShopClient } from './shop-client';
 
 export const dynamic = 'force-dynamic';
@@ -12,9 +12,10 @@ export const metadata: Metadata = {
 
 export default async function ShopPage() {
   const [products, categories] = await Promise.all([
-    productService.fetchProducts(),
-    categoryService.fetchCategories(),
+    getProducts(),
+    getCategories(),
   ]);
 
   return <ShopClient initialProducts={products} initialCategories={categories} />;
 }
+

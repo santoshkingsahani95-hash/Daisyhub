@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { productService } from '@/server/services';
+import { getProductBySlug, getProductById } from '@/lib/db-queries';
 import { ProductDetailClient } from './product-client';
 
 export const dynamic = 'force-dynamic';
@@ -11,8 +11,8 @@ interface ProductDetailPageProps {
 
 export async function generateMetadata({ params }: ProductDetailPageProps): Promise<Metadata> {
   const product =
-    (await productService.getProductBySlug(params.slug)) ||
-    (await productService.getProductById(params.slug));
+    (await getProductBySlug(params.slug)) ||
+    (await getProductById(params.slug));
 
   return {
     title: product ? `${product.name} | Daisy Hub Luxury Garments` : 'Product Details | Daisy Hub',
@@ -29,8 +29,9 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const product =
-    (await productService.getProductBySlug(params.slug)) ||
-    (await productService.getProductById(params.slug));
+    (await getProductBySlug(params.slug)) ||
+    (await getProductById(params.slug));
 
   return <ProductDetailClient initialProduct={product || null} slug={params.slug} />;
 }
+

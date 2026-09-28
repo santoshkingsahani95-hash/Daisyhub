@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { categoryService, productService } from '@/server/services';
+import { getCategoryBySlug, getProducts } from '@/lib/db-queries';
 import { CategoryClientView } from './category-client';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +10,7 @@ interface CategoryPageProps {
 }
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
-  const category = await categoryService.getCategoryBySlug(params.slug);
+  const category = await getCategoryBySlug(params.slug);
   const title = category?.name
     ? `${category.name} | Daisy Hub Luxury Garments`
     : params.slug === 'new-arrivals'
@@ -27,8 +27,8 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const slug = params.slug || 'dresses';
-  const category = await categoryService.getCategoryBySlug(slug);
-  const products = await productService.getProductsByCategory(slug);
+  const category = await getCategoryBySlug(slug);
+  const products = await getProducts({ category: slug });
 
   return (
     <CategoryClientView
@@ -38,3 +38,4 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     />
   );
 }
+

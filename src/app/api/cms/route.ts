@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { cmsService } from '@/server/services';
+import { getCMS, updateCMS } from '@/lib/db-queries';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -13,7 +13,7 @@ const NO_CACHE_HEADERS = {
 
 export async function GET() {
   try {
-    const cms = await cmsService.fetchCMS();
+    const cms = await getCMS();
     return NextResponse.json({ success: true, cms, data: cms }, { headers: NO_CACHE_HEADERS });
   } catch (error: any) {
     console.error('[API /api/cms GET Error]', error);
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const cms = body.cms || body;
 
-    const updated = await cmsService.updateCMS(cms);
+    const updated = await updateCMS(cms);
 
     // Invalidate root layout & storefront caches immediately so banner/SEO/hero changes are instant
     revalidatePath('/', 'layout');
@@ -38,3 +38,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Failed to update CMS', message: error?.message }, { status: 500, headers: NO_CACHE_HEADERS });
   }
 }
+

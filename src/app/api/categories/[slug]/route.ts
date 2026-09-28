@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
-import { categoryService, productService } from '@/server/services';
+import { revalidatePath } from 'next/cache';
+import {
+  getCategoryBySlug,
+  getCategoryById,
+  saveCategory,
+  deleteCategory,
+  getProducts,
+} from '@/lib/db-queries';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -19,7 +26,7 @@ export async function GET(
 ) {
   try {
     const slug = params.slug;
-    const category = await categoryService.getCategoryBySlug(slug) || await categoryService.getCategoryById(slug);
+    const category = (await getCategoryBySlug(slug)) || (await getCategoryById(slug));
 
     if (!category) {
       return NextResponse.json(
@@ -33,7 +40,7 @@ export async function GET(
 
     let products: any[] = [];
     if (includeProducts) {
-      products = await productService.getProductsByCategory(category.slug);
+      products = await getProducts({ category: category.slug });
     }
 
     return NextResponse.json(
@@ -58,7 +65,7 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const existing = await categoryService.getCategoryBySlug(params.slug) || await categoryService.getCategoryById(params.slug);
+    const existing = (await getCategoryBySlug(params.slug)) || (await getCategoryById(params.slug));
 
     const categoryData = {
       id: existing ? existing.id : `cat-${Date.now()}`,
@@ -66,7 +73,11 @@ export async function PUT(
       ...body,
     };
 
-    const saved = await categoryService.saveCategory(categoryData);
+    const saved = await saveCategory(categoryData);
+    revalidatePath('/');
+    revalidatePath('/shop');
+    revalidatePath('/category/[slug]', 'page');
+
     return NextResponse.json(
       { success: true, category: saved, data: saved },
       { headers: NO_CACHE_HEADERS }
@@ -88,7 +99,11 @@ export async function DELETE(
   { params }: { params: { slug: string } }
 ) {
   try {
-    const success = await categoryService.deleteCategory(params.slug);
+    const success = await deleteCategory(params.slug);
+    revalidatePath('/');
+    revalidatePath('/shop');
+    revalidatePath('/category/[slug]', 'page');
+
     return NextResponse.json(
       { success, message: success ? `Category ${params.slug} deleted` : `Failed to delete category ${params.slug}` },
       { headers: NO_CACHE_HEADERS }
@@ -101,3 +116,4 @@ export async function DELETE(
     );
   }
 }
+

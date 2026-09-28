@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { categoryService, productService } from '@/server/services';
+import {
+  getCategories,
+  getCategoryBySlug,
+  getCategoryById,
+  saveCategory,
+  deleteCategory,
+  getProducts,
+} from '@/lib/db-queries';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -26,26 +33,26 @@ export async function GET(request: Request) {
     const includeProducts = searchParams.get('includeProducts') === 'true';
 
     if (slug) {
-      const category = await categoryService.getCategoryBySlug(slug);
+      const category = await getCategoryBySlug(slug);
       if (!category) {
         return NextResponse.json({ success: false, error: 'Category not found' }, { status: 404, headers: NO_CACHE_HEADERS });
       }
       let products: any[] = [];
       if (includeProducts) {
-        products = await productService.getProductsByCategory(slug);
+        products = await getProducts({ category: slug });
       }
       return NextResponse.json({ success: true, category, products, data: category }, { headers: NO_CACHE_HEADERS });
     }
 
     if (id) {
-      const category = await categoryService.getCategoryById(id);
+      const category = await getCategoryById(id);
       if (!category) {
         return NextResponse.json({ success: false, error: 'Category not found' }, { status: 404, headers: NO_CACHE_HEADERS });
       }
       return NextResponse.json({ success: true, category, data: category }, { headers: NO_CACHE_HEADERS });
     }
 
-    const categories = await categoryService.fetchCategories();
+    const categories = await getCategories();
     return NextResponse.json(
       {
         success: true,
@@ -90,8 +97,8 @@ export async function POST(request: Request) {
       seo: category.seo || undefined,
     };
 
-    const saved = await categoryService.saveCategory(categoryToSave);
-    const categories = await categoryService.fetchCategories();
+    const saved = await saveCategory(categoryToSave);
+    const categories = await getCategories();
 
     // Invalidate Next.js page caches immediately
     revalidatePath('/');
@@ -131,8 +138,8 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const success = await categoryService.deleteCategory(id);
-    const categories = await categoryService.fetchCategories();
+    const success = await deleteCategory(id);
+    const categories = await getCategories();
 
     // Invalidate Next.js page caches immediately
     revalidatePath('/');

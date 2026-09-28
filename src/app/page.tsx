@@ -5,7 +5,7 @@ import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
 import { ProductShelf } from '@/components/product/product-shelf';
 import { CategoryGrid } from '@/components/category/category-grid';
-import { productService, categoryService, cmsService } from '@/server/services';
+import { getCMS, getProducts, getCategories } from '@/lib/db-queries';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -18,9 +18,9 @@ export const metadata: Metadata = {
 
 export default async function HomePage() {
   const [cms, allProducts, categories] = await Promise.all([
-    cmsService.fetchCMS(),
-    productService.fetchProducts(),
-    categoryService.fetchCategories(),
+    getCMS(),
+    getProducts(),
+    getCategories(),
   ]);
 
   const trendingProducts = allProducts.filter((p) => p.isTrending).slice(0, 8);

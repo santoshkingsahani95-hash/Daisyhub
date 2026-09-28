@@ -1,15 +1,26 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { serverDb } from '@/lib/server-db';
+import {
+  getProducts,
+  getFreshData,
+  updateColorStock,
+  updateInventory,
+  deleteProduct,
+} from '@/lib/db-queries';
 
 // Force dynamic server rendering for inventory API route
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+};
+
 export async function GET() {
   try {
-
     // 1. Fetch raw inventory documents from MySQL
     let rawInventory: any[] = await prisma.inventory.findMany({ orderBy: { updatedAt: 'desc' } });
 
@@ -18,7 +29,7 @@ export async function GET() {
     // 2. If inventory is empty, auto-sync from products in 1 fast bulk operation
     if (docCount === 0) {
       console.log('[Inventory API] MySQL inventory table empty. Auto-syncing from products...');
-      const products = await serverDb.getProducts();
+      const products = await getProducts();
       if (products && products.length > 0) {
         for (const prod of products) {
           const totalStock = prod.colors && prod.colors.length > 0
@@ -48,14 +59,14 @@ export async function GET() {
       }
     }
 
-    // 3. Retrieve fast cached product map via serverDb
-    const freshData = await serverDb.getFreshData();
+    // 3. Retrieve fresh product map
+    const freshData = await getFreshData();
     const productsMap = new Map<string, any>();
     (freshData.products || []).forEach((p: any) => {
       if (p.id) productsMap.set(p.id, p);
     });
 
-    // If rawInventory is still empty, synthesize inventory items directly from freshData.products!
+    // If rawInventory is still empty, synthesize inventory items directly from freshData.products
     if ((!rawInventory || rawInventory.length === 0) && freshData.products && freshData.products.length > 0) {
       rawInventory = freshData.products.map((prod: any) => {
         const totalStock = prod.colors && prod.colors.length > 0
@@ -133,13 +144,7 @@ export async function GET() {
         count: formattedInventory.length,
         data: formattedInventory,
       },
-      {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-        },
-      }
+      { headers: NO_CACHE_HEADERS }
     );
   } catch (error: any) {
     console.error('[API /api/inventory GET Error]', error);
@@ -149,7 +154,7 @@ export async function GET() {
         error: 'Failed to retrieve inventory records from MySQL',
         details: error?.message || String(error),
       },
-      { status: 500 }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }
@@ -158,40 +163,40 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { action } = body;
-    serverDb.invalidateCache('products');
     revalidatePath('/', 'layout');
 
     switch (action) {
       case 'updateColorStock': {
         const { productId, colorName, newStock } = body;
-        await serverDb.updateColorStock(productId, colorName, newStock);
+        await updateColorStock(productId, colorName, newStock);
         break;
       }
 
       case 'updateSizeStock': {
         const { productId, size, newStock } = body;
-        await serverDb.updateInventory(productId, size, newStock);
+        await updateInventory(productId, size, newStock);
         break;
       }
 
       case 'deleteItem': {
         const { productId } = body;
         if (productId) {
-          await serverDb.deleteProduct(productId);
+          await deleteProduct(productId);
         }
         break;
       }
 
       default:
-        return NextResponse.json({ success: false, error: 'Invalid inventory action' }, { status: 400 });
+        return NextResponse.json({ success: false, error: 'Invalid inventory action' }, { status: 400, headers: NO_CACHE_HEADERS });
     }
 
-    return NextResponse.json({ success: true, message: 'Inventory updated successfully in MySQL' });
+    return NextResponse.json({ success: true, message: 'Inventory updated successfully in MySQL' }, { headers: NO_CACHE_HEADERS });
   } catch (error: any) {
     console.error('[API /api/inventory POST Error]', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update inventory in MySQL', details: error?.message },
-      { status: 500 }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }
+

@@ -1,12 +1,12 @@
 import { MetadataRoute } from 'next';
-import { productService, categoryService } from '@/server/services';
+import { getProducts, getCategories } from '@/lib/db-queries';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
   const [categories, products] = await Promise.all([
-    categoryService.fetchCategories().catch(() => []),
-    productService.fetchProducts().catch(() => []),
+    getCategories().catch(() => []),
+    getProducts().catch(() => []),
   ]);
 
   // Static routes

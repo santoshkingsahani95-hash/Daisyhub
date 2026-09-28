@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { couponService } from '@/server/services';
+import {
+  getCoupons,
+  getCouponByCode,
+  saveCoupon,
+  deleteCoupon,
+} from '@/lib/db-queries';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,14 +21,14 @@ export async function GET(request: Request) {
     const code = searchParams.get('code');
 
     if (code) {
-      const coupon = await couponService.getCouponByCode(code);
+      const coupon = await getCouponByCode(code);
       if (!coupon) {
         return NextResponse.json({ success: false, error: 'Coupon not found' }, { status: 404, headers: NO_CACHE_HEADERS });
       }
       return NextResponse.json({ success: true, coupon, data: coupon }, { headers: NO_CACHE_HEADERS });
     }
 
-    const coupons = await couponService.fetchCoupons();
+    const coupons = await getCoupons();
     return NextResponse.json({ success: true, count: coupons.length, coupons, data: { coupons } }, { headers: NO_CACHE_HEADERS });
   } catch (error: any) {
     console.error('[API /api/coupons GET Error]', error);
@@ -40,8 +45,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Coupon code is required' }, { status: 400, headers: NO_CACHE_HEADERS });
     }
 
-    const saved = await couponService.saveCoupon(coupon);
-    const coupons = await couponService.fetchCoupons();
+    const saved = await saveCoupon(coupon);
+    const coupons = await getCoupons();
 
     return NextResponse.json({ success: true, coupon: saved, coupons, data: saved }, { headers: NO_CACHE_HEADERS });
   } catch (error: any) {
@@ -64,10 +69,11 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: 'Coupon code required' }, { status: 400, headers: NO_CACHE_HEADERS });
     }
 
-    const success = await couponService.deleteCoupon(code);
+    const success = await deleteCoupon(code);
     return NextResponse.json({ success, message: success ? `Coupon ${code} deleted` : `Failed to delete coupon ${code}` }, { headers: NO_CACHE_HEADERS });
   } catch (error: any) {
     console.error('[API /api/coupons DELETE Error]', error);
     return NextResponse.json({ success: false, error: 'Failed to delete coupon', message: error?.message }, { status: 500, headers: NO_CACHE_HEADERS });
   }
 }
+

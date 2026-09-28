@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { collectionService } from '@/server/services';
+import { revalidatePath } from 'next/cache';
+import {
+  getCollections,
+  getCollectionBySlug,
+  saveCollection,
+  deleteCollection,
+} from '@/lib/db-queries';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,14 +22,14 @@ export async function GET(request: Request) {
     const slug = searchParams.get('slug');
 
     if (slug) {
-      const collection = await collectionService.getCollectionBySlug(slug);
+      const collection = await getCollectionBySlug(slug);
       if (!collection) {
         return NextResponse.json({ success: false, error: 'Collection not found' }, { status: 404, headers: NO_CACHE_HEADERS });
       }
       return NextResponse.json({ success: true, collection, data: collection }, { headers: NO_CACHE_HEADERS });
     }
 
-    const collections = await collectionService.fetchCollections();
+    const collections = await getCollections();
     return NextResponse.json({ success: true, count: collections.length, collections, data: { collections } }, { headers: NO_CACHE_HEADERS });
   } catch (error: any) {
     console.error('[API /api/collections GET Error]', error);
@@ -40,7 +46,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Collection name is required' }, { status: 400, headers: NO_CACHE_HEADERS });
     }
 
-    const saved = await collectionService.saveCollection({
+    const saved = await saveCollection({
       id: collection.id || `col-${Date.now()}`,
       slug: collection.slug || collection.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       name: collection.name.trim(),
@@ -49,7 +55,10 @@ export async function POST(request: Request) {
       seo: collection.seo || undefined,
     });
 
-    const collections = await collectionService.fetchCollections();
+    const collections = await getCollections();
+    revalidatePath('/');
+    revalidatePath('/shop');
+
     return NextResponse.json({ success: true, collection: saved, collections, data: saved }, { headers: NO_CACHE_HEADERS });
   } catch (error: any) {
     console.error('[API /api/collections POST Error]', error);
@@ -71,10 +80,15 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: 'Collection ID or Slug required' }, { status: 400, headers: NO_CACHE_HEADERS });
     }
 
-    const success = await collectionService.deleteCollection(id);
-    return NextResponse.json({ success, message: success ? `Collection ${id} deleted` : `Failed to delete collection ${id}` }, { headers: NO_CACHE_HEADERS });
+    const success = await deleteCollection(id);
+    const collections = await getCollections();
+    revalidatePath('/');
+    revalidatePath('/shop');
+
+    return NextResponse.json({ success, message: success ? `Collection ${id} deleted` : `Failed to delete collection ${id}`, collections }, { headers: NO_CACHE_HEADERS });
   } catch (error: any) {
     console.error('[API /api/collections DELETE Error]', error);
     return NextResponse.json({ success: false, error: 'Failed to delete collection', message: error?.message }, { status: 500, headers: NO_CACHE_HEADERS });
   }
 }
+

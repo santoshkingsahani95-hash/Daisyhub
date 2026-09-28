@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { productService } from '@/server/services';
+import {
+  getProducts,
+  getProductById,
+  getProductBySlug,
+  saveProduct,
+  deleteProduct,
+} from '@/lib/db-queries';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -25,12 +31,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const slug = searchParams.get('slug');
-    const category = searchParams.get('category');
-    const search = searchParams.get('search');
+    const category = searchParams.get('category') || undefined;
+    const search = searchParams.get('search') || undefined;
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : undefined;
 
     if (id) {
-      const product = await productService.getProductById(id);
+      const product = await getProductById(id);
       if (!product) {
         return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404, headers: NO_CACHE_HEADERS });
       }
@@ -38,30 +44,14 @@ export async function GET(request: Request) {
     }
 
     if (slug) {
-      const product = await productService.getProductBySlug(slug);
+      const product = await getProductBySlug(slug);
       if (!product) {
         return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404, headers: NO_CACHE_HEADERS });
       }
       return NextResponse.json({ success: true, product, data: product }, { headers: NO_CACHE_HEADERS });
     }
 
-    let products = category
-      ? await productService.getProductsByCategory(category)
-      : await productService.fetchProducts();
-
-    if (search) {
-      const searchLower = search.toLowerCase().trim();
-      products = products.filter(
-        (p) =>
-          (p.name || '').toLowerCase().includes(searchLower) ||
-          (p.sku || '').toLowerCase().includes(searchLower) ||
-          (p.category || '').toLowerCase().includes(searchLower)
-      );
-    }
-
-    if (limit && limit > 0) {
-      products = products.slice(0, limit);
-    }
+    const products = await getProducts({ category, search, limit });
 
     return NextResponse.json(
       {
@@ -97,8 +87,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const saved = await productService.saveProduct(product);
-    const products = await productService.fetchProducts();
+    const saved = await saveProduct(product);
+    const products = await getProducts();
 
     // Invalidate Next.js page caches immediately so changes are visible everywhere
     revalidatePath('/');
@@ -139,7 +129,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const success = await productService.deleteProduct(id);
+    const success = await deleteProduct(id);
 
     // Invalidate Next.js page caches immediately
     revalidatePath('/');

@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { orderService } from '@/server/services';
+import {
+  getOrders,
+  getOrderById,
+  saveOrder,
+  updateOrderStatus,
+  deleteOrder,
+} from '@/lib/db-queries';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -23,14 +29,14 @@ export async function GET(request: Request) {
     const email = searchParams.get('email');
 
     if (id) {
-      const order = await orderService.getOrderById(id);
+      const order = await getOrderById(id);
       if (!order) {
         return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404, headers: NO_CACHE_HEADERS });
       }
       return NextResponse.json({ success: true, order, data: order }, { headers: NO_CACHE_HEADERS });
     }
 
-    let orders = await orderService.fetchOrders();
+    let orders = await getOrders();
     if (email) {
       const cleanEmail = email.toLowerCase().trim();
       orders = orders.filter((o) => (o.customerEmail || '').toLowerCase() === cleanEmail);
@@ -65,7 +71,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const created = await orderService.createOrder(order);
+    const created = await saveOrder(order);
     return NextResponse.json(
       { success: true, order: created, data: created },
       { headers: NO_CACHE_HEADERS }
@@ -95,7 +101,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const updated = await orderService.updateOrderStatus(orderId, status);
+    const updated = await updateOrderStatus(orderId, status);
     return NextResponse.json(
       { success: !!updated, order: updated, data: updated },
       { headers: NO_CACHE_HEADERS }
@@ -129,7 +135,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const success = await orderService.deleteOrder(id);
+    const success = await deleteOrder(id);
     return NextResponse.json(
       { success, message: success ? `Order ${id} deleted` : `Failed to delete order ${id}` },
       { headers: NO_CACHE_HEADERS }
@@ -142,3 +148,4 @@ export async function DELETE(request: Request) {
     );
   }
 }
+
