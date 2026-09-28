@@ -65,17 +65,33 @@ export default function AdminProductsPage() {
 
   const fetchFreshProducts = React.useCallback(async () => {
     try {
-      const res = await fetch('/api/db', { cache: 'no-store' });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data && Array.isArray(json.data.products)) {
-          setProducts(json.data.products);
-          if (Array.isArray(json.data.categories)) {
-            setCategories(json.data.categories);
+      const [prodRes, dbRes] = await Promise.all([
+        fetch('/api/products', { cache: 'no-store' }),
+        fetch('/api/db', { cache: 'no-store' }),
+      ]);
+
+      let fetchedProds: Product[] | null = null;
+      if (prodRes.ok) {
+        const prodJson = await prodRes.json();
+        if (prodJson.success && Array.isArray(prodJson.products)) {
+          fetchedProds = prodJson.products;
+          setProducts(prodJson.products);
+        }
+      }
+
+      if (dbRes.ok) {
+        const dbJson = await dbRes.json();
+        if (dbJson.success && dbJson.data) {
+          if (!fetchedProds && Array.isArray(dbJson.data.products)) {
+            setProducts(dbJson.data.products);
+          }
+          if (Array.isArray(dbJson.data.categories)) {
+            setCategories(dbJson.data.categories);
           }
           return;
         }
       }
+      if (fetchedProds) return;
     } catch (e) {
       console.warn('[Products Page] Direct API fetch warning:', e);
     }
