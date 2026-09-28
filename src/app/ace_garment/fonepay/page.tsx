@@ -88,10 +88,18 @@ export default function AdminFonepayPage() {
     }
   }, []);
 
-  const saveSettingsToDb = (newSettings: FonepaySettings) => {
+  const saveSettingsToDb = async (newSettings: FonepaySettings) => {
     const updatedCms = db.updateCMS({ fonepaySettings: newSettings });
     setCms(updatedCms);
-    // Broadcast DB update event to storefront
+    try {
+      await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateCMS', cms: updatedCms }),
+      });
+    } catch (e) {
+      console.error('[Fonepay Page] Error saving to MySQL:', e);
+    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('ace_db_fonepay_settings', JSON.stringify(newSettings));
       window.dispatchEvent(new Event('ace-db-updated'));
@@ -106,6 +114,24 @@ export default function AdminFonepayPage() {
 
     try {
       const scanRes = await scanQRFromFile(file);
+
+      let uploadedUrl = '';
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (uploadRes.ok) {
+          const uJson = await uploadRes.json();
+          if (uJson.success && uJson.url) {
+            uploadedUrl = uJson.url;
+          }
+        }
+      } catch (e) {
+        console.warn('[Fonepay Image Upload Error]', e);
+      }
 
       let newMerchantCode = settings.merchantCode;
       let newMerchantName = settings.merchantName;
@@ -122,9 +148,11 @@ export default function AdminFonepayPage() {
         }
       }
 
+      const finalQrUrl = uploadedUrl || scanRes.dataUrl || settings.qrImageUrl;
+
       const newQrItem: FonepayQRItem = {
         id: `qr-${Date.now()}`,
-        qrImageUrl: scanRes.dataUrl || settings.qrImageUrl,
+        qrImageUrl: finalQrUrl,
         merchantName: newMerchantName,
         merchantCode: newMerchantCode,
         isPrimary: true,
@@ -136,14 +164,14 @@ export default function AdminFonepayPage() {
 
       const nextSettings: FonepaySettings = {
         ...settings,
-        qrImageUrl: newQrItem.qrImageUrl,
+        qrImageUrl: finalQrUrl,
         merchantCode: newMerchantCode,
         merchantName: newMerchantName,
         savedQrs: updatedSavedQrs,
       };
 
       setSettings(nextSettings);
-      saveSettingsToDb(nextSettings);
+      await saveSettingsToDb(nextSettings);
 
       if (scanRes.parsed && (scanRes.parsed.merchantCode || scanRes.parsed.merchantName)) {
         setAutoDetectedMsg(`✨ QR Code Scanned & Auto-Detected! ${detectedText}`);

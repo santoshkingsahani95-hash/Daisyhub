@@ -286,7 +286,7 @@ class DataStore {
     return prods.filter((p) => matchCategory(p.category, categorySlug));
   }
 
-  saveProduct(product: Product): Product {
+  saveProduct(product: Product, skipServerSync = false): Product {
     const prods = this.getProducts();
     const existingIndex = prods.findIndex((p) => p.id === product.id);
     if (existingIndex >= 0) {
@@ -296,7 +296,9 @@ class DataStore {
     }
     this.products = prods;
     this.saveAndBroadcast('ace_db_products', this.products);
-    postApiAction('saveProduct', { product });
+    if (!skipServerSync) {
+      postApiAction('saveProduct', { product });
+    }
     return product;
   }
 

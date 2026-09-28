@@ -53,6 +53,18 @@ export const ProductVariantInspector: React.FC<ProductVariantInspectorProps> = (
   const [newImageUrl, setNewImageUrl] = useState('');
   const [customColorName, setCustomColorName] = useState('');
   const [customColorCode, setCustomColorCode] = useState('#111111');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Auto sync selectedImageKey when colors list changes
+  React.useEffect(() => {
+    if (allImages.length > 0) {
+      const exists = allImages.some((item) => `${item.colIdx}-${item.imgIdx}` === selectedImageKey);
+      if (!exists || !selectedImageKey) {
+        setSelectedImageKey(`${allImages[0].colIdx}-${allImages[0].imgIdx}`);
+      }
+    }
+  }, [colors, allImages.length]);
 
   // Find active image item
   const activeItem = allImages.find(
@@ -61,6 +73,8 @@ export const ProductVariantInspector: React.FC<ProductVariantInspectorProps> = (
 
   const handleFileUpload = async (file: File, callback: (url: string) => void) => {
     if (!file) return;
+    setIsUploading(true);
+    setUploadError(null);
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -68,15 +82,21 @@ export const ProductVariantInspector: React.FC<ProductVariantInspectorProps> = (
         method: 'POST',
         body: formData,
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.url) {
-          callback(data.url);
-          return;
-        }
+      const data = await res.json();
+      if (res.ok && data.success && data.url) {
+        callback(data.url);
+      } else {
+        const msg = data.error || `Upload failed with status ${res.status}`;
+        setUploadError(msg);
+        alert(`Image Upload Error: ${msg}`);
       }
-    } catch (e) {
-      console.warn('[Product Variant Inspector Upload Error]', e);
+    } catch (e: any) {
+      console.error('[Product Variant Inspector Upload Error]', e);
+      const msg = e?.message || 'Network error during image upload';
+      setUploadError(msg);
+      alert(`Image Upload Error: ${msg}`);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -85,21 +105,27 @@ export const ProductVariantInspector: React.FC<ProductVariantInspectorProps> = (
     const updated = JSON.parse(JSON.stringify(colors)) as ColorOption[];
     
     // Add to first color variant or active color variant
-    const targetColIdx = activeItem ? activeItem.colIdx : 0;
+    const targetColIdx = activeItem ? Math.min(activeItem.colIdx, updated.length - 1) : 0;
     if (updated[targetColIdx]) {
+      if (!Array.isArray(updated[targetColIdx].images)) {
+        updated[targetColIdx].images = [];
+      }
       updated[targetColIdx].images.push(imageUrl.trim());
+    } else if (updated.length > 0) {
+      updated[0].images.push(imageUrl.trim());
     } else {
       updated.push({
-        name: 'Black',
+        name: 'Default',
         code: '#111111',
         images: [imageUrl.trim()],
         sizes: DEFAULT_SIZES,
+        stock: 10,
       });
     }
 
     onChange(updated);
     setNewImageUrl('');
-    const newColIdx = updated[targetColIdx] ? targetColIdx : updated.length - 1;
+    const newColIdx = updated[targetColIdx] ? targetColIdx : 0;
     const newImgIdx = updated[newColIdx].images.length - 1;
     setSelectedImageKey(`${newColIdx}-${newImgIdx}`);
   };
@@ -109,9 +135,7 @@ export const ProductVariantInspector: React.FC<ProductVariantInspectorProps> = (
     updated.push({
       name: colorName,
       code: colorCode,
-      images: [
-        'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop',
-      ],
+      images: [],
       sizes: DEFAULT_SIZES,
     });
     onChange(updated);
@@ -230,20 +254,36 @@ export const ProductVariantInspector: React.FC<ProductVariantInspectorProps> = (
           })}
 
           {/* Add Image Card Button */}
-          <label className="aspect-[3/4] rounded-lg border-2 border-dashed border-brand-border hover:border-brand-dark bg-brand-cream/30 flex flex-col items-center justify-center text-center p-2 cursor-pointer transition-colors text-brand-muted hover:text-brand-dark">
-            <Upload size={20} />
-            <span className="text-[10px] font-bold mt-1 uppercase">Upload Photo</span>
+          <label className={`aspect-[3/4] rounded-lg border-2 border-dashed border-brand-border hover:border-brand-dark bg-brand-cream/30 flex flex-col items-center justify-center text-center p-2 transition-colors text-brand-muted hover:text-brand-dark ${isUploading ? 'opacity-60 cursor-wait' : 'cursor-pointer'}`}>
+            {isUploading ? (
+              <div className="flex flex-col items-center gap-1">
+                <span className="w-5 h-5 border-2 border-brand-dark border-t-transparent rounded-full animate-spin" />
+                <span className="text-[9px] font-bold uppercase text-brand-dark mt-1">UPLOADING...</span>
+              </div>
+            ) : (
+              <>
+                <Upload size={20} />
+                <span className="text-[10px] font-bold mt-1 uppercase">Upload Photo</span>
+              </>
+            )}
             <input
               type="file"
               accept="image/*"
+              disabled={isUploading}
               className="hidden"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
-                if (file) handleFileUpload(file, (url) => handleAddImage(url));
+                if (file) {
+                  await handleFileUpload(file, (url) => handleAddImage(url));
+                  e.target.value = '';
+                }
               }}
             />
           </label>
         </div>
+        {uploadError && (
+          <p className="mt-2 text-rose-600 text-[11px] font-semibold">⚠️ {uploadError}</p>
+        )}
       </div>
 
       {/* 2. CLICKED IMAGE PROPERTIES & VARIANT STOCK INSPECTOR PANEL */}

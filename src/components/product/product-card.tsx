@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { ImageWithSkeleton } from '@/components/ui/image-with-skeleton';
 import { Heart, Eye, ShoppingBag } from 'lucide-react';
 import { Product } from '@/types';
 import { useStore, isProductOutOfStock } from '@/lib/store';
@@ -77,11 +77,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
         {/* Image Swap Link */}
         <Link href={`/product/${product.slug}`} className="block w-full h-full">
-          <Image
+          <ImageWithSkeleton
             src={isHovered && secondImg ? secondImg : firstImg}
             alt={product.name}
             fill
-            unoptimized
             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
             className={`object-cover transition-all duration-700 ease-out group-hover:scale-105 ${
               isOutOfStock ? 'opacity-75 grayscale-25' : ''

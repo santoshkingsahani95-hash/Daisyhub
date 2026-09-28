@@ -1,10 +1,10 @@
 import mysql from 'mysql2/promise';
 import path from 'path';
 
-const MYSQL_HOST = process.env.MYSQL_HOST || '103.235.199.20';
+const MYSQL_HOST = process.env.MYSQL_HOST || 'phillips.mysecurecloudserver.com';
 const MYSQL_PORT = Number(process.env.MYSQL_PORT || 3306);
-const MYSQL_USER = process.env.MYSQL_USER || 'daisyhub_daisyhubb';
-const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || 'P@ss-W0rd';
+const MYSQL_USER = process.env.MYSQL_USER || 'daisyhub_app_user';
+const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || '$wyDinSV*$5fZv_r';
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'daisyhub_daisyhubb';
 
 let pool: mysql.Pool | null = null;
@@ -356,22 +356,18 @@ export async function initializeMySqlTables(): Promise<boolean> {
       );
     `);
 
-    // 10. Photo Gallery Table
+    // 11. Images Table (BLOB Storage for Vercel Host compatibility)
     await executeQuery(`
-      CREATE TABLE IF NOT EXISTS photo_gallery (
+      CREATE TABLE IF NOT EXISTS images (
         id VARCHAR(100) PRIMARY KEY,
-        product_id VARCHAR(100) NOT NULL,
-        color_name VARCHAR(100),
-        color_code VARCHAR(50),
-        image_url LONGTEXT NOT NULL,
-        is_main TINYINT(1) DEFAULT 0,
-        sort_order INT DEFAULT 0,
+        mime_type VARCHAR(100) NOT NULL DEFAULT 'image/jpeg',
+        data LONGBLOB NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
     isInitialized = true;
-    console.log(`✅ All 10 SQL Database tables initialized successfully.`);
+    console.log(`✅ All 11 SQL Database tables initialized successfully.`);
     return true;
   } catch (err: any) {
     console.error('❌ SQL Database DDL Table Initialization Error:', err?.message || err);
@@ -381,4 +377,71 @@ export async function initializeMySqlTables(): Promise<boolean> {
 
 export function isMySqlConnected(): boolean {
   return useMySql;
+}
+
+/**
+ * Saves a Buffer image as LONGBLOB into MySQL images table or local fallback memory store
+ */
+export async function saveImageBlobToDb(buffer: Buffer, mimeType: string = 'image/jpeg'): Promise<string> {
+  const imageId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+  if (useMySql && pool) {
+    try {
+      await pool.execute(
+        `INSERT INTO images (id, mime_type, data) VALUES (?, ?, ?)`,
+        [imageId, mimeType, buffer]
+      );
+      return `/api/images/${imageId}`;
+    } catch (err) {
+      console.error('[MySQL Image Blob Save Error]', err);
+    }
+  }
+
+  // Fallback to storing base64 string in local JSON store
+  const base64Str = `data:${mimeType};base64,${buffer.toString('base64')}`;
+  if (!localStore['images']) localStore['images'] = [];
+  localStore['images'].unshift({ id: imageId, mime_type: mimeType, data: base64Str });
+  saveLocalStore(localStore);
+
+  return `/api/images/${imageId}`;
+}
+
+/**
+ * Retrieves a Buffer image from MySQL images table or local fallback memory store
+ */
+export async function getImageBlobFromDb(imageId: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  if (useMySql && pool) {
+    try {
+      const [rows] = await pool.execute<any[]>(
+        `SELECT mime_type, data FROM images WHERE id = ? LIMIT 1`,
+        [imageId]
+      );
+      if (rows && rows.length > 0) {
+        const row = rows[0];
+        const buffer = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
+        return { buffer, mimeType: row.mime_type || 'image/jpeg' };
+      }
+    } catch (err) {
+      console.error('[MySQL Image Blob Read Error]', err);
+    }
+  }
+
+  // Fallback local memory store fetch
+  const localList = localStore['images'] || [];
+  const found = localList.find((item) => item.id === imageId);
+  if (found && found.data) {
+    if (typeof found.data === 'string' && found.data.startsWith('data:')) {
+      const matches = found.data.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      if (matches) {
+        return {
+          buffer: Buffer.from(matches[2], 'base64'),
+          mimeType: matches[1] || found.mime_type || 'image/jpeg',
+        };
+      }
+    } else if (Buffer.isBuffer(found.data)) {
+      return { buffer: found.data, mimeType: found.mime_type || 'image/jpeg' };
+    }
+  }
+
+  return null;
 }

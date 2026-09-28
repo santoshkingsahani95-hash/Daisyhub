@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Missing image data' }, { status: 400 });
     }
 
-    const savedUrl = saveBase64Image(targetData);
+    const savedUrl = await saveBase64Image(targetData);
     return NextResponse.json({ success: true, url: savedUrl });
   } catch (error: any) {
     console.error('[Upload API Error]', error);

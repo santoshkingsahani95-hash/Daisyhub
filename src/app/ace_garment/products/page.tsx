@@ -13,6 +13,8 @@ export default function AdminProductsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleFileUpload = async (file: File, callback: (url: string) => void) => {
     if (!file) return;
@@ -116,12 +118,9 @@ export default function AdminProductsPage() {
     });
     setColorsList([
       {
-        name: 'Black',
+        name: 'Default',
         code: '#111111',
-        images: [
-          'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1000&auto=format&fit=crop',
-        ],
+        images: [],
       },
     ]);
     setIsModalOpen(true);
@@ -146,9 +145,9 @@ export default function AdminProductsPage() {
     } else {
       setColorsList([
         {
-          name: 'Black',
+          name: 'Default',
           code: '#111111',
-          images: ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop'],
+          images: [],
         },
       ]);
     }
@@ -231,12 +230,31 @@ export default function AdminProductsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const slugGen = formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    if (!formData.name.trim()) {
+      setSaveError('Product Name is required.');
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    // Build unique slug
+    let baseSlug = formData.slug || formData.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!baseSlug) baseSlug = 'product';
+
+    // If creating new product and slug collides with another product, append unique suffix
+    let finalSlug = baseSlug;
+    const existingWithSlug = products.find((p) => p.slug === finalSlug && p.id !== (editingProduct?.id || ''));
+    if (existingWithSlug) {
+      finalSlug = `${baseSlug}-${Date.now().toString().slice(-4)}`;
+    }
+
+    const prodId = editingProduct ? editingProduct.id : `prod-${Date.now()}`;
 
     const newProd: Product = {
-      id: editingProduct ? editingProduct.id : `prod-${Date.now()}`,
-      slug: slugGen,
-      name: formData.name,
+      id: prodId,
+      slug: finalSlug,
+      name: formData.name.trim(),
       description: formData.description,
       category: formData.category,
       price: Number(formData.price),
@@ -244,11 +262,13 @@ export default function AdminProductsPage() {
       discountPercentage: Number(formData.salePrice) > 0 ? Math.round(((formData.price - formData.salePrice) / formData.price) * 100) : undefined,
       rating: editingProduct ? editingProduct.rating : 4.8,
       reviewCount: editingProduct ? editingProduct.reviewCount : 1,
-      sku: formData.sku,
+      sku: formData.sku.trim(),
       createdAt: editingProduct ? editingProduct.createdAt : new Date().toISOString(),
       colors: colorsList.map((c) => ({
         ...c,
-        images: c.images.length > 0 ? c.images : ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop'],
+        name: c.name.trim() || 'Default',
+        code: c.code || '#111111',
+        images: c.images.length > 0 ? c.images : [],
       })),
       sizes: [
         { size: 'Free Size', stock: colorsList.reduce((acc, c) => acc + (typeof c.stock === 'number' ? c.stock : 10), 0) },
@@ -258,28 +278,35 @@ export default function AdminProductsPage() {
       isFreeDelivery: formData.isFreeDelivery,
     };
 
-    // 1. Save to local store
-    db.saveProduct(newProd);
+    // 1. Save locally with skipServerSync=true (we will send the server POST directly next)
+    db.saveProduct(newProd, true);
 
-    // 2. Directly POST to /api/db and await MySQL save completion
+    // 2. Direct POST to /api/db and await MySQL response
     try {
       const res = await fetch('/api/db', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'saveProduct', product: newProd }),
       });
-      if (res.ok) {
-        const result = await res.json();
-        if (result.success && result.data && Array.isArray(result.data.products)) {
+
+      const result = await res.json();
+      if (res.ok && result.success) {
+        if (result.data && Array.isArray(result.data.products)) {
           setProducts(result.data.products);
         }
+        setIsModalOpen(false);
+        fetchFreshProducts();
+      } else {
+        const msg = result?.error || 'Failed to save product to MySQL database.';
+        setSaveError(msg);
+        console.error('[Products Page] MySQL save error:', msg);
       }
-    } catch (err) {
-      console.error('[Products Page] Error saving product to MySQL:', err);
+    } catch (err: any) {
+      console.error('[Products Page] Network/Server Error saving product to MySQL:', err);
+      setSaveError(err?.message || 'Network error while connecting to database.');
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsModalOpen(false);
-    fetchFreshProducts();
   };
 
   return (
@@ -551,19 +578,34 @@ export default function AdminProductsPage() {
               {/* DYNAMIC CLICKABLE PHOTO & COLOR/SIZE VARIANT INSPECTOR */}
               <ProductVariantInspector colors={colorsList} onChange={setColorsList} />
 
+              {saveError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 font-medium text-xs rounded-md">
+                  ⚠️ {saveError}
+                </div>
+              )}
+
               <div className="pt-2 flex justify-end gap-3 border-t border-brand-border">
                 <button
                   type="button"
+                  disabled={isSaving}
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 border border-brand-border text-brand-dark font-semibold rounded hover:bg-brand-cream"
+                  className="px-5 py-2.5 border border-brand-border text-brand-dark font-semibold rounded hover:bg-brand-cream disabled:opacity-50"
                 >
                   CANCEL
                 </button>
                 <button
                   type="submit"
-                  className="px-7 py-2.5 bg-brand-dark text-white font-bold uppercase tracking-widest rounded shadow"
+                  disabled={isSaving}
+                  className="px-7 py-2.5 bg-brand-dark text-white font-bold uppercase tracking-widest rounded shadow hover:bg-brand-dark/90 disabled:opacity-50 flex items-center gap-2"
                 >
-                  SAVE PRODUCT & COLOR IMAGES
+                  {isSaving ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>SAVING TO MYSQL...</span>
+                    </>
+                  ) : (
+                    <span>SAVE PRODUCT & COLOR IMAGES</span>
+                  )}
                 </button>
               </div>
             </form>

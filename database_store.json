@@ -1,5 +1,36 @@
 {
-  "products": [],
+  "products": [
+    {
+      "id": "prod-1790565165104",
+      "slug": "jkygu67tfvgb",
+      "name": "jkygu67tfvgb",
+      "description": "Elegant women’s fashion piece designed for effortless confidence.",
+      "details": "[]",
+      "fabric_care": "",
+      "category": "top",
+      "subcategory": null,
+      "collections": "[]",
+      "price": 1999,
+      "sale_price": 1599,
+      "discount_percentage": 20,
+      "rating": 4.8,
+      "review_count": 1,
+      "is_trending": 0,
+      "is_new_arrival": 0,
+      "is_best_seller": 0,
+      "is_sale": 0,
+      "is_out_of_stock": 0,
+      "colors": "[{\"name\":\"Default\",\"code\":\"#111111\",\"images\":[\"/uploads/img_1790565162607_20rw8u.jpg\"]}]",
+      "sizes": "[{\"size\":\"Free Size\",\"stock\":10}]",
+      "sku": "DAISY-PROD-852",
+      "reviews": "[]",
+      "inside_valley_fee": 100,
+      "outside_valley_fee": 200,
+      "is_free_delivery": 0,
+      "seo": null,
+      "created_at": "2026-09-28T03:12:45.104Z"
+    }
+  ],
   "categories": [
     {
       "id": "cat-sets",
@@ -67,10 +98,725 @@
   "orders": [],
   "coupons": [],
   "cms": [],
-  "users": [],
-  "inventory": [],
-  "photo_gallery": [],
+  "users": [
+    {
+      "id": "usr-admin-1",
+      "name": "Admin Manager",
+      "email": "admin@daisyhub.com",
+      "mobile": "+977 9800000000",
+      "password": null,
+      "role": "ADMIN",
+      "registration_date": "2026-01-01",
+      "is_blocked": 0,
+      "addresses": "[]"
+    }
+  ],
+  "inventory": [
+    {
+      "id": "inv-prod-1790565165104",
+      "product_id": "prod-1790565165104",
+      "sku": "DAISY-PROD-852",
+      "product_name": "jkygu67tfvgb",
+      "category": "top",
+      "total_stock": 0,
+      "is_out_of_stock": 1,
+      "colors": "[{\"name\":\"Default\",\"code\":\"#111111\",\"images\":[\"/uploads/img_1790565162607_20rw8u.jpg\"]}]",
+      "sizes": "[{\"size\":\"Free Size\",\"stock\":10}]",
+      "updated_at": "2026-09-28T03:12:47.357Z"
+    }
+  ],
+  "photo_gallery": [
+    {
+      "id": "gal-prod-1790565165104-1",
+      "product_id": "prod-1790565165104",
+      "color_name": "Default",
+      "color_code": "#111111",
+      "image_url": "/uploads/img_1790565162607_20rw8u.jpg",
+      "is_main": 1,
+      "sort_order": 1
+    }
+  ],
   "delivery_rates": [
+    {
+      "district": "Kanchanpur",
+      "province": "Sudurpashchim Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Kailali",
+      "province": "Sudurpashchim Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Doti",
+      "province": "Sudurpashchim Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Darchula",
+      "province": "Sudurpashchim Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Dadeldhura",
+      "province": "Sudurpashchim Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Bajura",
+      "province": "Sudurpashchim Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Bajhang",
+      "province": "Sudurpashchim Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Baitadi",
+      "province": "Sudurpashchim Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Achham",
+      "province": "Sudurpashchim Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Surkhet",
+      "province": "Karnali Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Salyan",
+      "province": "Karnali Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Rukum West",
+      "province": "Karnali Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Mugu",
+      "province": "Karnali Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Kalikot",
+      "province": "Karnali Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Jumla",
+      "province": "Karnali Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Jajarkot",
+      "province": "Karnali Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Humla",
+      "province": "Karnali Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Dolpa",
+      "province": "Karnali Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Dailekh",
+      "province": "Karnali Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Rupandehi",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Rukum East",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Rolpa",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Pyuthan",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Parasi",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Palpa",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Kapilvastu",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Gulmi",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Dang",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Bardiya",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Banke",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Arghakhanchi",
+      "province": "Lumbini Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Tanahun",
+      "province": "Gandaki Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Syangja",
+      "province": "Gandaki Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Parbat",
+      "province": "Gandaki Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Nawalpur",
+      "province": "Gandaki Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Myagdi",
+      "province": "Gandaki Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Mustang",
+      "province": "Gandaki Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Manang",
+      "province": "Gandaki Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Lamjung",
+      "province": "Gandaki Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Kaski",
+      "province": "Gandaki Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Gorkha",
+      "province": "Gandaki Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Baglung",
+      "province": "Gandaki Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Siraha",
+      "province": "Madhesh Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Sarlahi",
+      "province": "Madhesh Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Saptari",
+      "province": "Madhesh Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Rautahat",
+      "province": "Madhesh Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Parsa",
+      "province": "Madhesh Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Mahottari",
+      "province": "Madhesh Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Dhanusha",
+      "province": "Madhesh Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Bara",
+      "province": "Madhesh Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Udayapur",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Terhathum",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Taplejung",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Sunsari",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Solukhumbu",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Sankhuwasabha",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Panchthar",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Okhaldhunga",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Morang",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Khotang",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Jhapa",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Ilam",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Dhankuta",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Bhojpur",
+      "province": "Koshi Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Sindhulipalchok",
+      "province": "Bagmati Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Sindhuli",
+      "province": "Bagmati Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Rasuwa",
+      "province": "Bagmati Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
+    {
+      "district": "Ramechhap",
+      "province": "Bagmati Province",
+      "delivery_fee": 180,
+      "enabled": 1,
+      "home_delivery_fee": 180,
+      "branch_delivery_fee": 120,
+      "home_delivery_enabled": 1,
+      "branch_delivery_enabled": 1
+    },
     {
       "district": "Nuwakot",
       "province": "Bagmati Province",

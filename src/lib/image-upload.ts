@@ -1,25 +1,24 @@
-import { v2 as cloudinary } from 'cloudinary';
+import { saveImageBlobToDb } from './mysql';
 import fs from 'fs';
 import path from 'path';
 
-const DEFAULT_FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop';
+const DEFAULT_FALLBACK_IMAGE = '';
 
-// Configure Cloudinary from environment variables
-const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'acegarment';
-const apiKey = process.env.CLOUDINARY_API_KEY;
-const apiSecret = process.env.CLOUDINARY_API_SECRET;
-
-if (cloudName && apiKey && apiSecret && apiSecret !== 'your_cloudinary_api_secret') {
-  cloudinary.config({
-    cloud_name: cloudName,
-    api_key: apiKey,
-    api_secret: apiSecret,
-    secure: true,
-  });
+/**
+ * Saves a Buffer image as a LONGBLOB in MySQL database and returns /api/images/[id]
+ */
+export async function saveBufferToDatabase(buffer: Buffer, mimeType: string = 'image/jpeg'): Promise<string> {
+  try {
+    return await saveImageBlobToDb(buffer, mimeType);
+  } catch (e) {
+    console.error('[Database Image Save Error]', e);
+    // Local disk fallback for dev environment if needed
+    return saveBufferLocally(buffer);
+  }
 }
 
 /**
- * Saves a Buffer or Base64 image to local public/uploads directory
+ * Saves a Buffer image to local public/uploads directory (fallback)
  */
 export function saveBufferLocally(buffer: Buffer, originalName?: string): string {
   try {
@@ -34,44 +33,22 @@ export function saveBufferLocally(buffer: Buffer, originalName?: string): string
     return `/uploads/${fileName}`;
   } catch (e) {
     console.error('[Local File Save Error]', e);
-    return DEFAULT_FALLBACK_IMAGE;
+    return '';
   }
 }
 
 /**
- * Uploads an image Buffer to Cloudinary (or falls back to local storage)
+ * Uploads an image Buffer directly to MySQL Database BLOB storage
  */
 export async function uploadImageToCloudinary(buffer: Buffer, originalName?: string): Promise<string> {
-  if (cloudName && apiKey && apiSecret && apiSecret !== 'your_cloudinary_api_secret') {
-    try {
-      return await new Promise<string>((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          {
-            folder: 'ace_garment_products',
-            resource_type: 'image',
-          },
-          (error, result) => {
-            if (error || !result) {
-              reject(error || new Error('Cloudinary upload failed'));
-            } else {
-              resolve(result.secure_url);
-            }
-          }
-        );
-        uploadStream.end(buffer);
-      });
-    } catch (err) {
-      console.warn('[Cloudinary Upload Failed, using local storage fallback]', err);
-    }
-  }
-
-  return saveBufferLocally(buffer, originalName);
+  const mimeType = originalName?.endsWith('.png') ? 'image/png' : (originalName?.endsWith('.webp') ? 'image/webp' : 'image/jpeg');
+  return await saveBufferToDatabase(buffer, mimeType);
 }
 
 /**
- * Saves a base64 data URL to Cloudinary or local storage and returns the image URL
+ * Converts a base64 data URL to a MySQL DB BLOB record and returns /api/images/[id]
  */
-export function saveBase64Image(dataUrl: string): string {
+export async function saveBase64Image(dataUrl: string): Promise<string> {
   if (!dataUrl || typeof dataUrl !== 'string') {
     return DEFAULT_FALLBACK_IMAGE;
   }
@@ -82,8 +59,9 @@ export function saveBase64Image(dataUrl: string): string {
   try {
     const matches = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
     if (matches) {
+      const mimeType = matches[1] || 'image/jpeg';
       const buffer = Buffer.from(matches[2], 'base64');
-      return saveBufferLocally(buffer);
+      return await saveBufferToDatabase(buffer, mimeType);
     }
   } catch (e) {
     console.error('[saveBase64Image Error]', e);
@@ -93,30 +71,30 @@ export function saveBase64Image(dataUrl: string): string {
 }
 
 /**
- * Recursively inspects objects/arrays and converts any base64 image string to stored URL
+ * Recursively inspects objects/arrays and converts any base64 image string to MySQL DB BLOB URL
  */
-export function sanitizeObjectImages<T>(obj: T): T {
+export async function sanitizeObjectImages<T>(obj: T): Promise<T> {
   if (obj === null || obj === undefined) return obj;
 
   if (typeof obj === 'string') {
     if (obj.startsWith('data:image/')) {
-      return saveBase64Image(obj) as unknown as T;
+      return (await saveBase64Image(obj)) as unknown as T;
     }
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => sanitizeObjectImages(item)) as unknown as T;
+    const sanitizedArray = await Promise.all(obj.map((item) => sanitizeObjectImages(item)));
+    return sanitizedArray as unknown as T;
   }
 
   if (typeof obj === 'object') {
     const newObj: Record<string, any> = {};
     for (const [key, value] of Object.entries(obj)) {
-      newObj[key] = sanitizeObjectImages(value);
+      newObj[key] = await sanitizeObjectImages(value);
     }
     return newObj as T;
   }
 
   return obj;
 }
-

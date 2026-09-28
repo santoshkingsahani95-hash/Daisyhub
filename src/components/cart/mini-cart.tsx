@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { ImageWithSkeleton } from '@/components/ui/image-with-skeleton';
 import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useStore, getProductStock } from '@/lib/store';
 import { db } from '@/lib/db';
@@ -87,7 +87,7 @@ export const MiniCart: React.FC = () => {
                   isItemOutOfStock ? 'bg-rose-50/60 border-rose-200' : 'bg-brand-cream/30 border-brand-border/60'
                 }`}>
                   <div className="relative w-20 aspect-[3/4] rounded overflow-hidden bg-brand-cream shrink-0">
-                    <Image src={item.image} alt={item.productName} fill unoptimized className={`object-cover ${isItemOutOfStock ? 'opacity-60 grayscale-25' : ''}`} />
+                    <ImageWithSkeleton src={item.image} alt={item.productName} fill className={`object-cover ${isItemOutOfStock ? 'opacity-60 grayscale-25' : ''}`} />
                     {isItemOutOfStock && (
                       <span className="absolute inset-x-0 bottom-0 bg-rose-600 text-white text-[8px] font-bold text-center py-0.5 uppercase tracking-tighter">
                         OUT OF STOCK

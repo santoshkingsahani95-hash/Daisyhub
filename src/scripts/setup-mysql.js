@@ -1,9 +1,26 @@
+const fs = require('fs');
+const path = require('path');
+
+try {
+  const envPath = path.join(process.cwd(), '.env.local');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+        const [k, ...v] = trimmed.split('=');
+        process.env[k.trim()] = v.join('=').trim();
+      }
+    });
+  }
+} catch (e) {}
+
 const mysql = require('mysql2/promise');
 
-const MYSQL_HOST = process.env.MYSQL_HOST || '103.235.199.20';
+const MYSQL_HOST = process.env.MYSQL_HOST || 'phillips.mysecurecloudserver.com';
 const MYSQL_PORT = Number(process.env.MYSQL_PORT || 3306);
-const MYSQL_USER = process.env.MYSQL_USER || 'daisyhub_daisyhubb';
-const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || 'P@ss-W0rd';
+const MYSQL_USER = process.env.MYSQL_USER || 'daisyhub_app_user';
+const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || '$wyDinSV*$5fZv_r';
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'daisyhub_daisyhubb';
 
 async function setupDatabase() {
@@ -198,6 +215,18 @@ async function setupDatabase() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+    console.log(`  ✓ Table 'delivery_rates' created/verified.`);
+
+    // 10. Images Table (BLOB Storage for Vercel Host compatibility)
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS images (
+        id VARCHAR(100) PRIMARY KEY,
+        mime_type VARCHAR(100) NOT NULL DEFAULT 'image/jpeg',
+        data LONGBLOB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    console.log(`  ✓ Table 'images' (BLOB storage) created/verified.`);
     console.log(`  ✓ Table 'delivery_rates' created/verified.`);
 
     // Verify existing tables

@@ -151,12 +151,9 @@ export default function AdminInventoryPage() {
   });
   const [newItemColors, setNewItemColors] = useState<ColorOption[]>([
     {
-      name: 'Black',
+      name: 'Default',
       code: '#111111',
-      images: [
-        'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop',
-        'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1000&auto=format&fit=crop',
-      ],
+      images: [],
     },
   ]);
 
@@ -187,8 +184,31 @@ export default function AdminInventoryPage() {
     } catch (err: any) {
       clearTimeout(timeoutId);
       console.error('[Inventory Page] Error loading MySQL inventory:', err);
+
+      const localProds = db.getProducts();
+      if (localProds && localProds.length > 0) {
+        const fallbackItems: InventoryItem[] = localProds.map((prod) => {
+          const totalStock = prod.colors && prod.colors.length > 0
+            ? prod.colors.reduce((sum, c) => sum + (typeof c.stock === 'number' ? c.stock : 0), 0)
+            : (prod.sizes ? prod.sizes.reduce((sum, s) => sum + (s.stock || 0), 0) : 0);
+          return {
+            id: `inv-${prod.id}`,
+            productId: prod.id,
+            productName: prod.name,
+            sku: prod.sku || 'N/A',
+            category: prod.category || 'General',
+            totalStock,
+            isOutOfStock: totalStock <= 0,
+            colors: prod.colors || [{ name: 'Default', code: '#111111', stock: totalStock, images: [] }],
+            sizes: prod.sizes || [{ size: 'Free Size', stock: totalStock }],
+            displayImage: prod.colors?.[0]?.images?.[0] || '',
+          };
+        });
+        setInventoryItems(fallbackItems);
+      }
+
       if (err.name === 'AbortError') {
-        setError('Inventory request timed out. Please check your MySQL database connection.');
+        setError('Inventory request timed out. Showing cached records.');
       } else {
         setError(err?.message || 'Failed to connect to MySQL Database inventory table.');
       }
@@ -323,12 +343,9 @@ export default function AdminInventoryPage() {
     });
     setNewItemColors([
       {
-        name: 'Black',
+        name: 'Default',
         code: '#111111',
-        images: [
-          'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1000&auto=format&fit=crop',
-        ],
+        images: [],
       },
     ]);
     setIsAddModalOpen(true);

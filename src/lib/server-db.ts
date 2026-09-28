@@ -168,7 +168,7 @@ class ServerDataStore {
 
         let products: Product[] = [];
         if (rows && rows.length > 0) {
-          products = rows.map((r: any) => sanitizeObjectImages({
+          products = rows.map((r: any) => ({
             id: r.id,
             slug: r.slug,
             name: r.name,
@@ -198,15 +198,6 @@ class ServerDataStore {
             seo: parseJSON(r.seo, undefined),
             createdAt: r.created_at || new Date().toISOString(),
           }));
-        }
-
-        // If MySQL table is empty, auto-seed with initial seedProducts
-        if (products.length === 0 && seedProducts && seedProducts.length > 0) {
-          console.log('[MySQL] Products table empty. Auto-populating initial seed products...');
-          for (const p of seedProducts) {
-            await this.saveProduct(p);
-          }
-          products = seedProducts;
         }
 
         this.productsCache = {
@@ -780,7 +771,7 @@ class ServerDataStore {
   }
 
   async saveProduct(rawProduct: Product): Promise<Product> {
-    const product = sanitizeObjectImages(rawProduct);
+    const product = await sanitizeObjectImages(rawProduct);
     this.invalidateCache('products');
 
     // Update in-memory product cache immediately for instant response
@@ -852,6 +843,7 @@ class ServerDataStore {
       console.log(`[MySQL] Successfully saved product '${product.name}' (${product.id})`);
     } catch (err: any) {
       console.error(`[MySQL Error] Saving product ${product.id}:`, err?.message || err);
+      throw err;
     }
     return product;
   }
@@ -962,7 +954,7 @@ class ServerDataStore {
   }
 
   async saveCategory(rawCategory: Category): Promise<Category> {
-    const category = sanitizeObjectImages(rawCategory);
+    const category = await sanitizeObjectImages(rawCategory);
     this.invalidateCache('categories');
 
     if (this.categoriesCache.data) {
@@ -1017,7 +1009,8 @@ class ServerDataStore {
     }
   }
 
-  async saveCollection(collection: Collection): Promise<Collection> {
+  async saveCollection(rawCollection: Collection): Promise<Collection> {
+    const collection = await sanitizeObjectImages(rawCollection);
     this.invalidateCache('collections');
     try {
       await initializeMySqlTables();
@@ -1220,7 +1213,8 @@ class ServerDataStore {
     }
   }
 
-  async updateCMS(newCms: Partial<HomepageCMS>): Promise<HomepageCMS> {
+  async updateCMS(rawCms: Partial<HomepageCMS>): Promise<HomepageCMS> {
+    const newCms = await sanitizeObjectImages(rawCms);
     this.invalidateCache('cms');
     try {
       await initializeMySqlTables();
