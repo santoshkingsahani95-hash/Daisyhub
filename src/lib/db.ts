@@ -38,10 +38,95 @@ export function matchCategory(productCat: string, filterCat: string): boolean {
   return false;
 }
 
-// Helper to push client-side mutations to the server API asynchronously
+// Helper to push client-side mutations to the dedicated server API routes asynchronously
 async function postApiAction(action: string, payload: Record<string, any> = {}) {
   if (typeof window === 'undefined') return;
   try {
+    // 1. Route specific domain actions to their dedicated professional API endpoints
+    if (action === 'saveProduct' && payload.product) {
+      await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload.product),
+        cache: 'no-store',
+      });
+      return;
+    }
+    if (action === 'deleteProduct' && payload.id) {
+      await fetch(`/api/products?id=${encodeURIComponent(payload.id)}`, {
+        method: 'DELETE',
+        cache: 'no-store',
+      });
+      return;
+    }
+    if (action === 'saveCategory' && payload.category) {
+      await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload.category),
+        cache: 'no-store',
+      });
+      return;
+    }
+    if (action === 'deleteCategory' && payload.id) {
+      await fetch(`/api/categories?id=${encodeURIComponent(payload.id)}`, {
+        method: 'DELETE',
+        cache: 'no-store',
+      });
+      return;
+    }
+    if (action === 'createOrder' && payload.order) {
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload.order),
+        cache: 'no-store',
+      });
+      return;
+    }
+    if (action === 'saveCoupon' && payload.coupon) {
+      await fetch('/api/coupons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload.coupon),
+        cache: 'no-store',
+      });
+      return;
+    }
+    if (action === 'deleteCoupon' && payload.code) {
+      await fetch(`/api/coupons?code=${encodeURIComponent(payload.code)}`, {
+        method: 'DELETE',
+        cache: 'no-store',
+      });
+      return;
+    }
+    if (action === 'saveCollection' && payload.collection) {
+      await fetch('/api/collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload.collection),
+        cache: 'no-store',
+      });
+      return;
+    }
+    if (action === 'deleteCollection' && payload.id) {
+      await fetch(`/api/collections?id=${encodeURIComponent(payload.id)}`, {
+        method: 'DELETE',
+        cache: 'no-store',
+      });
+      return;
+    }
+    if (action === 'updateCMS' && payload.cms) {
+      await fetch('/api/cms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cms: payload.cms }),
+        cache: 'no-store',
+      });
+      return;
+    }
+
+    // Fallback to /api/db for any other actions (e.g., syncFull, updateInventory)
     const res = await fetch('/api/db', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

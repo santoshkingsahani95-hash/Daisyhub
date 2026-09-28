@@ -65,33 +65,25 @@ export default function AdminProductsPage() {
 
   const fetchFreshProducts = React.useCallback(async () => {
     try {
-      const [prodRes, dbRes] = await Promise.all([
+      const [prodRes, catRes] = await Promise.all([
         fetch('/api/products', { cache: 'no-store' }),
-        fetch('/api/db', { cache: 'no-store' }),
+        fetch('/api/categories', { cache: 'no-store' }),
       ]);
 
-      let fetchedProds: Product[] | null = null;
       if (prodRes.ok) {
         const prodJson = await prodRes.json();
         if (prodJson.success && Array.isArray(prodJson.products)) {
-          fetchedProds = prodJson.products;
           setProducts(prodJson.products);
         }
       }
 
-      if (dbRes.ok) {
-        const dbJson = await dbRes.json();
-        if (dbJson.success && dbJson.data) {
-          if (!fetchedProds && Array.isArray(dbJson.data.products)) {
-            setProducts(dbJson.data.products);
-          }
-          if (Array.isArray(dbJson.data.categories)) {
-            setCategories(dbJson.data.categories);
-          }
-          return;
+      if (catRes.ok) {
+        const catJson = await catRes.json();
+        if (catJson.success && Array.isArray(catJson.categories)) {
+          setCategories(catJson.categories);
         }
       }
-      if (fetchedProds) return;
+      return;
     } catch (e) {
       console.warn('[Products Page] Direct API fetch warning:', e);
     }
@@ -176,16 +168,12 @@ export default function AdminProductsPage() {
     if (confirm('Are you sure you want to delete this product?')) {
       db.deleteProduct(id);
       try {
-        const res = await fetch('/api/db', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'deleteProduct', id }),
+        const res = await fetch(`/api/products?id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          cache: 'no-store',
         });
         if (res.ok) {
-          const result = await res.json();
-          if (result.success && result.data && Array.isArray(result.data.products)) {
-            setProducts(result.data.products);
-          }
+          fetchFreshProducts();
         }
       } catch (e) {}
       fetchFreshProducts();
@@ -299,28 +287,28 @@ export default function AdminProductsPage() {
     // 1. Save locally with skipServerSync=true (we will send the server POST directly next)
     db.saveProduct(newProd, true);
 
-    // 2. Direct POST to /api/db and await MySQL response
+    // 2. Direct POST to /api/products and await response
     try {
-      const res = await fetch('/api/db', {
+      const res = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'saveProduct', product: newProd }),
+        body: JSON.stringify(newProd),
       });
 
       const result = await res.json();
       if (res.ok && result.success) {
-        if (result.data && Array.isArray(result.data.products)) {
-          setProducts(result.data.products);
+        if (result.products && Array.isArray(result.products)) {
+          setProducts(result.products);
         }
         setIsModalOpen(false);
         fetchFreshProducts();
       } else {
-        const msg = result?.error || 'Failed to save product to MySQL database.';
+        const msg = result?.error || 'Failed to save product to database.';
         setSaveError(msg);
-        console.error('[Products Page] MySQL save error:', msg);
+        console.error('[Products Page] Save error:', msg);
       }
     } catch (err: any) {
-      console.error('[Products Page] Network/Server Error saving product to MySQL:', err);
+      console.error('[Products Page] Network/Server Error saving product:', err);
       setSaveError(err?.message || 'Network error while connecting to database.');
     } finally {
       setIsSaving(false);

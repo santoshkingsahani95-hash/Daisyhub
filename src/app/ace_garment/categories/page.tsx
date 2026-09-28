@@ -40,10 +40,24 @@ export default function AdminCategoriesPage() {
   };
 
   useEffect(() => {
-    const handleDbUpdate = () => {
+    const fetchFreshCategories = async () => {
+      try {
+        const res = await fetch('/api/categories', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.categories)) {
+            setCategories(data.categories);
+            return;
+          }
+        }
+      } catch (e) {}
       setCategories([...db.getCategories()]);
     };
-    handleDbUpdate();
+
+    fetchFreshCategories();
+    const handleDbUpdate = () => {
+      fetchFreshCategories();
+    };
     window.addEventListener('ace-db-updated', handleDbUpdate);
     return () => window.removeEventListener('ace-db-updated', handleDbUpdate);
   }, []);

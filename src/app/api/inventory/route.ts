@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { executeQuery, initializeMySqlTables, parseJSON } from '@/lib/mysql';
+import { prisma } from '@/lib/prisma';
+import { initializeMySqlTables } from '@/lib/mysql';
 import { serverDb } from '@/lib/server-db';
 import { cachePrewarmer } from '@/lib/cache-prewarmer';
 
@@ -12,7 +13,7 @@ export async function GET() {
     await initializeMySqlTables();
 
     // 1. Fetch raw inventory documents from MySQL
-    let rawInventory: any[] = await executeQuery('SELECT * FROM inventory ORDER BY updated_at DESC');
+    let rawInventory: any[] = await prisma.inventory.findMany({ orderBy: { updatedAt: 'desc' } });
 
     let docCount = rawInventory ? rawInventory.length : 0;
 
@@ -26,29 +27,26 @@ export async function GET() {
             ? prod.colors.reduce((sum: number, c: any) => sum + (typeof c.stock === 'number' ? c.stock : 0), 0)
             : (prod.sizes ? prod.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0);
 
-          await executeQuery(
-            `INSERT INTO inventory (id, product_id, sku, product_name, category, total_stock, is_out_of_stock, colors, sizes, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE
-               sku=VALUES(sku), product_name=VALUES(product_name), category=VALUES(category),
-               total_stock=VALUES(total_stock), is_out_of_stock=VALUES(is_out_of_stock),
-               colors=VALUES(colors), sizes=VALUES(sizes), updated_at=VALUES(updated_at);`,
-            [
-              `inv-${prod.id}`,
-              prod.id,
-              prod.sku || 'N/A',
-              prod.name,
-              prod.category || 'General',
-              totalStock,
-              totalStock <= 0 ? 1 : 0,
-              JSON.stringify(prod.colors || []),
-              JSON.stringify(prod.sizes || []),
-              new Date().toISOString(),
-            ]
-          );
+          const data = {
+            productId: prod.id,
+            sku: prod.sku || 'N/A',
+            productName: prod.name,
+            category: prod.category || 'General',
+            totalStock,
+            isOutOfStock: totalStock <= 0,
+            colors: (prod.colors || []) as any,
+            sizes: (prod.sizes || []) as any,
+            updatedAt: new Date().toISOString(),
+          };
+
+          await prisma.inventory.upsert({
+            where: { id: `inv-${prod.id}` },
+            update: data,
+            create: { id: `inv-${prod.id}`, ...data },
+          });
         }
         // Re-fetch raw inventory after sync
-        rawInventory = await executeQuery('SELECT * FROM inventory ORDER BY updated_at DESC');
+        rawInventory = await prisma.inventory.findMany({ orderBy: { updatedAt: 'desc' } });
       }
     }
 
@@ -67,30 +65,30 @@ export async function GET() {
           : (prod.sizes ? prod.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0);
         return {
           id: `inv-${prod.id}`,
-          product_id: prod.id,
+          productId: prod.id,
           sku: prod.sku || 'N/A',
-          product_name: prod.name,
+          productName: prod.name,
           category: prod.category || 'General',
-          total_stock: totalStock,
-          is_out_of_stock: totalStock <= 0 ? 1 : 0,
-          colors: JSON.stringify(prod.colors || []),
-          sizes: JSON.stringify(prod.sizes || []),
-          updated_at: prod.createdAt || new Date().toISOString()
+          totalStock,
+          isOutOfStock: totalStock <= 0,
+          colors: prod.colors || [],
+          sizes: prod.sizes || [],
+          updatedAt: prod.createdAt || new Date().toISOString()
         };
       });
     }
 
-    // 4. Safely map and serialize MySQL inventory records
+    // 4. Safely map and serialize inventory records
     const formattedInventory = (rawInventory || []).map((item: any) => {
-      const productId = item.product_id || item.id;
+      const productId = item.productId || item.id;
       const matchedProd = productsMap.get(productId) || productsMap.get(item.id);
       const prodImages = matchedProd?.colors?.[0]?.images || [];
       const defaultImg = prodImages[0] || '';
 
-      const itemColors = parseJSON(item.colors, []);
-      const itemSizes = parseJSON(item.sizes, []);
+      const itemColors = Array.isArray(item.colors) ? item.colors : [];
+      const itemSizes = Array.isArray(item.sizes) ? item.sizes : [];
 
-      const colors = Array.isArray(itemColors) && itemColors.length > 0
+      const colors = itemColors.length > 0
         ? itemColors.map((c: any) => ({
             name: c.name || 'Default',
             code: c.code || '#111111',
@@ -98,25 +96,25 @@ export async function GET() {
             images: Array.isArray(c.images) && c.images.length > 0 ? c.images : (prodImages.length > 0 ? prodImages : [])
           }))
         : (matchedProd?.colors || [
-            { name: 'Default', code: '#111111', stock: Number(item.total_stock || 0), images: prodImages }
+            { name: 'Default', code: '#111111', stock: Number(item.totalStock || 0), images: prodImages }
           ]);
 
-      const sizes = Array.isArray(itemSizes) && itemSizes.length > 0
+      const sizes = itemSizes.length > 0
         ? itemSizes.map((s: any) => ({
             size: s.size || 'Free Size',
             stock: typeof s.stock === 'number' ? s.stock : 0,
             sku: s.sku || item.sku || 'N/A'
           }))
-        : [{ size: 'Free Size', stock: Number(item.total_stock || 0), sku: item.sku || 'N/A' }];
+        : [{ size: 'Free Size', stock: Number(item.totalStock || 0), sku: item.sku || 'N/A' }];
 
       const computedTotalStock = colors.reduce((acc: number, c: any) => acc + (typeof c.stock === 'number' ? c.stock : 0), 0);
-      const totalStock = typeof item.total_stock === 'number' && item.total_stock > 0 ? item.total_stock : computedTotalStock;
+      const totalStock = typeof item.totalStock === 'number' && item.totalStock > 0 ? item.totalStock : computedTotalStock;
 
       return {
         _id: item.id,
         id: item.id || `inv-${productId}`,
         productId,
-        productName: item.product_name || item.name || matchedProd?.name || 'Unnamed Product',
+        productName: item.productName || matchedProd?.name || 'Unnamed Product',
         sku: item.sku || matchedProd?.sku || 'N/A',
         category: item.category || matchedProd?.category || 'General',
         totalStock,
@@ -124,8 +122,8 @@ export async function GET() {
         colors,
         sizes,
         displayImage: colors[0]?.images?.[0] || defaultImg,
-        createdAt: item.updated_at || new Date().toISOString(),
-        updatedAt: item.updated_at || new Date().toISOString()
+        createdAt: item.updatedAt || new Date().toISOString(),
+        updatedAt: item.updatedAt || new Date().toISOString()
       };
     });
 

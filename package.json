@@ -6,16 +6,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@prisma/adapter-mariadb": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "@types/nodemailer": "^8.0.2",
     "cloudinary": "^2.11.0",
     "clsx": "^2.1.0",
     "framer-motion": "^11.0.8",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.359.0",
+    "mariadb": "^3.5.4",
     "mysql2": "^3.24.4",
     "next": "^14.1.4",
     "nodemailer": "^10.0.10",
@@ -30,6 +36,7 @@
     "@types/react-dom": "^18.2.22",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
+    "prisma": "^7.10.0",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.4.3"
   }
