@@ -94,7 +94,7 @@ export default function AdminDashboardPage() {
             <h3 className="font-serif-title text-base font-bold text-brand-dark uppercase tracking-wider">
               RECENT ORDERS
             </h3>
-            <Link href="/ace_garment/orders" className="text-xs font-bold text-brand-dark hover:underline">
+            <Link href="/admin/orders" className="text-xs font-bold text-brand-dark hover:underline">
               VIEW ALL →
             </Link>
           </div>
@@ -141,7 +141,7 @@ export default function AdminDashboardPage() {
             <h3 className="font-serif-title text-base font-bold text-brand-dark uppercase tracking-wider">
               LOW STOCK WATCHLIST
             </h3>
-            <Link href="/ace_garment/inventory" className="text-xs font-bold text-brand-dark hover:underline">
+            <Link href="/admin/inventory" className="text-xs font-bold text-brand-dark hover:underline">
               MANAGE
             </Link>
           </div>

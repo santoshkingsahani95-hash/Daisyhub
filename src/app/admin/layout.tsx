@@ -145,18 +145,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   const navItems = [
-    { label: 'Dashboard', href: '/ace_garment', icon: LayoutDashboard },
-    { label: 'Categories', href: '/ace_garment/categories', icon: Layers },
-    { label: 'Products', href: '/ace_garment/products', icon: Package },
-    { label: 'Inventory', href: '/ace_garment/inventory', icon: Boxes },
-    { label: 'Orders', href: '/ace_garment/orders', icon: ShoppingBag },
-    { label: 'Nepal Delivery Rates', href: '/ace_garment/delivery', icon: Truck },
-    { label: 'Fonepay QR Settings', href: '/ace_garment/fonepay', icon: QrCode },
-    { label: 'Homepage CMS', href: '/ace_garment/cms', icon: Sliders },
-    { label: 'Coupons', href: '/ace_garment/coupons', icon: Tag },
-    { label: 'Reviews', href: '/ace_garment/reviews', icon: Star },
-    { label: 'Registered Customers', href: '/ace_garment/customers', icon: UserIcon },
-    { label: 'SEO & Search Engine', href: '/ace_garment/seo', icon: Globe },
+    { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    { label: 'Categories', href: '/admin/categories', icon: Layers },
+    { label: 'Products', href: '/admin/products', icon: Package },
+    { label: 'Inventory', href: '/admin/inventory', icon: Boxes },
+    { label: 'Orders', href: '/admin/orders', icon: ShoppingBag },
+    { label: 'Nepal Delivery Rates', href: '/admin/delivery', icon: Truck },
+    { label: 'Fonepay QR Settings', href: '/admin/fonepay', icon: QrCode },
+    { label: 'Homepage CMS', href: '/admin/cms', icon: Sliders },
+    { label: 'Coupons', href: '/admin/coupons', icon: Tag },
+    { label: 'Reviews', href: '/admin/reviews', icon: Star },
+    { label: 'Registered Customers', href: '/admin/customers', icon: UserIcon },
+    { label: 'SEO & Search Engine', href: '/admin/seo', icon: Globe },
   ];
 
   // 1. SSR Hydration Guard
@@ -265,7 +265,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleAdminLogout = () => {
     logout();
-    router.push('/ace_garment');
+    router.push('/admin');
   };
 
   // 3. Authenticated Admin Interface
