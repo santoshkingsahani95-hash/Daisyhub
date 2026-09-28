@@ -163,11 +163,3 @@ model PhotoGallery {
   @@map("photo_gallery")
 }
 
-model Image {
-  id        String   @id @db.VarChar(100)
-  mimeType  String   @default("image/jpeg") @map("mime_type") @db.VarChar(100)
-  data      Bytes    @db.LongBlob
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("images")
-}
