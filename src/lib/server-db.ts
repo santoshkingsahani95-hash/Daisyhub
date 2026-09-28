@@ -200,6 +200,15 @@ class ServerDataStore {
           }));
         }
 
+        // If database table is empty, auto-seed with initial seedProducts
+        if (products.length === 0 && seedProducts && seedProducts.length > 0) {
+          console.log('[Database] Products table empty. Auto-populating initial products...');
+          for (const p of seedProducts) {
+            await this.saveProduct(p);
+          }
+          products = seedProducts;
+        }
+
         this.productsCache = {
           data: products,
           fetchedAt: Date.now(),
@@ -209,7 +218,7 @@ class ServerDataStore {
         return products;
       } catch (err: any) {
         console.error('[MySQL fetchProducts Error]', err?.message || err);
-        return this.productsCache.data || [];
+        return this.productsCache.data || seedProducts;
       }
     });
   }
