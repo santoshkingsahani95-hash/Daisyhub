@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { StorefrontModals } from '@/components/layout/storefront-modals';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://daisyhub.com';
 
@@ -134,7 +135,10 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <StorefrontModals />
+      </body>
     </html>
   );
 }

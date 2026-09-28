@@ -8,11 +8,9 @@ import { Heart, Star, ShoppingBag, Shield, Truck, RefreshCw } from 'lucide-react
 import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
-import { QuickAddModal } from '@/components/product/quick-add-modal';
-import { SizeGuideModal } from '@/components/product/size-guide-modal';
-import { MiniCart } from '@/components/cart/mini-cart';
-import { SearchOverlay } from '@/components/layout/search-overlay';
-import { ProductCard } from '@/components/product/product-card';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { RatingStars } from '@/components/ui/rating-stars';
+import { ProductShelf } from '@/components/product/product-shelf';
 import { db } from '@/lib/db';
 import { Product, ProductReview } from '@/types';
 import { useStore, getProductStock, isProductOutOfStock } from '@/lib/store';
@@ -160,13 +158,13 @@ export function ProductDetailClient({ initialProduct, slug }: ProductDetailClien
 
       <main className="flex-1 max-w-7xl mx-auto px-6 md:px-8 py-10 w-full">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-xs text-brand-muted mb-8 uppercase tracking-wider font-medium">
-          <Link href="/" className="hover:text-brand-dark">HOME</Link>
-          <span>/</span>
-          <Link href={`/category/${product.category}`} className="hover:text-brand-dark">{product.category}</Link>
-          <span>/</span>
-          <span className="text-brand-dark font-semibold truncate max-w-xs">{product.name}</span>
-        </nav>
+        <Breadcrumbs
+          items={[
+            { label: product.category, href: `/category/${product.category}` },
+            { label: product.name },
+          ]}
+          className="mb-8"
+        />
 
         {/* Product Main Display Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 mb-20">
@@ -204,17 +202,11 @@ export function ProductDetailClient({ initialProduct, slug }: ProductDetailClien
 
               {/* Rating & SKU */}
               <div className="flex items-center gap-4 mt-3 text-xs">
-                <div className="flex items-center gap-1 text-brand-gold">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      size={14}
-                      className={i < Math.floor(product.rating) ? 'fill-brand-gold' : 'text-brand-border'}
-                    />
-                  ))}
-                  <span className="font-bold text-brand-dark ml-1">{product.rating}</span>
-                  <span className="text-brand-muted">({product.reviewCount} reviews)</span>
-                </div>
+                <RatingStars
+                  rating={product.rating}
+                  reviewCount={product.reviewCount}
+                  showText
+                />
                 <span className="text-brand-border">•</span>
                 <span className="text-brand-muted font-mono">SKU: {product.sku}</span>
               </div>
@@ -461,26 +453,16 @@ export function ProductDetailClient({ initialProduct, slug }: ProductDetailClien
           )}
         </div>
 
-        {/* Related Products */}
-        {relatedProducts.length > 0 && (
-          <section className="mt-20 border-t border-brand-border pt-12">
-            <h2 className="font-serif-title text-2xl font-bold text-brand-dark mb-8 uppercase tracking-wider">
-              YOU MAY ALSO LIKE
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {relatedProducts.map((p) => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Related Products Shelf */}
+        <ProductShelf
+          title="YOU MAY ALSO LIKE"
+          products={relatedProducts}
+          columns="2-4"
+          className="mt-20 border-t border-brand-border pt-12"
+        />
       </main>
 
       <Footer />
-      <QuickAddModal />
-      <SizeGuideModal />
-      <MiniCart />
-      <SearchOverlay />
     </div>
   );
 }

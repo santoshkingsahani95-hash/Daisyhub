@@ -8,10 +8,7 @@ import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
 import { ProductCard } from '@/components/product/product-card';
-import { QuickAddModal } from '@/components/product/quick-add-modal';
-import { SizeGuideModal } from '@/components/product/size-guide-modal';
-import { MiniCart } from '@/components/cart/mini-cart';
-import { SearchOverlay } from '@/components/layout/search-overlay';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { db, matchCategory } from '@/lib/db';
 import { Product, Category } from '@/types';
 
@@ -185,11 +182,7 @@ function ShopContent({ initialProducts, initialCategories }: ShopClientProps) {
         {/* Breadcrumb & Header */}
         <div className="mb-6 border-b border-brand-border pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs text-brand-muted mb-2">
-              <Link href="/" className="hover:text-brand-dark">Home</Link>
-              <span>/</span>
-              <span className="text-brand-dark font-medium uppercase">Shop All</span>
-            </div>
+            <Breadcrumbs items={[{ label: 'Shop All' }]} className="mb-2" />
             <h1 className="font-serif-title text-3xl md:text-4xl font-bold uppercase tracking-wider text-brand-dark">
               Women&apos;s Collection
             </h1>
@@ -435,10 +428,6 @@ function ShopContent({ initialProducts, initialCategories }: ShopClientProps) {
       )}
 
       <Footer />
-      <QuickAddModal />
-      <SizeGuideModal />
-      <MiniCart />
-      <SearchOverlay />
     </div>
   );
 }

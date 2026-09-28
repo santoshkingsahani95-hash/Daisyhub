@@ -7,10 +7,7 @@ import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
 import { ProductCard } from '@/components/product/product-card';
-import { QuickAddModal } from '@/components/product/quick-add-modal';
-import { SizeGuideModal } from '@/components/product/size-guide-modal';
-import { MiniCart } from '@/components/cart/mini-cart';
-import { SearchOverlay } from '@/components/layout/search-overlay';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { Product, Category } from '@/types';
 import { db } from '@/lib/db';
 
@@ -27,14 +24,23 @@ export function CategoryClientView({
 }: CategoryClientProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [categoryInfo, setCategoryInfo] = useState<{ title: string; desc: string; image: string }>({
-    title: initialCategory?.name || (slug === 'new-arrivals' ? 'New Arrivals' : slug === 'sale' ? 'Sale Edit' : slug === 'trending' ? 'Trending Now' : 'Collection'),
+    title:
+      initialCategory?.name ||
+      (slug === 'new-arrivals'
+        ? 'New Arrivals'
+        : slug === 'sale'
+        ? 'Sale Edit'
+        : slug === 'trending'
+        ? 'Trending Now'
+        : 'Collection'),
     desc: initialCategory?.description || 'Explore our latest luxury designs.',
-    image: initialCategory?.image || 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1600&auto=format&fit=crop',
+    image:
+      initialCategory?.image ||
+      'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1600&auto=format&fit=crop',
   });
 
   const refreshCategoryData = useCallback(async () => {
     try {
-      // Use dedicated Category and Product API routes instead of monolithic DB endpoint
       const res = await fetch(`/api/categories/${encodeURIComponent(slug)}?includeProducts=true`, {
         cache: 'no-store',
       });
@@ -46,7 +52,9 @@ export function CategoryClientView({
             setCategoryInfo({
               title: json.category.name,
               desc: json.category.description,
-              image: json.category.image || 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1600&auto=format&fit=crop',
+              image:
+                json.category.image ||
+                'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1600&auto=format&fit=crop',
             });
           }
           if (Array.isArray(json.products) && json.products.length > 0) {
@@ -56,7 +64,6 @@ export function CategoryClientView({
         }
       }
 
-      // Fallback to dedicated products endpoint filtered by category
       const prodRes = await fetch(`/api/products?category=${encodeURIComponent(slug)}`, {
         cache: 'no-store',
       });
@@ -68,7 +75,6 @@ export function CategoryClientView({
         }
       }
     } catch (e) {
-      // Local fallback
       const localProducts = db.getProductsByCategory(slug);
       if (localProducts.length > 0) setProducts(localProducts);
     }
@@ -116,15 +122,7 @@ export function CategoryClientView({
         {/* Product Grid */}
         <div className="max-w-7xl mx-auto px-6 py-12">
           <div className="flex items-center justify-between pb-6 mb-8 border-b border-brand-border">
-            <div className="flex items-center gap-2 text-xs text-brand-muted">
-              <Link href="/" className="hover:text-brand-dark">
-                Home
-              </Link>
-              <span>/</span>
-              <span className="text-brand-dark font-medium uppercase">
-                {categoryInfo.title}
-              </span>
-            </div>
+            <Breadcrumbs items={[{ label: categoryInfo.title }]} />
             <span className="text-xs text-brand-muted font-medium">
               {products.length} Items
             </span>
@@ -153,10 +151,6 @@ export function CategoryClientView({
       </main>
 
       <Footer />
-      <QuickAddModal />
-      <SizeGuideModal />
-      <MiniCart />
-      <SearchOverlay />
     </div>
   );
 }

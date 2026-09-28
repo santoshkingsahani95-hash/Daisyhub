@@ -7,8 +7,6 @@ import { Heart, Trash2, ShoppingBag } from 'lucide-react';
 import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
-import { MiniCart } from '@/components/cart/mini-cart';
-import { SearchOverlay } from '@/components/layout/search-overlay';
 import { useStore } from '@/lib/store';
 import { db } from '@/lib/db';
 
@@ -93,8 +91,6 @@ export default function WishlistPage() {
       </main>
 
       <Footer />
-      <MiniCart />
-      <SearchOverlay />
     </div>
   );
 }
