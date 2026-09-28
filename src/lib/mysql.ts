@@ -266,18 +266,18 @@ export async function initializeMySqlTables(): Promise<boolean> {
           discount_percentage INT,
           rating DECIMAL(3, 1) DEFAULT 4.8,
           review_count INT DEFAULT 0,
-          is_trending TINYINT DEFAULT 0,
-          is_new_arrival TINYINT DEFAULT 0,
-          is_best_seller TINYINT DEFAULT 0,
-          is_sale TINYINT DEFAULT 0,
-          is_out_of_stock TINYINT DEFAULT 0,
+          is_trending INT DEFAULT 0,
+          is_new_arrival INT DEFAULT 0,
+          is_best_seller INT DEFAULT 0,
+          is_sale INT DEFAULT 0,
+          is_out_of_stock INT DEFAULT 0,
           colors TEXT,
           sizes TEXT,
           sku VARCHAR(100) NOT NULL,
           reviews TEXT,
           inside_valley_fee DECIMAL(10,2) DEFAULT 100.00,
           outside_valley_fee DECIMAL(10,2) DEFAULT 200.00,
-          is_free_delivery TINYINT DEFAULT 0,
+          is_free_delivery INT DEFAULT 0,
           seo TEXT,
           created_at VARCHAR(100)
         );
@@ -340,7 +340,7 @@ export async function initializeMySqlTables(): Promise<boolean> {
           min_order_value DECIMAL(10, 2) DEFAULT 0.00,
           max_discount DECIMAL(10, 2),
           expiry_date VARCHAR(50),
-          active TINYINT DEFAULT 1
+          active INT DEFAULT 1
         );
       `);
 
@@ -368,7 +368,7 @@ export async function initializeMySqlTables(): Promise<boolean> {
           password VARCHAR(255),
           role VARCHAR(20) DEFAULT 'CUSTOMER',
           registration_date VARCHAR(100),
-          is_blocked TINYINT DEFAULT 0,
+          is_blocked INT DEFAULT 0,
           addresses TEXT
         );
       `);
@@ -382,7 +382,7 @@ export async function initializeMySqlTables(): Promise<boolean> {
           product_name VARCHAR(255) NOT NULL,
           category VARCHAR(100),
           total_stock INT DEFAULT 0,
-          is_out_of_stock TINYINT DEFAULT 0,
+          is_out_of_stock INT DEFAULT 0,
           colors TEXT,
           sizes TEXT,
           updated_at VARCHAR(100)
