@@ -389,6 +389,7 @@ export function isMySqlConnected(): boolean {
  * Saves a Buffer image as LONGBLOB into MySQL images table or local fallback memory store
  */
 export async function saveImageBlobToDb(buffer: Buffer, mimeType: string = 'image/jpeg'): Promise<string> {
+  await initializeMySqlTables();
   const imageId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
   if (useMySql && pool) {
@@ -416,6 +417,7 @@ export async function saveImageBlobToDb(buffer: Buffer, mimeType: string = 'imag
  * Retrieves a Buffer image from MySQL images table or local fallback memory store
  */
 export async function getImageBlobFromDb(imageId: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  await initializeMySqlTables();
   if (useMySql && pool) {
     try {
       const [rows] = await pool.execute<any[]>(
