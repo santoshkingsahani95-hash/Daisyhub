@@ -319,7 +319,14 @@ export const useStore = create<StoreState>()(
         }
       },
 
-      logout: () => set({ user: null }),
+      logout: () => {
+        set({ user: null });
+        if (typeof window !== 'undefined') {
+          import('next-auth/react').then(({ signOut }) => {
+            signOut({ redirect: false }).catch(() => {});
+          });
+        }
+      },
     }),
     {
       name: 'ace-garment-storage',

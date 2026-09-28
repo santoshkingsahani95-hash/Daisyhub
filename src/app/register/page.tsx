@@ -3,10 +3,11 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, KeyRound, Mail, CheckCircle2, AlertCircle, RefreshCw, Chrome } from 'lucide-react';
+import { ArrowRight, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
+import { AuthCard, GoogleButton, AuthDivider, AuthAlert } from '@/components/auth';
 import { db } from '@/lib/db';
 import { CustomerUser } from '@/types';
 
@@ -86,9 +87,8 @@ export default function RegisterPage() {
       } else {
         setErrorMsg(data.message || 'Failed to send verification email. Please try again.');
       }
-    } catch (err) {
+    } catch {
       setIsLoading(false);
-      // Fallback in case of fetch error
       setStep('otp');
       setInfoMsg(`Verification code generated: ${code}`);
     }
@@ -104,7 +104,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // Save Customer Account
     const newUser: CustomerUser = {
       id: `usr-${Date.now()}`,
       name: fullName.trim(),
@@ -116,8 +115,6 @@ export default function RegisterPage() {
     };
 
     db.saveUser(newUser);
-
-    // Redirect to login with success indicator
     router.push('/login?registered=1');
   };
 
@@ -127,32 +124,17 @@ export default function RegisterPage() {
       <Header />
 
       <main className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="w-full max-w-md bg-white p-8 md:p-10 rounded-lg border border-brand-border shadow-xl space-y-6">
-          <div className="text-center space-y-2">
-            <span className="text-[11px] uppercase tracking-ultra font-bold text-brand-gold">DAISY HUB NEPAL</span>
-            <h1 className="font-serif-title text-3xl font-bold text-brand-dark uppercase">
-              {step === 'form' ? 'CREATE ACCOUNT' : 'VERIFY EMAIL'}
-            </h1>
-            <p className="text-xs text-brand-muted">
-              {step === 'form'
-                ? 'Customer Registration with Email OTP Verification'
-                : `Enter the 6-digit verification code sent to ${email}`}
-            </p>
-          </div>
-
-          {errorMsg && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded font-medium flex items-center gap-2">
-              <AlertCircle size={16} className="shrink-0 text-rose-600" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {infoMsg && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded font-medium flex items-center gap-2">
-              <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
-              <span>{infoMsg}</span>
-            </div>
-          )}
+        <AuthCard
+          badge="DAISY HUB PORTAL"
+          title={step === 'form' ? 'CREATE ACCOUNT' : 'VERIFY EMAIL'}
+          subtitle={
+            step === 'form'
+              ? 'Customer Registration with Email OTP Verification'
+              : `Enter the 6-digit verification code sent to ${email}`
+          }
+        >
+          <AuthAlert type="error" message={errorMsg} />
+          <AuthAlert type="success" message={infoMsg} />
 
           {/* STEP 1: Registration Form */}
           {step === 'form' && (
@@ -172,7 +154,7 @@ export default function RegisterPage() {
               <div>
                 <label className="text-xs font-semibold text-brand-dark block mb-1">MOBILE NUMBER *</label>
                 <input
-                  type="text"
+                  type="tel"
                   required
                   value={mobile}
                   onChange={(e) => setMobile(e.target.value)}
@@ -222,7 +204,7 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-4 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
+                className="w-full py-4 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50 cursor-pointer"
               >
                 {isLoading ? (
                   <>
@@ -237,21 +219,12 @@ export default function RegisterPage() {
                 )}
               </button>
 
-              <div className="relative flex items-center justify-center my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-brand-border" />
-                </div>
-                <span className="relative bg-white px-4 text-[10px] uppercase font-bold tracking-widest text-brand-muted">OR</span>
-              </div>
+              <AuthDivider />
 
-              <button
-                type="button"
-                onClick={() => { window.location.href = '/api/auth/google?redirect=/account'; }}
-                className="w-full py-3 border border-brand-border rounded text-xs font-semibold text-brand-dark hover:bg-brand-cream transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-              >
-                <Chrome size={16} className="text-rose-500" />
-                <span>Sign Up with Google</span>
-              </button>
+              <GoogleButton
+                text="Sign Up with Google"
+                callbackUrl="/account"
+              />
             </form>
           )}
 
@@ -285,7 +258,7 @@ export default function RegisterPage() {
 
               <button
                 type="submit"
-                className="w-full py-4 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 transition-all flex items-center justify-center gap-2 shadow-md"
+                className="w-full py-4 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
               >
                 <CheckCircle2 size={16} className="text-emerald-400" />
                 <span>VERIFY & REGISTER ACCOUNT</span>
@@ -295,14 +268,14 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setStep('form')}
-                  className="hover:text-brand-dark font-semibold"
+                  className="hover:text-brand-dark font-semibold cursor-pointer"
                 >
                   ← Edit Registration Info
                 </button>
                 <button
                   type="button"
                   onClick={(e) => handleSendOtp(e as any)}
-                  className="hover:text-brand-dark font-semibold text-brand-gold"
+                  className="hover:text-brand-dark font-semibold text-brand-gold cursor-pointer"
                 >
                   Resend Code 🔄
                 </button>
@@ -316,7 +289,7 @@ export default function RegisterPage() {
               Sign In
             </Link>
           </p>
-        </div>
+        </AuthCard>
       </main>
 
       <Footer />

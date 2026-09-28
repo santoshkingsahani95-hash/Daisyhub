@@ -3,10 +3,11 @@
 import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Lock, Mail, ArrowRight, Chrome, Shield, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Header } from '@/components/layout/header';
 import { AnnouncementBar } from '@/components/layout/announcement-bar';
 import { Footer } from '@/components/layout/footer';
+import { AuthCard, GoogleButton, AuthDivider, AuthAlert } from '@/components/auth';
 import { db } from '@/lib/db';
 import { useStore } from '@/lib/store';
 import { CustomerUser } from '@/types';
@@ -54,38 +55,23 @@ function LoginForm() {
     }
   };
 
-  const handleGoogleAuth = () => {
-    const target = redirectTarget ? encodeURIComponent(redirectTarget) : '/account';
-    window.location.href = `/api/auth/google?redirect=${target}`;
-  };
-
   return (
-    <div className="w-full max-w-md bg-white p-8 md:p-10 rounded-xl border border-brand-border shadow-xl space-y-6">
-      <div className="text-center space-y-2">
-        <span className="text-[11px] uppercase tracking-ultra font-bold text-brand-gold">DAISY HUB PORTAL</span>
-        <h1 className="font-serif-title text-3xl font-bold text-brand-dark">SIGN IN</h1>
-        <p className="text-xs text-brand-muted">Sign in to your account or access the Admin Control Center.</p>
-      </div>
-
-      {isRegisteredSuccess && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded font-medium flex items-center gap-2">
-          <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
-          <span>Registration successful! Please sign in with your email and password.</span>
-        </div>
-      )}
-
-      {loginError && (
-        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded font-medium flex items-center gap-2">
-          <AlertCircle size={16} className="shrink-0 text-rose-600" />
-          <span>{loginError}</span>
-        </div>
-      )}
+    <AuthCard
+      badge="DAISY HUB PORTAL"
+      title="SIGN IN"
+      subtitle="Sign in to your account or access the Admin Control Center."
+    >
+      <AuthAlert
+        type="success"
+        message={isRegisteredSuccess ? 'Registration successful! Please sign in with your email and password.' : null}
+      />
+      <AuthAlert type="error" message={loginError} />
 
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
           <label className="text-xs font-semibold text-brand-dark block mb-1">EMAIL ADDRESS</label>
           <input
-            type="text"
+            type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -122,28 +108,19 @@ function LoginForm() {
 
         <button
           type="submit"
-          className="w-full py-4 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 transition-all flex items-center justify-center gap-2 shadow-md"
+          className="w-full py-4 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
         >
           <span>SIGN IN</span>
           <ArrowRight size={14} />
         </button>
       </form>
 
-      <div className="relative flex items-center justify-center my-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-brand-border" />
-        </div>
-        <span className="relative bg-white px-4 text-[10px] uppercase font-bold tracking-widest text-brand-muted">OR</span>
-      </div>
+      <AuthDivider />
 
-      <button
-        type="button"
-        onClick={handleGoogleAuth}
-        className="w-full py-3 border border-brand-border rounded text-xs font-semibold text-brand-dark hover:bg-brand-cream transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-      >
-        <Chrome size={16} className="text-rose-500" />
-        <span>Continue with Google</span>
-      </button>
+      <GoogleButton
+        text="Continue with Google"
+        callbackUrl={redirectTarget || '/account'}
+      />
 
       <p className="text-xs text-brand-muted text-center pt-2">
         Don&apos;t have an account?{' '}
@@ -151,7 +128,7 @@ function LoginForm() {
           Create Account
         </Link>
       </p>
-    </div>
+    </AuthCard>
   );
 }
 
