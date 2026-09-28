@@ -93,12 +93,14 @@ export default function AdminProductsPage() {
     return () => window.removeEventListener('ace-db-updated', handleDbUpdate);
   }, [fetchFreshProducts]);
 
-  const filtered = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = products.filter((p) => {
+    if (!p) return false;
+    const name = (p.name || '').toLowerCase();
+    const sku = (p.sku || '').toLowerCase();
+    const cat = (p.category || '').toLowerCase();
+    const query = (searchQuery || '').toLowerCase();
+    return name.includes(query) || sku.includes(query) || cat.includes(query);
+  });
 
   const handleOpenAdd = () => {
     const cats = db.getCategories();
@@ -356,44 +358,46 @@ export default function AdminProductsPage() {
             </thead>
             <tbody className="divide-y divide-brand-border">
               {filtered.map((p) => {
-                const totalStock = p.sizes.reduce((acc, s) => acc + s.stock, 0);
-                const displayImg = p.colors[0]?.images[0] || '';
-                const totalPhotos = p.colors.reduce((acc, c) => acc + c.images.length, 0);
+                const sizes = Array.isArray(p.sizes) ? p.sizes : [];
+                const colors = Array.isArray(p.colors) ? p.colors : [];
+                const totalStock = sizes.reduce((acc, s) => acc + (s?.stock || 0), 0);
+                const displayImg = colors[0]?.images?.[0] || '';
+                const totalPhotos = colors.reduce((acc, c) => acc + (Array.isArray(c?.images) ? c.images.length : 0), 0);
                 return (
                   <tr key={p.id} className="hover:bg-brand-cream/30">
                     <td className="p-3">
                       <div className="flex items-center gap-3">
                         <div className="relative w-10 h-12 bg-brand-cream rounded overflow-hidden shrink-0 border border-brand-border">
                           {displayImg ? (
-                            <Image src={displayImg} alt={p.name} fill unoptimized className="object-cover" />
+                            <Image src={displayImg} alt={p.name || 'Product'} fill unoptimized className="object-cover" />
                           ) : (
                             <ImageIcon size={16} className="m-auto text-brand-muted" />
                           )}
                         </div>
                         <div>
-                          <span className="font-bold block line-clamp-1">{p.name}</span>
-                          <span className="text-[10px] text-brand-muted">{p.colors.map((c) => c.name).join(', ')}</span>
+                          <span className="font-bold block line-clamp-1">{p.name || 'Unnamed Product'}</span>
+                          <span className="text-[10px] text-brand-muted">{colors.map((c) => c.name || 'Default').join(', ')}</span>
                         </div>
                       </div>
                     </td>
-                    <td className="p-3 font-mono text-[11px] font-semibold">{p.sku}</td>
+                    <td className="p-3 font-mono text-[11px] font-semibold">{p.sku || 'N/A'}</td>
                     <td className="p-3 uppercase font-medium text-brand-muted">
-                      {categories.find((c) => c.slug === p.category)?.name || p.category}
+                      {categories.find((c) => c.slug === p.category)?.name || p.category || 'General'}
                     </td>
                     <td className="p-3">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1.5">
-                          {p.colors.map((c, i) => (
+                          {colors.map((c, i) => (
                             <span
                               key={i}
                               className="w-3.5 h-3.5 rounded-full border border-black/20 shadow-xs"
-                              style={{ backgroundColor: c.code }}
-                              title={`${c.name} (${c.images.length} photos)`}
+                              style={{ backgroundColor: c.code || '#111111' }}
+                              title={`${c.name || 'Color'} (${Array.isArray(c.images) ? c.images.length : 0} photos)`}
                             />
                           ))}
                         </div>
                         <span className="text-[10px] font-bold text-brand-dark">
-                          {p.colors.length} color(s) • {totalPhotos} photo(s)
+                          {colors.length} color(s) • {totalPhotos} photo(s)
                         </span>
                       </div>
                     </td>

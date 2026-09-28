@@ -168,36 +168,47 @@ class ServerDataStore {
 
         let products: Product[] = [];
         if (rows && rows.length > 0) {
-          products = rows.map((r: any) => ({
-            id: r.id,
-            slug: r.slug,
-            name: r.name,
-            description: r.description || '',
-            details: parseJSON(r.details, []),
-            fabricCare: r.fabric_care || '',
-            category: r.category,
-            subcategory: r.subcategory || undefined,
-            collections: parseJSON(r.collections, []),
-            price: Number(r.price),
-            salePrice: r.sale_price !== null && r.sale_price !== undefined ? Number(r.sale_price) : undefined,
-            discountPercentage: r.discount_percentage !== null ? Number(r.discount_percentage) : undefined,
-            rating: Number(r.rating || 4.8),
-            reviewCount: Number(r.review_count || 0),
-            isTrending: Boolean(r.is_trending),
-            isNewArrival: Boolean(r.is_new_arrival),
-            isBestSeller: Boolean(r.is_best_seller),
-            isSale: Boolean(r.is_sale),
-            isOutOfStock: Boolean(r.is_out_of_stock),
-            colors: parseJSON(r.colors, []),
-            sizes: parseJSON(r.sizes, []),
-            sku: r.sku,
-            reviews: parseJSON(r.reviews, []),
-            insideValleyFee: Number(r.inside_valley_fee || 100),
-            outsideValleyFee: Number(r.outside_valley_fee || 200),
-            isFreeDelivery: Boolean(r.is_free_delivery),
-            seo: parseJSON(r.seo, undefined),
-            createdAt: r.created_at || new Date().toISOString(),
-          }));
+          products = rows.map((r: any) => {
+            const rawColors = parseJSON(r.colors, []);
+            const rawSizes = parseJSON(r.sizes, []);
+            const rawDetails = parseJSON(r.details, []);
+            const rawCollections = parseJSON(r.collections, []);
+            const rawReviews = parseJSON(r.reviews, []);
+
+            const colors = Array.isArray(rawColors) ? rawColors : [];
+            const sizes = Array.isArray(rawSizes) && rawSizes.length > 0 ? rawSizes : [{ size: 'Free Size', stock: 10 }];
+
+            return {
+              id: String(r.id || `prod-${Date.now()}`),
+              slug: String(r.slug || r.name || 'product').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-'),
+              name: String(r.name || 'Unnamed Product'),
+              description: String(r.description || ''),
+              details: Array.isArray(rawDetails) ? rawDetails : [],
+              fabricCare: String(r.fabric_care || ''),
+              category: String(r.category || 'tops'),
+              subcategory: r.subcategory ? String(r.subcategory) : undefined,
+              collections: Array.isArray(rawCollections) ? rawCollections : [],
+              price: Number(r.price || 0),
+              salePrice: r.sale_price !== null && r.sale_price !== undefined ? Number(r.sale_price) : undefined,
+              discountPercentage: r.discount_percentage !== null ? Number(r.discount_percentage) : undefined,
+              rating: Number(r.rating || 4.8),
+              reviewCount: Number(r.review_count || 0),
+              isTrending: Boolean(r.is_trending),
+              isNewArrival: Boolean(r.is_new_arrival),
+              isBestSeller: Boolean(r.is_best_seller),
+              isSale: Boolean(r.is_sale),
+              isOutOfStock: Boolean(r.is_out_of_stock),
+              colors,
+              sizes,
+              sku: String(r.sku || `SKU-${r.id || Date.now()}`),
+              reviews: Array.isArray(rawReviews) ? rawReviews : [],
+              insideValleyFee: Number(r.inside_valley_fee || 100),
+              outsideValleyFee: Number(r.outside_valley_fee || 200),
+              isFreeDelivery: Boolean(r.is_free_delivery),
+              seo: parseJSON(r.seo, undefined),
+              createdAt: String(r.created_at || new Date().toISOString()),
+            };
+          });
         }
 
         // If database table is empty, auto-seed with initial seedProducts

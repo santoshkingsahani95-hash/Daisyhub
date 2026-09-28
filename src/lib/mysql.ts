@@ -183,10 +183,11 @@ export function toJSON(val: any): string | null {
 
 export function parseJSON<T = any>(val: any, fallback: T): T {
   if (val === undefined || val === null) return fallback;
-  if (typeof val === 'object') return val as T;
+  if (typeof val === 'object') return val !== null ? (val as T) : fallback;
   if (typeof val === 'string') {
     try {
-      return JSON.parse(val) as T;
+      const res = JSON.parse(val);
+      return res !== null && res !== undefined ? (res as T) : fallback;
     } catch (e) {
       return fallback;
     }
