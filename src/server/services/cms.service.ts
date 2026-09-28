@@ -1,8 +1,7 @@
 import { HomepageCMS, DistrictDeliveryRate } from '@/types';
-import { initialCMS } from '@/lib/seed-data';
+import { DEFAULT_CMS } from '@/server/config/defaults';
 import { generateDefaultDeliveryRates } from '@/lib/nepal-locations';
 import { prisma } from '@/lib/prisma';
-import { initializeMySqlTables } from '@/lib/mysql';
 import { sanitizeObjectImages } from '@/lib/image-upload';
 
 interface EntityCache<T> {
@@ -16,15 +15,15 @@ export class CMSService {
   private cmsCache: EntityCache<HomepageCMS> = {
     data: null,
     fetchedAt: 0,
-    softTtlMs: 45000,
-    hardTtlMs: 300000,
+    softTtlMs: 1000, // 1s TTL for instant admin updates
+    hardTtlMs: 10000,
   };
 
   private deliveryRatesCache: EntityCache<DistrictDeliveryRate[]> = {
     data: null,
     fetchedAt: 0,
-    softTtlMs: 60000,
-    hardTtlMs: 600000,
+    softTtlMs: 1000,
+    hardTtlMs: 10000,
   };
 
   private inFlightCMS: Promise<HomepageCMS> | null = null;
@@ -49,7 +48,6 @@ export class CMSService {
 
     this.inFlightDelivery = (async () => {
       try {
-        await initializeMySqlTables();
         const rows = await prisma.deliveryRate.findMany();
 
         let rates: DistrictDeliveryRate[] = rows.map((r) => ({
@@ -72,8 +70,8 @@ export class CMSService {
         this.deliveryRatesCache = {
           data: rates,
           fetchedAt: Date.now(),
-          softTtlMs: 60000,
-          hardTtlMs: 600000,
+          softTtlMs: 1000,
+          hardTtlMs: 10000,
         };
         return rates;
       } catch (err: any) {
@@ -91,7 +89,6 @@ export class CMSService {
     this.deliveryRatesCache.data = null;
     this.cmsCache.data = null;
     try {
-      await initializeMySqlTables();
       await prisma.$transaction(
         rates.map((r) => {
           const data = {
@@ -130,39 +127,38 @@ export class CMSService {
 
     this.inFlightCMS = (async () => {
       try {
-        await initializeMySqlTables();
         const row = await prisma.cms.findUnique({ where: { key: 'homepage' } });
         const rates = deliveryRates || (await this.fetchDeliveryRates());
 
         let cms: HomepageCMS;
         if (!row) {
           cms = {
-            ...initialCMS,
+            ...DEFAULT_CMS,
             deliveryRates: rates,
           };
           await this.updateCMS(cms);
         } else {
           cms = {
-            announcementBar: (row.announcementBar as any) || initialCMS.announcementBar,
-            hero: (row.hero as any) || initialCMS.hero,
-            editorialBanner: (row.editorialBanner as any) || initialCMS.editorialBanner,
-            instagramImages: Array.isArray(row.instagramImages) ? (row.instagramImages as any) : initialCMS.instagramImages,
-            fonepaySettings: (row.fonepaySettings as any) || initialCMS.fonepaySettings,
+            announcementBar: (row.announcementBar as any) || DEFAULT_CMS.announcementBar,
+            hero: (row.hero as any) || DEFAULT_CMS.hero,
+            editorialBanner: (row.editorialBanner as any) || DEFAULT_CMS.editorialBanner,
+            instagramImages: Array.isArray(row.instagramImages) ? (row.instagramImages as any) : DEFAULT_CMS.instagramImages,
+            fonepaySettings: (row.fonepaySettings as any) || DEFAULT_CMS.fonepaySettings,
             deliveryRates: rates,
-            seo: (row.seo as any) || initialCMS.seo,
+            seo: (row.seo as any) || DEFAULT_CMS.seo,
           };
         }
 
         this.cmsCache = {
           data: cms,
           fetchedAt: Date.now(),
-          softTtlMs: 45000,
-          hardTtlMs: 300000,
+          softTtlMs: 1000,
+          hardTtlMs: 10000,
         };
         return cms;
       } catch (err: any) {
         console.error('[CMSService fetchCMS Error]', err?.message || err);
-        return this.cmsCache.data || initialCMS;
+        return this.cmsCache.data || DEFAULT_CMS;
       } finally {
         this.inFlightCMS = null;
       }
@@ -175,7 +171,6 @@ export class CMSService {
     const newCms = await sanitizeObjectImages(rawCms);
     this.cmsCache.data = null;
     try {
-      await initializeMySqlTables();
       if (newCms.deliveryRates && Array.isArray(newCms.deliveryRates) && newCms.deliveryRates.length > 0) {
         await this.updateDeliveryRates(newCms.deliveryRates);
       }
@@ -211,7 +206,7 @@ export class CMSService {
       return updated;
     } catch (err: any) {
       console.error('[CMSService updateCMS Error]:', err?.message || err);
-      return { ...initialCMS, ...newCms };
+      return { ...DEFAULT_CMS, ...newCms };
     }
   }
 }

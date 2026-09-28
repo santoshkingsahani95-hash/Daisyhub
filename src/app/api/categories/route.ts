@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { categoryService, productService } from '@/server/services';
 
 export const dynamic = 'force-dynamic';
@@ -92,6 +93,11 @@ export async function POST(request: Request) {
     const saved = await categoryService.saveCategory(categoryToSave);
     const categories = await categoryService.fetchCategories();
 
+    // Invalidate Next.js page caches immediately
+    revalidatePath('/');
+    revalidatePath('/shop');
+    revalidatePath('/category/[slug]', 'page');
+
     return NextResponse.json(
       { success: true, category: saved, categories, data: saved },
       { headers: NO_CACHE_HEADERS }
@@ -127,6 +133,11 @@ export async function DELETE(request: Request) {
 
     const success = await categoryService.deleteCategory(id);
     const categories = await categoryService.fetchCategories();
+
+    // Invalidate Next.js page caches immediately
+    revalidatePath('/');
+    revalidatePath('/shop');
+    revalidatePath('/category/[slug]', 'page');
 
     return NextResponse.json(
       { success, message: success ? `Category ${id} deleted` : `Failed to delete category ${id}`, categories },

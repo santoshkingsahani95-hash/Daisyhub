@@ -1,38 +1,37 @@
 import { NextResponse } from 'next/server';
-import { cachePrewarmer } from '@/lib/cache-prewarmer';
+import { revalidatePath } from 'next/cache';
+import { serverDb } from '@/lib/server-db';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json().catch(() => ({}));
-    const { mode = 'full', force = true, baseUrl } = body;
-
-    let result: any = {};
-
-    if (mode === 'entities') {
-      result = await cachePrewarmer.warmEntities(force);
-    } else if (mode === 'routes') {
-      result = await cachePrewarmer.crawlRoutes(baseUrl);
-    } else {
-      // mode === 'full'
-      const warmRes = await cachePrewarmer.warmEntities(force);
-      const crawlRes = await cachePrewarmer.crawlRoutes(baseUrl);
-      result = {
-        entities: warmRes,
-        routes: crawlRes,
-      };
-    }
-
-    const stats = cachePrewarmer.getStats();
+    await serverDb.getFreshData();
+    revalidatePath('/', 'layout');
+    revalidatePath('/shop');
 
     return NextResponse.json(
       {
         success: true,
-        message: `Cache pre-warming triggered successfully (mode: ${mode})`,
-        result,
-        stats,
+        message: 'Entities refreshed and Next.js paths revalidated successfully',
+        stats: {
+          status: 'IDLE',
+          lastWarmedAt: Date.now(),
+          lastCrawlDurationMs: 0,
+          totalWarmRuns: 1,
+          totalCrawlRuns: 0,
+          totalUrlsCrawled: 1,
+          failedUrlsCount: 0,
+          daemonActive: false,
+          logs: [
+            {
+              timestamp: new Date().toISOString(),
+              type: 'SUCCESS',
+              message: 'Next.js cache paths revalidated and fresh DB entities loaded',
+            },
+          ],
+        },
       },
       {
         headers: {

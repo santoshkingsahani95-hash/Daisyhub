@@ -1,7 +1,6 @@
 import { Collection } from '@/types';
-import { initialCollections } from '@/lib/seed-data';
+import { DEFAULT_COLLECTIONS } from '@/server/config/defaults';
 import { prisma } from '@/lib/prisma';
-import { initializeMySqlTables } from '@/lib/mysql';
 import { sanitizeObjectImages } from '@/lib/image-upload';
 
 interface EntityCache<T> {
@@ -15,8 +14,8 @@ export class CollectionService {
   private cache: EntityCache<Collection[]> = {
     data: null,
     fetchedAt: 0,
-    softTtlMs: 60000,
-    hardTtlMs: 600000,
+    softTtlMs: 1000,
+    hardTtlMs: 10000,
   };
 
   private inFlight: Promise<Collection[]> | null = null;
@@ -38,7 +37,6 @@ export class CollectionService {
 
     this.inFlight = (async () => {
       try {
-        await initializeMySqlTables();
         const rows = await prisma.collection.findMany();
 
         let collections: Collection[] = rows.map((r) => ({
@@ -50,24 +48,24 @@ export class CollectionService {
           seo: (r.seo as any) ?? undefined,
         }));
 
-        if (collections.length === 0 && initialCollections && initialCollections.length > 0) {
+        if (collections.length === 0 && DEFAULT_COLLECTIONS.length > 0) {
           console.log('[CollectionService] Collections table empty. Auto-seeding initial collections...');
-          for (const col of initialCollections) {
+          for (const col of DEFAULT_COLLECTIONS) {
             await this.saveCollection(col);
           }
-          collections = initialCollections;
+          collections = DEFAULT_COLLECTIONS;
         }
 
         this.cache = {
           data: collections,
           fetchedAt: Date.now(),
-          softTtlMs: 60000,
-          hardTtlMs: 600000,
+          softTtlMs: 1000,
+          hardTtlMs: 10000,
         };
         return collections;
       } catch (err: any) {
         console.error('[CollectionService fetchCollections Error]', err?.message || err);
-        return this.cache.data || initialCollections;
+        return this.cache.data || DEFAULT_COLLECTIONS;
       } finally {
         this.inFlight = null;
       }
@@ -85,7 +83,6 @@ export class CollectionService {
     const collection = await sanitizeObjectImages(rawCollection);
     this.invalidateCache();
     try {
-      await initializeMySqlTables();
       await prisma.collection.deleteMany({
         where: { OR: [{ id: collection.id }, { slug: collection.slug }] },
       });
@@ -109,7 +106,6 @@ export class CollectionService {
   public async deleteCollection(idOrSlug: string): Promise<boolean> {
     this.invalidateCache();
     try {
-      await initializeMySqlTables();
       await prisma.collection.deleteMany({
         where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
       });

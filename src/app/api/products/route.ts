@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { productService } from '@/server/services';
 
 export const dynamic = 'force-dynamic';
@@ -99,6 +100,12 @@ export async function POST(request: Request) {
     const saved = await productService.saveProduct(product);
     const products = await productService.fetchProducts();
 
+    // Invalidate Next.js page caches immediately so changes are visible everywhere
+    revalidatePath('/');
+    revalidatePath('/shop');
+    revalidatePath('/category/[slug]', 'page');
+    revalidatePath('/product/[slug]', 'page');
+
     return NextResponse.json(
       { success: true, product: saved, products, data: saved },
       { headers: NO_CACHE_HEADERS }
@@ -133,6 +140,12 @@ export async function DELETE(request: Request) {
     }
 
     const success = await productService.deleteProduct(id);
+
+    // Invalidate Next.js page caches immediately
+    revalidatePath('/');
+    revalidatePath('/shop');
+    revalidatePath('/category/[slug]', 'page');
+
     return NextResponse.json(
       { success, message: success ? `Product ${id} deleted` : `Failed to delete product ${id}` },
       { headers: NO_CACHE_HEADERS }

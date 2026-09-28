@@ -1,6 +1,5 @@
 import { Order } from '@/types';
 import { prisma } from '@/lib/prisma';
-import { initializeMySqlTables } from '@/lib/mysql';
 
 interface EntityCache<T> {
   data: T | null;
@@ -13,8 +12,8 @@ export class OrderService {
   private cache: EntityCache<Order[]> = {
     data: null,
     fetchedAt: 0,
-    softTtlMs: 15000, // 15 seconds soft TTL
-    hardTtlMs: 120000, // 2 minutes hard TTL
+    softTtlMs: 1000, // 1s TTL for immediate order updates
+    hardTtlMs: 10000,
   };
 
   private inFlight: Promise<Order[]> | null = null;
@@ -36,7 +35,6 @@ export class OrderService {
 
     this.inFlight = (async () => {
       try {
-        await initializeMySqlTables();
         const rows = await prisma.order.findMany({ orderBy: { createdAt: 'desc' } });
 
         const orders: Order[] = rows.map((r) => ({
@@ -85,7 +83,6 @@ export class OrderService {
   public async createOrder(order: Order): Promise<Order> {
     this.invalidateCache();
     try {
-      await initializeMySqlTables();
       await prisma.order.deleteMany({
         where: { OR: [{ id: order.id }, { orderNumber: order.orderNumber }] },
       });
@@ -122,7 +119,6 @@ export class OrderService {
   public async updateOrderStatus(orderId: string, status: Order['orderStatus']): Promise<Order | undefined> {
     this.invalidateCache();
     try {
-      await initializeMySqlTables();
       await prisma.order.updateMany({
         where: { OR: [{ id: orderId }, { orderNumber: orderId }] },
         data: { orderStatus: status },
@@ -138,7 +134,6 @@ export class OrderService {
   public async deleteOrder(idOrNumber: string): Promise<boolean> {
     this.invalidateCache();
     try {
-      await initializeMySqlTables();
       await prisma.order.deleteMany({
         where: { OR: [{ id: idOrNumber }, { orderNumber: idOrNumber }] },
       });

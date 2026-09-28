@@ -1,6 +1,5 @@
 import { CustomerUser } from '@/types';
 import { prisma } from '@/lib/prisma';
-import { initializeMySqlTables } from '@/lib/mysql';
 
 interface EntityCache<T> {
   data: T | null;
@@ -13,8 +12,8 @@ export class UserService {
   private cache: EntityCache<CustomerUser[]> = {
     data: null,
     fetchedAt: 0,
-    softTtlMs: 30000,
-    hardTtlMs: 300000,
+    softTtlMs: 1000,
+    hardTtlMs: 10000,
   };
 
   private inFlight: Promise<CustomerUser[]> | null = null;
@@ -36,7 +35,6 @@ export class UserService {
 
     this.inFlight = (async () => {
       try {
-        await initializeMySqlTables();
         const rows = await prisma.user.findMany({ orderBy: { registrationDate: 'desc' } });
 
         const users: CustomerUser[] = rows.map((r) => ({
@@ -76,7 +74,6 @@ export class UserService {
   public async saveUser(user: CustomerUser): Promise<CustomerUser> {
     this.invalidateCache();
     try {
-      await initializeMySqlTables();
       const data = {
         name: user.name,
         email: user.email,
@@ -102,7 +99,6 @@ export class UserService {
   public async deleteUser(id: string): Promise<boolean> {
     this.invalidateCache();
     try {
-      await initializeMySqlTables();
       await prisma.user.deleteMany({
         where: { OR: [{ id }, { email: id }] },
       });

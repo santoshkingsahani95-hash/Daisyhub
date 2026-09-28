@@ -1,6 +1,5 @@
 import { Coupon } from '@/types';
 import { prisma } from '@/lib/prisma';
-import { initializeMySqlTables } from '@/lib/mysql';
 
 interface EntityCache<T> {
   data: T | null;
@@ -13,8 +12,8 @@ export class CouponService {
   private cache: EntityCache<Coupon[]> = {
     data: null,
     fetchedAt: 0,
-    softTtlMs: 30000,
-    hardTtlMs: 300000,
+    softTtlMs: 1000,
+    hardTtlMs: 10000,
   };
 
   private inFlight: Promise<Coupon[]> | null = null;
@@ -36,7 +35,6 @@ export class CouponService {
 
     this.inFlight = (async () => {
       try {
-        await initializeMySqlTables();
         const rows = await prisma.coupon.findMany();
 
         const coupons: Coupon[] = rows.map((r) => ({
@@ -78,7 +76,6 @@ export class CouponService {
     const cleanCode = coupon.code.trim().toUpperCase();
     const cleanCoupon = { ...coupon, code: cleanCode };
     try {
-      await initializeMySqlTables();
       const data = {
         discountType: cleanCoupon.discountType,
         discountValue: cleanCoupon.discountValue,
@@ -103,7 +100,6 @@ export class CouponService {
     this.invalidateCache();
     const cleanCode = code.trim().toUpperCase();
     try {
-      await initializeMySqlTables();
       await prisma.coupon.deleteMany({ where: { code: cleanCode } });
       console.log(`[CouponService] Successfully deleted coupon ${cleanCode}`);
       return true;

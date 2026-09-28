@@ -1,7 +1,6 @@
 import { Category } from '@/types';
-import { initialCategories } from '@/lib/seed-data';
+import { DEFAULT_CATEGORIES } from '@/server/config/defaults';
 import { prisma } from '@/lib/prisma';
-import { initializeMySqlTables } from '@/lib/mysql';
 import { sanitizeObjectImages } from '@/lib/image-upload';
 
 interface EntityCache<T> {
@@ -15,8 +14,8 @@ export class CategoryService {
   private cache: EntityCache<Category[]> = {
     data: null,
     fetchedAt: 0,
-    softTtlMs: 60000, // 60s soft TTL
-    hardTtlMs: 600000, // 10 min hard TTL
+    softTtlMs: 1000, // 1s TTL for instant admin updates
+    hardTtlMs: 10000,
   };
 
   private bySlugMap = new Map<string, Category>();
@@ -48,7 +47,6 @@ export class CategoryService {
 
     this.inFlight = (async () => {
       try {
-        await initializeMySqlTables();
         const rows = await prisma.category.findMany();
 
         let categories: Category[] = rows.map((r) => ({
@@ -61,19 +59,19 @@ export class CategoryService {
           seo: (r.seo as any) ?? undefined,
         }));
 
-        if (categories.length === 0 && initialCategories && initialCategories.length > 0) {
+        if (categories.length === 0 && DEFAULT_CATEGORIES.length > 0) {
           console.log('[CategoryService] Categories table empty. Auto-populating initial categories...');
-          for (const c of initialCategories) {
+          for (const c of DEFAULT_CATEGORIES) {
             await this.saveCategory(c);
           }
-          categories = initialCategories;
+          categories = DEFAULT_CATEGORIES;
         }
 
         this.cache = {
           data: categories,
           fetchedAt: Date.now(),
-          softTtlMs: 60000,
-          hardTtlMs: 600000,
+          softTtlMs: 1000,
+          hardTtlMs: 10000,
         };
 
         // Rebuild index maps
@@ -87,7 +85,7 @@ export class CategoryService {
         return categories;
       } catch (err: any) {
         console.error('[CategoryService fetchCategories Error]', err?.message || err);
-        return this.cache.data || initialCategories;
+        return this.cache.data || DEFAULT_CATEGORIES;
       } finally {
         this.inFlight = null;
       }
@@ -129,7 +127,6 @@ export class CategoryService {
     this.invalidateCache();
 
     try {
-      await initializeMySqlTables();
       await prisma.category.deleteMany({
         where: { OR: [{ id: category.id }, { slug: category.slug }] },
       });
@@ -159,7 +156,6 @@ export class CategoryService {
   public async deleteCategory(idOrSlug: string): Promise<boolean> {
     this.invalidateCache();
     try {
-      await initializeMySqlTables();
       await prisma.category.deleteMany({
         where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
       });

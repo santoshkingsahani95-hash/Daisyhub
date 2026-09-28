@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { serverDb } from '@/lib/server-db';
-import { cachePrewarmer } from '@/lib/cache-prewarmer';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -8,23 +8,21 @@ export const revalidate = 0;
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { entity = 'all', rewarm = true } = body;
+    const { entity = 'all' } = body;
 
     serverDb.invalidateCache(entity);
-
-    let warmResult = null;
-    if (rewarm) {
-      warmResult = await cachePrewarmer.warmEntities(true);
-    }
+    revalidatePath('/', 'layout');
+    revalidatePath('/shop');
+    revalidatePath('/category/[slug]', 'page');
+    revalidatePath('/product/[slug]', 'page');
 
     const updatedTelemetry = serverDb.getCacheStats();
 
     return NextResponse.json(
       {
         success: true,
-        message: `Object cache for '${entity}' purged successfully`,
+        message: `Cache for '${entity}' purged and Next.js paths revalidated successfully`,
         purgedTarget: entity,
-        rewarmResult: warmResult,
         telemetry: updatedTelemetry,
       },
       {

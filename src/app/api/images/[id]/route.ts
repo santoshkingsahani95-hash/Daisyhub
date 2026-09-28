@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getImageBlobFromDb, initializeMySqlTables } from '@/lib/mysql';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,14 +16,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    await initializeMySqlTables();
     const imageId = params.id;
     if (!imageId) {
       return new NextResponse('Image ID required', { status: 400 });
     }
 
-    const imageData = await getImageBlobFromDb(imageId);
-    if (!imageData) {
+    const row = await prisma.image.findUnique({ where: { id: imageId } });
+    if (!row) {
       return new NextResponse(FALLBACK_SVG, {
         status: 200,
         headers: {
@@ -33,9 +32,9 @@ export async function GET(
       });
     }
 
-    return new NextResponse(new Uint8Array(imageData.buffer), {
+    return new NextResponse(new Uint8Array(row.data), {
       headers: {
-        'Content-Type': imageData.mimeType || 'image/jpeg',
+        'Content-Type': row.mimeType || 'image/jpeg',
         'Cache-Control': 'public, max-age=31536000, immutable',
       },
     });

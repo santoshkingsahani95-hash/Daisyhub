@@ -1,8 +1,13 @@
 import { MetadataRoute } from 'next';
-import { seedProducts, initialCategories } from '@/lib/seed-data';
+import { productService, categoryService } from '@/server/services';
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
+  const [categories, products] = await Promise.all([
+    categoryService.fetchCategories().catch(() => []),
+    productService.fetchProducts().catch(() => []),
+  ]);
 
   // Static routes
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -39,7 +44,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   ];
 
   // Category routes
-  const categoryRoutes: MetadataRoute.Sitemap = initialCategories.map((cat) => ({
+  const categoryRoutes: MetadataRoute.Sitemap = categories.map((cat) => ({
     url: `${baseUrl}/category/${cat.slug}`,
     lastModified: new Date(),
     changeFrequency: 'weekly',
@@ -56,7 +61,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }));
 
   // Product routes
-  const productRoutes: MetadataRoute.Sitemap = seedProducts.map((prod) => ({
+  const productRoutes: MetadataRoute.Sitemap = products.map((prod) => ({
     url: `${baseUrl}/product/${prod.slug}`,
     lastModified: new Date(prod.createdAt || Date.now()),
     changeFrequency: 'weekly',

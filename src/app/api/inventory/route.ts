@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { initializeMySqlTables } from '@/lib/mysql';
 import { serverDb } from '@/lib/server-db';
-import { cachePrewarmer } from '@/lib/cache-prewarmer';
 
 // Force dynamic server rendering for inventory API route
 export const dynamic = 'force-dynamic';
@@ -10,7 +9,6 @@ export const revalidate = 0;
 
 export async function GET() {
   try {
-    await initializeMySqlTables();
 
     // 1. Fetch raw inventory documents from MySQL
     let rawInventory: any[] = await prisma.inventory.findMany({ orderBy: { updatedAt: 'desc' } });
@@ -158,11 +156,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await initializeMySqlTables();
     const body = await request.json();
     const { action } = body;
     serverDb.invalidateCache('products');
-    cachePrewarmer.triggerWarmupDebounced();
+    revalidatePath('/', 'layout');
 
     switch (action) {
       case 'updateColorStock': {

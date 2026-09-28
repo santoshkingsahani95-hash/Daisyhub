@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { serverDb } from '@/lib/server-db';
-import { initializeMySqlTables } from '@/lib/mysql';
-import { cachePrewarmer } from '@/lib/cache-prewarmer';
 
 // Force dynamic server rendering for API DB sync route
 export const dynamic = 'force-dynamic';
@@ -9,7 +8,6 @@ export const revalidate = 0;
 
 export async function GET() {
   try {
-    await initializeMySqlTables();
     const data = await serverDb.getFreshData();
     return NextResponse.json(
       { success: true, data },
@@ -31,10 +29,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await initializeMySqlTables();
     const body = await request.json();
     const { action } = body;
-    cachePrewarmer.triggerWarmupDebounced();
+    revalidatePath('/', 'layout');
 
     switch (action) {
       case 'updateInventory': {

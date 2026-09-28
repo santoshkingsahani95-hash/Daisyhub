@@ -1,7 +1,5 @@
 import { Product } from '@/types';
-import { seedProducts } from '@/lib/seed-data';
 import { prisma } from '@/lib/prisma';
-import { initializeMySqlTables } from '@/lib/mysql';
 import { sanitizeObjectImages } from '@/lib/image-upload';
 
 interface EntityCache<T> {
@@ -15,8 +13,8 @@ export class ProductService {
   private cache: EntityCache<Product[]> = {
     data: null,
     fetchedAt: 0,
-    softTtlMs: 45000, // 45 seconds soft TTL
-    hardTtlMs: 300000, // 5 minutes hard TTL
+    softTtlMs: 1000, // 1 second short memoization for immediate visibility of admin changes
+    hardTtlMs: 10000,
   };
 
   private byIdMap = new Map<string, Product>();
@@ -50,7 +48,6 @@ export class ProductService {
 
     this.inFlight = (async () => {
       try {
-        await initializeMySqlTables();
         const rows = await prisma.product.findMany();
 
         let products: Product[] = rows.map((r) => {
@@ -90,20 +87,11 @@ export class ProductService {
           };
         });
 
-        // Auto-seed if database is empty
-        if (products.length === 0 && seedProducts && seedProducts.length > 0) {
-          console.log('[ProductService] Products table empty. Auto-populating initial products...');
-          for (const p of seedProducts) {
-            await this.saveProduct(p);
-          }
-          products = seedProducts;
-        }
-
         this.cache = {
           data: products,
           fetchedAt: Date.now(),
-          softTtlMs: 45000,
-          hardTtlMs: 300000,
+          softTtlMs: 1000,
+          hardTtlMs: 10000,
         };
 
         // Rebuild index maps
@@ -126,7 +114,7 @@ export class ProductService {
         return products;
       } catch (err: any) {
         console.error('[ProductService fetchProducts Error]', err?.message || err);
-        return this.cache.data || seedProducts;
+        return this.cache.data || [];
       } finally {
         this.inFlight = null;
       }
@@ -181,7 +169,6 @@ export class ProductService {
     this.invalidateCache();
 
     try {
-      await initializeMySqlTables();
       await prisma.product.deleteMany({
         where: { OR: [{ id: product.id }, { slug: product.slug }] },
       });
@@ -236,7 +223,6 @@ export class ProductService {
   public async deleteProduct(id: string): Promise<boolean> {
     this.invalidateCache();
     try {
-      await initializeMySqlTables();
       await prisma.product.deleteMany({ where: { id } });
       await prisma.inventory.deleteMany({ where: { OR: [{ productId: id }, { id: `inv-${id}` }] } });
       await prisma.photoGallery.deleteMany({ where: { productId: id } });
@@ -353,7 +339,6 @@ export class ProductService {
    */
   private async syncInventoryDoc(prod: any) {
     try {
-      await initializeMySqlTables();
       const totalStock = prod.colors && prod.colors.length > 0
         ? prod.colors.reduce((sum: number, c: any) => sum + (typeof c.stock === 'number' ? c.stock : 0), 0)
         : (prod.sizes ? prod.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0);
@@ -388,7 +373,6 @@ export class ProductService {
    */
   private async syncGalleryDocs(prod: any) {
     try {
-      await initializeMySqlTables();
       await prisma.photoGallery.deleteMany({ where: { productId: prod.id } });
 
       if (prod.colors && Array.isArray(prod.colors) && prod.colors.length > 0) {

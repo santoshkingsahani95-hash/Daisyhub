@@ -1,5 +1,5 @@
 import { Product, Category, Collection, Order, Coupon, HomepageCMS, CustomerUser, ProductReview, ColorOption, SEOMetadata, AdminCredentials, DistrictDeliveryRate } from '@/types';
-import { seedProducts, initialCategories, initialCollections, initialCMS } from './seed-data';
+import { DEFAULT_CMS } from '@/server/config/defaults';
 import { generateDefaultDeliveryRates } from './nepal-locations';
 
 // Category matching helper supporting unlimited products per category and flexible singular/plural/alias matching
@@ -160,7 +160,7 @@ class DataStore {
   private products: Product[] = [];
   private categories: Category[] = [];
   private collections: Collection[] = [];
-  private cms: HomepageCMS = { ...initialCMS };
+  private cms: HomepageCMS = { ...DEFAULT_CMS };
   private orders: Order[] = [];
   private coupons: Coupon[] = [];
   private newsletterSubscribers: string[] = [];

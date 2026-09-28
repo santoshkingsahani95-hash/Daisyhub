@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { serverDb } from '@/lib/server-db';
-import { cachePrewarmer } from '@/lib/cache-prewarmer';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -8,14 +7,29 @@ export const revalidate = 0;
 export async function GET() {
   try {
     const dbTelemetry = serverDb.getCacheStats();
-    const crawlerTelemetry = cachePrewarmer.getStats();
 
     return NextResponse.json(
       {
         success: true,
         timestamp: new Date().toISOString(),
         objectCache: dbTelemetry,
-        crawler: crawlerTelemetry,
+        crawler: {
+          status: 'IDLE',
+          lastWarmedAt: Date.now(),
+          lastCrawlDurationMs: 0,
+          totalWarmRuns: 0,
+          totalCrawlRuns: 0,
+          totalUrlsCrawled: 0,
+          failedUrlsCount: 0,
+          daemonActive: false,
+          logs: [
+            {
+              timestamp: new Date().toISOString(),
+              type: 'INFO',
+              message: 'Native Next.js caching active (stale time: 1s, direct MySQL)',
+            },
+          ],
+        },
       },
       {
         headers: {

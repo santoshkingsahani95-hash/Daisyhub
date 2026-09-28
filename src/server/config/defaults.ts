@@ -1,7 +1,7 @@
-import { Product, Category, Collection, HomepageCMS } from '@/types';
-import { generateDefaultDeliveryRates } from './nepal-locations';
+import { Category, Collection, HomepageCMS } from '@/types';
+import { generateDefaultDeliveryRates } from '@/lib/nepal-locations';
 
-export const initialCategories: Category[] = [
+export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'cat-dresses',
     slug: 'dresses',
@@ -36,7 +36,7 @@ export const initialCategories: Category[] = [
   },
 ];
 
-export const initialCollections: Collection[] = [
+export const DEFAULT_COLLECTIONS: Collection[] = [
   {
     id: 'col-new-arrivals',
     slug: 'new-arrivals',
@@ -60,16 +60,14 @@ export const initialCollections: Collection[] = [
   },
 ];
 
-export const seedProducts: Product[] = [];
-
-export const initialCMS: HomepageCMS = {
+export const DEFAULT_CMS: HomepageCMS = {
   announcementBar: {
     enabled: true,
     text: 'WELCOME TO DAISY HUB (daissyhub.com) | FREE DELIVERY ACROSS NEPAL ON ORDERS ABOVE NPR 3,000',
   },
   hero: {
-    heading: 'ELEVATED WOMEN\'S FASHION',
-    subtitle: 'Discover Nepal\'s premier online ladies clothing boutique.',
+    heading: "ELEVATED WOMEN'S FASHION",
+    subtitle: "Discover Nepal's premier online ladies clothing boutique.",
     buttonText: 'SHOP COLLECTION',
     buttonUrl: '/shop',
     secondaryButtonText: 'NEW ARRIVALS',
@@ -104,4 +102,3 @@ export const initialCMS: HomepageCMS = {
     h1: "DaisyHub – Premium Ladies Clothing & Women's Fashion Online in Nepal",
   },
 };
-

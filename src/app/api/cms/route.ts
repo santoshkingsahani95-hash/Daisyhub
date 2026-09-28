@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { cmsService } from '@/server/services';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,11 @@ export async function POST(request: Request) {
     const cms = body.cms || body;
 
     const updated = await cmsService.updateCMS(cms);
+
+    // Invalidate root layout & storefront caches immediately so banner/SEO/hero changes are instant
+    revalidatePath('/', 'layout');
+    revalidatePath('/shop');
+
     return NextResponse.json({ success: true, cms: updated, data: updated }, { headers: NO_CACHE_HEADERS });
   } catch (error: any) {
     console.error('[API /api/cms POST Error]', error);
