@@ -1,30 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { Instagram, Facebook, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { db } from '@/lib/db';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Instagram, Facebook } from 'lucide-react';
 
 export const Footer: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<{ type: 'idle' | 'success' | 'error'; message: string }>({
-    type: 'idle',
-    message: '',
-  });
-
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !email.includes('@')) {
-      setStatus({ type: 'error', message: 'Please enter a valid email address.' });
-      return;
-    }
-    const res = db.addNewsletterSubscriber(email);
-    setStatus({ type: 'success', message: res.message });
-    setEmail('');
-  };
-
   return (
     <footer className="bg-zinc-950 text-white pt-16 pb-12 border-t border-zinc-800">
       <div className="max-w-7xl mx-auto px-6 md:px-8">
@@ -37,35 +17,6 @@ export const Footer: React.FC = () => {
             <p className="text-xs text-zinc-400 max-w-sm leading-relaxed font-sans">
               Modern women’s fashion made for your everyday confidence. Clean silhouettes, luxury fabrics, and understated elegance delivered across Nepal.
             </p>
-
-            <div className="pt-4">
-              <span className="text-[11px] uppercase tracking-widest text-zinc-400 block mb-2 font-semibold">JOIN THE DAISY HUB VIP CLUB</span>
-              <form onSubmit={handleSubscribe} className="flex max-w-sm">
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  className="bg-zinc-900 text-white placeholder:text-zinc-500 text-xs rounded-r-none border-zinc-800 focus-visible:ring-brand-gold"
-                />
-                <Button
-                  type="submit"
-                  variant="gold"
-                  size="default"
-                  className="rounded-l-none px-4"
-                >
-                  <ArrowRight size={15} />
-                </Button>
-              </form>
-              {status.type === 'success' && (
-                <p className="text-[11px] text-emerald-400 mt-2 flex items-center gap-1">
-                  <CheckCircle2 size={12} /> {status.message}
-                </p>
-              )}
-              {status.type === 'error' && (
-                <p className="text-[11px] text-rose-400 mt-2">{status.message}</p>
-              )}
-            </div>
           </div>
 
           {/* Column 2: SHOP */}
