@@ -51,8 +51,6 @@ export default function AdminProductsPage() {
     price: 1999,
     salePrice: 1599,
     description: '',
-    insideValleyFee: 100,
-    outsideValleyFee: 200,
     isFreeDelivery: false,
   });
 
@@ -127,8 +125,6 @@ export default function AdminProductsPage() {
       price: 1999,
       salePrice: 1599,
       description: 'Elegant women’s fashion piece designed for effortless confidence.',
-      insideValleyFee: 100,
-      outsideValleyFee: 200,
       isFreeDelivery: false,
     });
     setColorsList([
@@ -151,8 +147,6 @@ export default function AdminProductsPage() {
       price: p.price,
       salePrice: p.salePrice || 0,
       description: p.description,
-      insideValleyFee: p.insideValleyFee !== undefined ? p.insideValleyFee : 100,
-      outsideValleyFee: p.outsideValleyFee !== undefined ? p.outsideValleyFee : 200,
       isFreeDelivery: !!p.isFreeDelivery,
     });
     if (p.colors && p.colors.length > 0) {
@@ -284,8 +278,6 @@ export default function AdminProductsPage() {
       sizes: [
         { size: 'Free Size', stock: colorsList.reduce((acc, c) => acc + (typeof c.stock === 'number' ? c.stock : 10), 0) },
       ],
-      insideValleyFee: Number(formData.insideValleyFee) || 100,
-      outsideValleyFee: Number(formData.outsideValleyFee) || 200,
       isFreeDelivery: formData.isFreeDelivery,
     };
 
@@ -571,38 +563,6 @@ export default function AdminProductsPage() {
                     />
                     <span className="text-xs font-bold text-emerald-700 uppercase">OFFER FREE DELIVERY</span>
                   </label>
-                </div>
-
-                {!formData.isFreeDelivery && (
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div>
-                      <label className="text-[11px] font-semibold text-brand-dark block mb-1">
-                        INSIDE VALLEY DELIVERY FEE (NPR)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={formData.insideValleyFee}
-                        onChange={(e) => setFormData({ ...formData, insideValleyFee: Number(e.target.value) })}
-                        className="w-full p-2.5 border border-brand-border rounded font-mono font-bold text-xs bg-white"
-                        placeholder="e.g. 100"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-brand-dark block mb-1">
-                        OUTSIDE VALLEY DELIVERY FEE (NPR)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={formData.outsideValleyFee}
-                        onChange={(e) => setFormData({ ...formData, outsideValleyFee: Number(e.target.value) })}
-                        className="w-full p-2.5 border border-brand-border rounded font-mono font-bold text-xs bg-white"
-                        placeholder="e.g. 200"
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* DYNAMIC CLICKABLE PHOTO & COLOR/SIZE VARIANT INSPECTOR */}

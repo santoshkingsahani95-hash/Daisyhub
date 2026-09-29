@@ -32,8 +32,6 @@ model Product {
   sizes              Json?
   sku                String   @db.VarChar(100)
   reviews            Json?
-  insideValleyFee    Decimal  @default(100.00) @map("inside_valley_fee") @db.Decimal(10, 2)
-  outsideValleyFee   Decimal  @default(200.00) @map("outside_valley_fee") @db.Decimal(10, 2)
   isFreeDelivery     Boolean  @default(false) @map("is_free_delivery")
   seo                Json?
   createdAt          String?  @map("created_at") @db.VarChar(100)

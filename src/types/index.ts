@@ -65,8 +65,6 @@ export interface Product {
   sku: string;
   createdAt: string;
   reviews?: ProductReview[];
-  insideValleyFee?: number;
-  outsideValleyFee?: number;
   isFreeDelivery?: boolean;
   seo?: SEOMetadata;
 }
