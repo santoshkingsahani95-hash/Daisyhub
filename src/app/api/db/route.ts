@@ -61,12 +61,11 @@ function mapProduct(r: any): Product {
 }
 
 async function fetchAllData() {
-  const [prodRows, catRows, colRows, rateRows, orderRows, cmsRow] =
+  const [prodRows, catRows, colRows, orderRows, cmsRow] =
     await Promise.all([
       prisma.product.findMany({ orderBy: { createdAt: 'desc' } }),
       prisma.category.findMany(),
       prisma.collection.findMany(),
-      prisma.deliveryRate.findMany(),
       prisma.order.findMany({ orderBy: { createdAt: 'desc' } }),
       prisma.cms.findUnique({ where: { key: 'homepage' } }),
     ]);
@@ -94,17 +93,10 @@ async function fetchAllData() {
   }));
   if (collections.length === 0) collections = DEFAULT_COLLECTIONS;
 
-  let deliveryRates: DistrictDeliveryRate[] = rateRows.map((r) => ({
-    province: r.province,
-    district: r.district,
-    deliveryFee: Number(r.deliveryFee),
-    enabled: Boolean(r.enabled),
-    homeDeliveryFee: r.homeDeliveryFee !== null && r.homeDeliveryFee !== undefined ? Number(r.homeDeliveryFee) : undefined,
-    branchDeliveryFee: r.branchDeliveryFee !== null && r.branchDeliveryFee !== undefined ? Number(r.branchDeliveryFee) : undefined,
-    homeDeliveryEnabled: r.homeDeliveryEnabled !== null && r.homeDeliveryEnabled !== undefined ? Boolean(r.homeDeliveryEnabled) : undefined,
-    branchDeliveryEnabled: r.branchDeliveryEnabled !== null && r.branchDeliveryEnabled !== undefined ? Boolean(r.branchDeliveryEnabled) : undefined,
-  }));
-  if (deliveryRates.length === 0) deliveryRates = generateDefaultDeliveryRates();
+  let deliveryRates: DistrictDeliveryRate[] =
+    Array.isArray(cmsRow?.deliveryRates) && (cmsRow.deliveryRates as any[]).length > 0
+      ? (cmsRow.deliveryRates as any)
+      : generateDefaultDeliveryRates();
 
   const orders: Order[] = orderRows.map((r) => ({
     id: r.id,
@@ -323,6 +315,7 @@ export async function POST(request: Request) {
               editorialBanner: (sanitized.editorialBanner ?? null) as any,
               instagramImages: (sanitized.instagramImages ?? []) as any,
               fonepaySettings: (sanitized.fonepaySettings ?? null) as any,
+              deliveryRates: (sanitized.deliveryRates ?? null) as any,
               seo: (sanitized.seo ?? null) as any,
             },
             create: {
@@ -332,6 +325,7 @@ export async function POST(request: Request) {
               editorialBanner: (sanitized.editorialBanner ?? null) as any,
               instagramImages: (sanitized.instagramImages ?? []) as any,
               fonepaySettings: (sanitized.fonepaySettings ?? null) as any,
+              deliveryRates: (sanitized.deliveryRates ?? null) as any,
               seo: (sanitized.seo ?? null) as any,
             },
           });
@@ -342,32 +336,16 @@ export async function POST(request: Request) {
       case 'updateDeliveryRates': {
         const { rates } = body;
         if (rates && Array.isArray(rates)) {
-          await prisma.$transaction(
-            rates.map((r: any) =>
-              prisma.deliveryRate.upsert({
-                where: { district: r.district },
-                update: {
-                  province: r.province,
-                  deliveryFee: r.deliveryFee,
-                  enabled: !!r.enabled,
-                  homeDeliveryFee: r.homeDeliveryFee ?? r.deliveryFee,
-                  branchDeliveryFee: r.branchDeliveryFee ?? r.deliveryFee,
-                  homeDeliveryEnabled: !!r.homeDeliveryEnabled,
-                  branchDeliveryEnabled: !!r.branchDeliveryEnabled,
-                },
-                create: {
-                  district: r.district,
-                  province: r.province,
-                  deliveryFee: r.deliveryFee,
-                  enabled: !!r.enabled,
-                  homeDeliveryFee: r.homeDeliveryFee ?? r.deliveryFee,
-                  branchDeliveryFee: r.branchDeliveryFee ?? r.deliveryFee,
-                  homeDeliveryEnabled: !!r.homeDeliveryEnabled,
-                  branchDeliveryEnabled: !!r.branchDeliveryEnabled,
-                },
-              })
-            )
-          );
+          await prisma.cms.upsert({
+            where: { key: 'homepage' },
+            update: {
+              deliveryRates: rates as any,
+            },
+            create: {
+              key: 'homepage',
+              deliveryRates: rates as any,
+            },
+          });
         }
         break;
       }

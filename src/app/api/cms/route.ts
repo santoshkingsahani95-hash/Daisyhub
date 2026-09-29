@@ -19,67 +19,18 @@ const NO_CACHE_HEADERS = {
 // Direct Database Queries & Mutations (Internal)
 // -------------------------------------------------------------
 
-async function queryDeliveryRates(): Promise<DistrictDeliveryRate[]> {
-  try {
-    const rows = await prisma.deliveryRate.findMany();
-    let rates: DistrictDeliveryRate[] = rows.map((r) => ({
-      province: r.province,
-      district: r.district,
-      deliveryFee: Number(r.deliveryFee),
-      enabled: Boolean(r.enabled),
-      homeDeliveryFee: r.homeDeliveryFee !== null && r.homeDeliveryFee !== undefined ? Number(r.homeDeliveryFee) : undefined,
-      branchDeliveryFee: r.branchDeliveryFee !== null && r.branchDeliveryFee !== undefined ? Number(r.branchDeliveryFee) : undefined,
-      homeDeliveryEnabled: r.homeDeliveryEnabled !== null && r.homeDeliveryEnabled !== undefined ? Boolean(r.homeDeliveryEnabled) : undefined,
-      branchDeliveryEnabled: r.branchDeliveryEnabled !== null && r.branchDeliveryEnabled !== undefined ? Boolean(r.branchDeliveryEnabled) : undefined,
-    }));
-
-    if (rates.length === 0) {
-      rates = generateDefaultDeliveryRates();
-      await saveDeliveryRatesToDb(rates);
-    }
-    return rates;
-  } catch (error) {
-    console.error('[queryDeliveryRates Error]', error);
-    return generateDefaultDeliveryRates();
-  }
-}
-
-async function saveDeliveryRatesToDb(rates: DistrictDeliveryRate[]): Promise<DistrictDeliveryRate[]> {
-  try {
-    await prisma.$transaction(
-      rates.map((r) => {
-        const data = {
-          province: r.province,
-          deliveryFee: r.deliveryFee,
-          enabled: !!r.enabled,
-          homeDeliveryFee: r.homeDeliveryFee ?? r.deliveryFee,
-          branchDeliveryFee: r.branchDeliveryFee ?? r.deliveryFee,
-          homeDeliveryEnabled: !!r.homeDeliveryEnabled,
-          branchDeliveryEnabled: !!r.branchDeliveryEnabled,
-        };
-        return prisma.deliveryRate.upsert({
-          where: { district: r.district },
-          update: data,
-          create: { district: r.district, ...data },
-        });
-      })
-    );
-  } catch (error) {
-    console.error('[saveDeliveryRatesToDb Error]', error);
-  }
-  return rates;
-}
-
 async function queryCMS(): Promise<HomepageCMS> {
   try {
-    const [row, rates] = await Promise.all([
-      prisma.cms.findUnique({ where: { key: 'homepage' } }),
-      queryDeliveryRates(),
-    ]);
+    const row = await prisma.cms.findUnique({ where: { key: 'homepage' } });
 
     if (!row) {
-      return { ...DEFAULT_CMS, deliveryRates: rates };
+      return { ...DEFAULT_CMS, deliveryRates: generateDefaultDeliveryRates() };
     }
+
+    const deliveryRates =
+      Array.isArray(row.deliveryRates) && (row.deliveryRates as any[]).length > 0
+        ? (row.deliveryRates as any)
+        : generateDefaultDeliveryRates();
 
     return {
       announcementBar: (row.announcementBar as any) || DEFAULT_CMS.announcementBar,
@@ -87,7 +38,7 @@ async function queryCMS(): Promise<HomepageCMS> {
       editorialBanner: (row.editorialBanner as any) || DEFAULT_CMS.editorialBanner,
       instagramImages: Array.isArray(row.instagramImages) ? (row.instagramImages as any) : DEFAULT_CMS.instagramImages,
       fonepaySettings: (row.fonepaySettings as any) || DEFAULT_CMS.fonepaySettings,
-      deliveryRates: rates,
+      deliveryRates,
       seo: (row.seo as any) || DEFAULT_CMS.seo,
     };
   } catch (error) {
@@ -99,9 +50,6 @@ async function queryCMS(): Promise<HomepageCMS> {
 async function saveCMSToDb(rawCms: Partial<HomepageCMS>): Promise<HomepageCMS> {
   const newCms = await sanitizeObjectImages(rawCms);
   try {
-    if (newCms.deliveryRates && Array.isArray(newCms.deliveryRates)) {
-      await saveDeliveryRatesToDb(newCms.deliveryRates);
-    }
     const existing = await queryCMS();
     const updated: HomepageCMS = {
       ...existing,

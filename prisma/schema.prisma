@@ -107,21 +107,3 @@ model Cms {
   @@map("cms")
 }
 
-
-
-model DeliveryRate {
-  district               String   @id @db.VarChar(100)
-  province               String   @db.VarChar(100)
-  deliveryFee            Decimal  @default(180.00) @map("delivery_fee") @db.Decimal(10, 2)
-  enabled                Boolean  @default(true)
-  homeDeliveryFee        Decimal? @map("home_delivery_fee") @db.Decimal(10, 2)
-  branchDeliveryFee      Decimal? @map("branch_delivery_fee") @db.Decimal(10, 2)
-  homeDeliveryEnabled    Boolean? @map("home_delivery_enabled")
-  branchDeliveryEnabled  Boolean? @map("branch_delivery_enabled")
-  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at")
-
-  @@map("delivery_rates")
-}
-
-
-
