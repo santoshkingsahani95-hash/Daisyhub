@@ -6,6 +6,11 @@ import { Plus, Edit2, Trash2, Search, X, Check, Image as ImageIcon, Upload, Pale
 import { db } from '@/lib/db';
 import { Product, ColorOption, Category } from '@/types';
 import { ProductVariantInspector } from '@/components/admin/product-variant-inspector';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -319,128 +324,145 @@ export default function AdminProductsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-serif-title text-3xl font-bold text-brand-dark uppercase tracking-wider">
+          <h1 className="font-serif-title text-3xl font-bold text-foreground uppercase tracking-wider">
             PRODUCT MANAGEMENT
           </h1>
-          <p className="text-xs text-brand-muted mt-0.5">Manage women&apos;s fashion catalog, multi-color variants, 2+ images per color & stock setup.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Manage women&apos;s fashion catalog, multi-color variants, 2+ images per color & stock setup.</p>
         </div>
 
-        <button
+        <Button
           onClick={handleOpenAdd}
-          className="px-5 py-3 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 flex items-center justify-center gap-2 rounded shadow"
+          variant="luxury"
+          size="default"
+          className="gap-2 tracking-wider shadow-sm"
         >
           <Plus size={16} />
           <span>ADD NEW PRODUCT</span>
-        </button>
+        </Button>
       </div>
 
       {/* Table & Controls */}
-      <div className="bg-white rounded-lg border border-brand-border shadow-sm p-6 space-y-4">
-        <div className="flex items-center gap-3 bg-brand-cream/60 px-4 py-2.5 rounded max-w-md border border-brand-border">
-          <Search size={16} className="text-brand-muted" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, SKU, category..."
-            className="bg-transparent text-xs w-full focus:outline-none"
-          />
-        </div>
+      <Card className="shadow-xs">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3 max-w-md relative">
+            <Search size={15} className="absolute left-3 text-muted-foreground" />
+            <Input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, SKU, category..."
+              className="pl-9 text-xs"
+            />
+          </div>
+        </CardHeader>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-brand-dark">
-            <thead className="bg-brand-cream uppercase text-[10px] font-bold tracking-wider text-brand-muted">
-              <tr>
-                <th className="p-3">Product</th>
-                <th className="p-3">SKU</th>
-                <th className="p-3">Category</th>
-                <th className="p-3">Colors & Photos</th>
-                <th className="p-3">Price</th>
-                <th className="p-3">Total Stock</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand-border">
-              {filtered.map((p) => {
-                const sizes = Array.isArray(p.sizes) ? p.sizes : [];
-                const colors = Array.isArray(p.colors) ? p.colors : [];
-                const totalStock = sizes.reduce((acc, s) => acc + (s?.stock || 0), 0);
-                const displayImg = colors[0]?.images?.[0] || '';
-                const totalPhotos = colors.reduce((acc, c) => acc + (Array.isArray(c?.images) ? c.images.length : 0), 0);
-                return (
-                  <tr key={p.id} className="hover:bg-brand-cream/30">
-                    <td className="p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="relative w-10 h-12 bg-brand-cream rounded overflow-hidden shrink-0 border border-brand-border">
-                          {displayImg ? (
-                            <Image src={displayImg} alt={p.name || 'Product'} fill unoptimized className="object-cover" />
-                          ) : (
-                            <ImageIcon size={16} className="m-auto text-brand-muted" />
-                          )}
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[280px]">Product</TableHead>
+                <TableHead>SKU</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Colors & Photos</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Total Stock</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No products found matching your search.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((p) => {
+                  const sizes = Array.isArray(p.sizes) ? p.sizes : [];
+                  const colors = Array.isArray(p.colors) ? p.colors : [];
+                  const totalStock = sizes.reduce((acc, s) => acc + (s?.stock || 0), 0);
+                  const displayImg = colors[0]?.images?.[0] || '';
+                  const totalPhotos = colors.reduce((acc, c) => acc + (Array.isArray(c?.images) ? c.images.length : 0), 0);
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-10 h-12 bg-secondary rounded overflow-hidden shrink-0 border border-border">
+                            {displayImg ? (
+                              <Image src={displayImg} alt={p.name || 'Product'} fill unoptimized className="object-cover" />
+                            ) : (
+                              <ImageIcon size={16} className="m-auto text-muted-foreground" />
+                            )}
+                          </div>
+                          <div>
+                            <span className="font-bold text-foreground block line-clamp-1">{p.name || 'Unnamed Product'}</span>
+                            <span className="text-[10px] text-muted-foreground">{colors.map((c) => c.name || 'Default').join(', ')}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="font-bold block line-clamp-1">{p.name || 'Unnamed Product'}</span>
-                          <span className="text-[10px] text-brand-muted">{colors.map((c) => c.name || 'Default').join(', ')}</span>
+                      </TableCell>
+                      <TableCell className="font-mono text-[11px] font-semibold">{p.sku || 'N/A'}</TableCell>
+                      <TableCell className="uppercase font-medium text-muted-foreground text-[11px]">
+                        {categories.find((c) => c.slug === p.category)?.name || p.category || 'General'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            {colors.map((c, i) => (
+                              <span
+                                key={i}
+                                className="w-3.5 h-3.5 rounded-full border border-border shadow-xs"
+                                style={{ backgroundColor: c.code || '#111111' }}
+                                title={`${c.name || 'Color'} (${Array.isArray(c.images) ? c.images.length : 0} photos)`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[10px] font-semibold text-muted-foreground">
+                            {colors.length} color(s) • {totalPhotos} photo(s)
+                          </span>
                         </div>
-                      </div>
-                    </td>
-                    <td className="p-3 font-mono text-[11px] font-semibold">{p.sku || 'N/A'}</td>
-                    <td className="p-3 uppercase font-medium text-brand-muted">
-                      {categories.find((c) => c.slug === p.category)?.name || p.category || 'General'}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5">
-                          {colors.map((c, i) => (
-                            <span
-                              key={i}
-                              className="w-3.5 h-3.5 rounded-full border border-black/20 shadow-xs"
-                              style={{ backgroundColor: c.code || '#111111' }}
-                              title={`${c.name || 'Color'} (${Array.isArray(c.images) ? c.images.length : 0} photos)`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-[10px] font-bold text-brand-dark">
-                          {colors.length} color(s) • {totalPhotos} photo(s)
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-3 font-bold">
-                      NPR {(p.salePrice || p.price).toLocaleString()}
-                      {p.salePrice && <span className="text-brand-muted line-through font-normal text-[10px] block">NPR {p.price.toLocaleString()}</span>}
-                    </td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
-                        totalStock > 20 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-brand-sale'
-                      }`}>
-                        {totalStock} UNITS
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleOpenEdit(p)}
-                          className="p-1.5 text-brand-dark hover:bg-brand-cream rounded"
-                          title="Edit Product & Photos"
+                      </TableCell>
+                      <TableCell className="font-bold">
+                        NPR {(p.salePrice || p.price).toLocaleString()}
+                        {p.salePrice && <span className="text-muted-foreground line-through font-normal text-[10px] block">NPR {p.price.toLocaleString()}</span>}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={totalStock > 20 ? 'success' : totalStock > 5 ? 'warning' : 'destructive'}
+                          className="font-mono text-[9px]"
                         >
-                          <Edit2 size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(p.id)}
-                          className="p-1.5 text-brand-sale hover:bg-rose-50 rounded"
-                          title="Delete Product"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                          {totalStock} UNITS
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            onClick={() => handleOpenEdit(p)}
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-foreground hover:text-brand-gold"
+                            title="Edit Product & Photos"
+                          >
+                            <Edit2 size={14} />
+                          </Button>
+                          <Button
+                            onClick={() => handleDelete(p.id)}
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                            title="Delete Product"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Add / Edit Product Modal */}
       {isModalOpen && (

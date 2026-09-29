@@ -149,7 +149,6 @@ export async function POST(request: Request) {
 
       case 'deleteItem': {
         await prisma.product.deleteMany({ where: { id: productId } });
-        await prisma.photoGallery.deleteMany({ where: { productId } });
         break;
       }
 

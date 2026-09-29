@@ -2,9 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { DollarSign, ShoppingBag, Users, AlertTriangle, TrendingUp, Package } from 'lucide-react';
+import { DollarSign, ShoppingBag, Users, AlertTriangle, TrendingUp, Package, ArrowRight } from 'lucide-react';
 import { db } from '@/lib/db';
 import { Order, Product } from '@/types';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 
 export default function AdminDashboardPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -31,138 +35,172 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-serif-title text-3xl font-bold text-brand-dark uppercase tracking-wider">
-          ADMIN DASHBOARD
+        <h1 className="font-serif-title text-3xl font-bold text-foreground uppercase tracking-wider">
+          CONTROL CENTER DASHBOARD
         </h1>
-        <p className="text-xs text-brand-muted mt-1">Real-time store performance, revenue analytics & low stock monitoring.</p>
+        <p className="text-xs text-muted-foreground mt-1">Real-time store performance, revenue analytics & inventory monitoring.</p>
       </div>
 
       {/* Top 4 KPI Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg border border-brand-border shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold text-brand-muted uppercase tracking-wider block">TOTAL REVENUE</span>
-            <span className="text-2xl font-bold text-brand-dark font-mono mt-1 block">NPR {totalRevenue.toLocaleString()}</span>
-            <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-1">
-              <TrendingUp size={12} /> +18.4% this month
-            </span>
-          </div>
-          <div className="p-3 bg-brand-cream rounded-full text-brand-dark">
-            <DollarSign size={24} />
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <Card className="shadow-xs hover:border-brand-gold/40 transition-colors">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">TOTAL REVENUE</span>
+              <span className="text-2xl font-bold text-foreground font-mono block">NPR {totalRevenue.toLocaleString()}</span>
+              <Badge variant="success" className="text-[9px] gap-1 px-1.5 py-0 mt-1 font-semibold">
+                <TrendingUp size={11} /> +18.4% this month
+              </Badge>
+            </div>
+            <div className="p-3 bg-secondary rounded-full text-foreground border border-border">
+              <DollarSign size={22} className="text-brand-gold" />
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white p-6 rounded-lg border border-brand-border shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold text-brand-muted uppercase tracking-wider block">TOTAL ORDERS</span>
-            <span className="text-2xl font-bold text-brand-dark font-mono mt-1 block">{orders.length}</span>
-            <span className="text-[10px] text-brand-muted mt-1 block">98% fulfillment rate</span>
-          </div>
-          <div className="p-3 bg-brand-cream rounded-full text-brand-dark">
-            <ShoppingBag size={24} />
-          </div>
-        </div>
+        <Card className="shadow-xs hover:border-brand-gold/40 transition-colors">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">TOTAL ORDERS</span>
+              <span className="text-2xl font-bold text-foreground font-mono block">{orders.length}</span>
+              <span className="text-[11px] text-muted-foreground block">98% fulfillment rate</span>
+            </div>
+            <div className="p-3 bg-secondary rounded-full text-foreground border border-border">
+              <ShoppingBag size={22} className="text-brand-gold" />
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white p-6 rounded-lg border border-brand-border shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold text-brand-muted uppercase tracking-wider block">ACTIVE PRODUCTS</span>
-            <span className="text-2xl font-bold text-brand-dark font-mono mt-1 block">{products.length}</span>
-            <span className="text-[10px] text-brand-muted mt-1 block">Across 4 categories</span>
-          </div>
-          <div className="p-3 bg-brand-cream rounded-full text-brand-dark">
-            <Package size={24} />
-          </div>
-        </div>
+        <Card className="shadow-xs hover:border-brand-gold/40 transition-colors">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">ACTIVE PRODUCTS</span>
+              <span className="text-2xl font-bold text-foreground font-mono block">{products.length}</span>
+              <span className="text-[11px] text-muted-foreground block">Across catalog</span>
+            </div>
+            <div className="p-3 bg-secondary rounded-full text-foreground border border-border">
+              <Package size={22} className="text-brand-gold" />
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white p-6 rounded-lg border border-brand-border shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold text-brand-muted uppercase tracking-wider block">LOW STOCK ALERTS</span>
-            <span className="text-2xl font-bold text-brand-sale font-mono mt-1 block">{lowStockProducts.length}</span>
-            <span className="text-[10px] text-brand-sale font-semibold mt-1 block">Requires restocking</span>
-          </div>
-          <div className="p-3 bg-rose-50 rounded-full text-brand-sale">
-            <AlertTriangle size={24} />
-          </div>
-        </div>
+        <Card className="shadow-xs hover:border-brand-gold/40 transition-colors">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">LOW STOCK ALERTS</span>
+              <span className="text-2xl font-bold text-destructive font-mono block">{lowStockProducts.length}</span>
+              <span className="text-[11px] text-destructive font-semibold block">Requires replenishment</span>
+            </div>
+            <div className="p-3 bg-destructive/10 rounded-full text-destructive border border-destructive/20">
+              <AlertTriangle size={22} />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Main Grid: Recent Orders + Low Stock Table */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Recent Orders */}
-        <div className="lg:col-span-8 bg-white p-6 rounded-lg border border-brand-border shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-brand-border pb-4">
-            <h3 className="font-serif-title text-base font-bold text-brand-dark uppercase tracking-wider">
-              RECENT ORDERS
-            </h3>
-            <Link href="/admin/orders" className="text-xs font-bold text-brand-dark hover:underline">
-              VIEW ALL →
-            </Link>
-          </div>
+        <Card className="lg:col-span-8 shadow-xs">
+          <CardHeader className="pb-4 flex flex-row items-center justify-between border-b border-border">
+            <div>
+              <CardTitle className="text-base uppercase tracking-wider">
+                RECENT ORDERS
+              </CardTitle>
+              <CardDescription className="text-xs">Latest transactions placed across Nepal</CardDescription>
+            </div>
+            <Button asChild variant="ghost" size="sm" className="text-xs font-bold gap-1">
+              <Link href="/admin/orders">
+                <span>VIEW ALL</span>
+                <ArrowRight size={13} />
+              </Link>
+            </Button>
+          </CardHeader>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-brand-dark">
-              <thead className="bg-brand-cream/60 uppercase text-[10px] font-bold tracking-wider text-brand-muted">
-                <tr>
-                  <th className="p-3">Order ID</th>
-                  <th className="p-3">Customer</th>
-                  <th className="p-3">Amount</th>
-                  <th className="p-3">Payment</th>
-                  <th className="p-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand-border">
-                {orders.map((ord) => (
-                  <tr key={ord.id} className="hover:bg-brand-cream/30">
-                    <td className="p-3 font-mono font-bold">{ord.orderNumber}</td>
-                    <td className="p-3 font-medium">{ord.customerName}</td>
-                    <td className="p-3 font-bold">NPR {ord.total.toLocaleString()}</td>
-                    <td className="p-3 font-mono uppercase">{ord.paymentMethod}</td>
-                    <td className="p-3">
-                      <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded uppercase border ${
-                        ord.orderStatus === 'Out for Delivery'
-                          ? 'bg-purple-100 text-purple-900 border-purple-300'
-                          : ord.orderStatus === 'Cancelled'
-                          ? 'bg-rose-100 text-rose-900 border-rose-300'
-                          : 'bg-amber-100 text-amber-900 border-amber-300'
-                      }`}>
-                        {ord.orderStatus === 'Pending' ? '⏳ PENDING' : ord.orderStatus === 'Out for Delivery' ? '🚚 OUT FOR DELIVERY' : '❌ CANCELLED'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px]">Order ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Payment</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      No customer orders recorded yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  orders.slice(0, 7).map((ord) => (
+                    <TableRow key={ord.id}>
+                      <TableCell className="font-mono font-bold">{ord.orderNumber}</TableCell>
+                      <TableCell className="font-medium">{ord.customerName}</TableCell>
+                      <TableCell className="font-bold">NPR {ord.total.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono uppercase text-muted-foreground">{ord.paymentMethod}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge
+                          variant={
+                            ord.orderStatus === 'Out for Delivery'
+                              ? 'default'
+                              : ord.orderStatus === 'Cancelled'
+                              ? 'destructive'
+                              : 'warning'
+                          }
+                          className="font-mono text-[9px]"
+                        >
+                          {ord.orderStatus}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
         {/* Low Stock Alerts */}
-        <div className="lg:col-span-4 bg-white p-6 rounded-lg border border-brand-border shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-brand-border pb-4">
-            <h3 className="font-serif-title text-base font-bold text-brand-dark uppercase tracking-wider">
-              LOW STOCK WATCHLIST
-            </h3>
-            <Link href="/admin/inventory" className="text-xs font-bold text-brand-dark hover:underline">
-              MANAGE
-            </Link>
-          </div>
+        <Card className="lg:col-span-4 shadow-xs">
+          <CardHeader className="pb-4 flex flex-row items-center justify-between border-b border-border">
+            <div>
+              <CardTitle className="text-base uppercase tracking-wider">
+                LOW STOCK WATCH
+              </CardTitle>
+              <CardDescription className="text-xs">Items nearing depleted stock</CardDescription>
+            </div>
+            <Button asChild variant="ghost" size="sm" className="text-xs font-bold">
+              <Link href="/admin/inventory">
+                MANAGE
+              </Link>
+            </Button>
+          </CardHeader>
 
-          <div className="space-y-3">
-            {lowStockProducts.slice(0, 5).map((p) => {
-              const minStock = Math.min(...p.sizes.map((s) => s.stock));
-              return (
-                <div key={p.id} className="flex items-center justify-between p-3 bg-brand-cream/40 rounded border border-brand-border/60 text-xs">
-                  <div>
-                    <span className="font-semibold text-brand-dark block line-clamp-1">{p.name}</span>
-                    <span className="text-[10px] text-brand-muted font-mono">{p.sku}</span>
+          <CardContent className="p-4 space-y-3">
+            {lowStockProducts.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-6">All items have healthy inventory levels.</p>
+            ) : (
+              lowStockProducts.slice(0, 6).map((p) => {
+                const minStock = Math.min(...p.sizes.map((s) => s.stock));
+                return (
+                  <div key={p.id} className="flex items-center justify-between p-3 bg-secondary/40 rounded-lg border border-border text-xs">
+                    <div className="space-y-0.5">
+                      <span className="font-semibold text-foreground block line-clamp-1">{p.name}</span>
+                      <span className="text-[10px] text-muted-foreground font-mono">{p.sku}</span>
+                    </div>
+                    <Badge variant="destructive" className="text-[9px] font-bold">
+                      {minStock} LEFT
+                    </Badge>
                   </div>
-                  <span className="bg-rose-100 text-brand-sale text-[10px] font-bold px-2 py-0.5 rounded">
-                    {minStock} LEFT
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

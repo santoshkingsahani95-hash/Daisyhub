@@ -139,6 +139,11 @@ async function saveProductToDb(rawProduct: Product): Promise<Product> {
         isSale: !!product.isSale,
         isOutOfStock: product.isOutOfStock !== undefined ? !!product.isOutOfStock : totalStock <= 0,
         stockQuantity: totalStock,
+        images: (Array.isArray(product.images) && product.images.length > 0
+          ? product.images
+          : (product.colors && Array.isArray(product.colors)
+              ? product.colors.flatMap((c: any) => Array.isArray(c.images) ? c.images : [])
+              : [])) as any,
         colors: (product.colors || []) as any,
         sizes: (product.sizes || []) as any,
         sku: product.sku,
@@ -150,32 +155,6 @@ async function saveProductToDb(rawProduct: Product): Promise<Product> {
         createdAt: product.createdAt || new Date().toISOString(),
       },
     });
-
-    // Sync photo gallery
-    await prisma.photoGallery.deleteMany({ where: { productId: product.id } });
-    if (product.colors && Array.isArray(product.colors) && product.colors.length > 0) {
-      let sortOrder = 0;
-      const rows: any[] = [];
-      for (const c of product.colors) {
-        if (c.images && Array.isArray(c.images)) {
-          for (let i = 0; i < c.images.length; i++) {
-            sortOrder++;
-            rows.push({
-              id: `gal-${product.id}-${sortOrder}`,
-              productId: product.id,
-              colorName: c.name || 'Default',
-              colorCode: c.code || '#111111',
-              imageUrl: c.images[i],
-              isMain: i === 0 && sortOrder === 1,
-              sortOrder,
-            });
-          }
-        }
-      }
-      if (rows.length > 0) {
-        await prisma.photoGallery.createMany({ data: rows });
-      }
-    }
   } catch (error) {
     console.error('[saveProductToDb Error]', error);
     throw error;
@@ -186,7 +165,6 @@ async function saveProductToDb(rawProduct: Product): Promise<Product> {
 async function deleteProductFromDb(id: string): Promise<boolean> {
   try {
     await prisma.product.deleteMany({ where: { id } });
-    await prisma.photoGallery.deleteMany({ where: { productId: id } });
     return true;
   } catch (error) {
     console.error('[deleteProductFromDb Error]', error);

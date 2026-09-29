@@ -22,6 +22,10 @@ import {
 } from 'lucide-react';
 import { db } from '@/lib/db';
 import { Product, ColorOption, Category } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 interface InventoryItem {
   _id?: string;
@@ -462,111 +466,112 @@ export default function AdminInventoryPage() {
               <CheckCircle2 size={14} /> {updateMsg}
             </span>
           )}
-          <button
+          <Button
             onClick={fetchInventory}
             disabled={isLoading}
-            className="p-2.5 bg-brand-cream hover:bg-brand-border text-brand-dark rounded border border-brand-border flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95"
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs font-bold"
             title="Refresh Inventory from MySQL Database"
           >
             <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             <span className="hidden sm:inline">Refresh</span>
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleOpenAddModal}
-            className="px-5 py-3 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 flex items-center justify-center gap-2 rounded shadow transition-all active:scale-95"
+            variant="luxury"
+            size="default"
+            className="gap-2 tracking-wider font-bold shadow-sm"
           >
             <Plus size={16} />
             <span>ADD INVENTORY ITEM</span>
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs">
-          <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">TOTAL PRODUCTS</span>
-          <span className="text-2xl font-serif-title font-bold text-brand-dark">{totalRecords}</span>
-          <span className="text-[10px] text-emerald-600 block mt-0.5">Records in MySQL</span>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs">
-          <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">TOTAL STOCK UNITS</span>
-          <span className="text-2xl font-mono font-bold text-brand-dark">{totalStockUnits.toLocaleString()}</span>
-          <span className="text-[10px] text-brand-muted block mt-0.5">Available across all sizes</span>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs">
-          <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">LOW STOCK ITEMS</span>
-          <span className="text-2xl font-mono font-bold text-amber-600">{lowStockCount}</span>
-          <span className="text-[10px] text-amber-700 block mt-0.5">5 units or remaining</span>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs">
-          <span className="text-[10px] text-brand-muted font-bold uppercase tracking-wider block">OUT OF STOCK</span>
-          <span className="text-2xl font-mono font-bold text-rose-600">{outOfStockCount}</span>
-          <span className="text-[10px] text-rose-700 block mt-0.5">Requires immediate restock</span>
-        </div>
+        <Card className="shadow-xs hover:border-brand-gold/40 transition-colors">
+          <CardContent className="p-4 space-y-1">
+            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider block">TOTAL PRODUCTS</span>
+            <span className="text-2xl font-serif-title font-bold text-foreground block">{totalRecords}</span>
+            <span className="text-[10px] text-emerald-600 block">Catalog records</span>
+          </CardContent>
+        </Card>
+        <Card className="shadow-xs hover:border-brand-gold/40 transition-colors">
+          <CardContent className="p-4 space-y-1">
+            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider block">TOTAL STOCK UNITS</span>
+            <span className="text-2xl font-mono font-bold text-foreground block">{totalStockUnits.toLocaleString()}</span>
+            <span className="text-[10px] text-muted-foreground block">Across all sizes</span>
+          </CardContent>
+        </Card>
+        <Card className="shadow-xs hover:border-amber-500/40 transition-colors">
+          <CardContent className="p-4 space-y-1">
+            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider block">LOW STOCK ITEMS</span>
+            <span className="text-2xl font-mono font-bold text-amber-600 block">{lowStockCount}</span>
+            <span className="text-[10px] text-amber-600 block">5 units or less</span>
+          </CardContent>
+        </Card>
+        <Card className="shadow-xs hover:border-destructive/40 transition-colors">
+          <CardContent className="p-4 space-y-1">
+            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider block">OUT OF STOCK</span>
+            <span className="text-2xl font-mono font-bold text-destructive block">{outOfStockCount}</span>
+            <span className="text-[10px] text-destructive block">Requires restock</span>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Search & Filter Control Toolbar */}
-      <div className="bg-white p-4 rounded-lg border border-brand-border shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 bg-brand-cream/60 px-3.5 py-2 rounded border border-brand-border flex-1 max-w-md">
-          <Search size={16} className="text-brand-muted shrink-0" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter inventory by Name, SKU code or Category..."
-            className="bg-transparent text-xs w-full focus:outline-none font-medium"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="text-brand-muted hover:text-brand-dark">
-              <X size={14} />
-            </button>
-          )}
-        </div>
+      <Card className="shadow-xs">
+        <CardContent className="p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search size={15} className="absolute left-3 top-3 text-muted-foreground" />
+            <Input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter inventory by Name, SKU code or Category..."
+              className="pl-9 text-xs"
+            />
+          </div>
 
-        {/* Status Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
-              statusFilter === 'all'
-                ? 'bg-brand-dark text-white shadow-xs'
-                : 'bg-brand-cream text-brand-dark hover:bg-brand-border'
-            }`}
-          >
-            All ({totalRecords})
-          </button>
-          <button
-            onClick={() => setStatusFilter('in_stock')}
-            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
-              statusFilter === 'in_stock'
-                ? 'bg-emerald-700 text-white shadow-xs'
-                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-            }`}
-          >
-            In Stock
-          </button>
-          <button
-            onClick={() => setStatusFilter('low_stock')}
-            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
-              statusFilter === 'low_stock'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
-            }`}
-          >
-            Low Stock ({lowStockCount})
-          </button>
-          <button
-            onClick={() => setStatusFilter('out_of_stock')}
-            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
-              statusFilter === 'out_of_stock'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
-            }`}
-          >
-            Out of Stock ({outOfStockCount})
-          </button>
-        </div>
-      </div>
+          {/* Status Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            <Button
+              onClick={() => setStatusFilter('all')}
+              variant={statusFilter === 'all' ? 'default' : 'outline'}
+              size="sm"
+              className="text-xs h-8"
+            >
+              All ({totalRecords})
+            </Button>
+            <Button
+              onClick={() => setStatusFilter('in_stock')}
+              variant={statusFilter === 'in_stock' ? 'default' : 'outline'}
+              size="sm"
+              className={`text-xs h-8 ${statusFilter === 'in_stock' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
+            >
+              In Stock
+            </Button>
+            <Button
+              onClick={() => setStatusFilter('low_stock')}
+              variant={statusFilter === 'low_stock' ? 'default' : 'outline'}
+              size="sm"
+              className={`text-xs h-8 ${statusFilter === 'low_stock' ? 'bg-amber-600 hover:bg-amber-700 text-white' : ''}`}
+            >
+              Low Stock ({lowStockCount})
+            </Button>
+            <Button
+              onClick={() => setStatusFilter('out_of_stock')}
+              variant={statusFilter === 'out_of_stock' ? 'default' : 'outline'}
+              size="sm"
+              className={`text-xs h-8 ${statusFilter === 'out_of_stock' ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground' : ''}`}
+            >
+              Out of Stock ({outOfStockCount})
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Main Content Area: Loading / Error / Table */}
       {isLoading ? (

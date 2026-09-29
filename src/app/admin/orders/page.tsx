@@ -23,6 +23,10 @@ import {
 } from 'lucide-react';
 import { db } from '@/lib/db';
 import { Order, OrderStatus } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 type DateFilterType = 'all' | 'today' | 'yesterday' | 'this_month' | 'custom';
 
@@ -264,49 +268,52 @@ export default function AdminOrdersPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-lg border border-brand-border shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-serif-title text-3xl font-bold text-brand-dark uppercase tracking-wider">
+            <h1 className="font-serif-title text-3xl font-bold text-foreground uppercase tracking-wider">
               ORDERS MANAGEMENT
             </h1>
-            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+            <Badge variant="success" className="font-mono text-[9px] gap-1 px-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
               LIVE GOOGLE SHEET AUTO-SYNC
-            </span>
+            </Badge>
           </div>
-          <p className="text-xs text-brand-muted mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Filter customer orders by date & automatically sync new orders straight into Google Sheets without re-entry.
           </p>
         </div>
 
         {/* Direct Google Sheet Link Button & Config */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
+          <Button
             onClick={handleExportExcel}
-            className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider rounded shadow flex items-center gap-2 transition-all cursor-pointer"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider gap-2 shadow-xs"
             title="Download Excel Sheet for currently filtered orders"
           >
-            <Download size={18} />
+            <Download size={16} />
             <span>CREATE EXCEL SHEET ({filteredOrders.length})</span>
-          </button>
+          </Button>
 
-          <a
-            href={googleSheetUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="px-4 py-3 bg-brand-dark hover:bg-brand-accent text-white text-xs font-bold uppercase tracking-wider rounded shadow flex items-center gap-2 transition-all"
-            title="Open linked Google Sheet in new tab"
-          >
-            <FileSpreadsheet size={18} />
-            <span>OPEN GOOGLE SHEET ↗</span>
-          </a>
+          <Button asChild variant="luxury" size="default" className="text-xs font-bold uppercase tracking-wider gap-2 shadow-xs">
+            <a
+              href={googleSheetUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="Open linked Google Sheet in new tab"
+            >
+              <FileSpreadsheet size={16} />
+              <span>OPEN GOOGLE SHEET ↗</span>
+            </a>
+          </Button>
 
-          <button
+          <Button
             onClick={() => setIsConfiguringSheet(!isConfiguringSheet)}
-            className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-brand-dark border border-brand-border rounded hover:bg-brand-cream transition-colors flex items-center gap-1.5"
+            variant="outline"
+            size="default"
+            className="text-xs font-bold uppercase tracking-wider gap-1.5"
             title="Configure Google Sheet Link & Auto-Sync"
           >
             <Zap size={14} className="text-brand-gold" />
             <span>SHEET SETTINGS</span>
-          </button>
+          </Button>
         </div>
       </div>
 

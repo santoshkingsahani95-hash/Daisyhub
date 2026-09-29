@@ -10,7 +10,6 @@ import {
   Layers,
   ShoppingBag,
   Sliders,
-  Tag,
   Star,
   QrCode,
   ArrowLeft,
@@ -25,11 +24,16 @@ import {
   ArrowRight,
   AlertCircle,
   Truck,
-  Cpu,
+  CheckCircle2,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { db } from '@/lib/db';
 import { CustomerUser } from '@/types';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -161,10 +165,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // 1. SSR Hydration Guard
   if (!isMounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-brand-cream/40">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-brand-dark border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-bold uppercase tracking-widest text-brand-dark">Loading Control Center...</span>
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-bold uppercase tracking-widest text-foreground">Loading Control Center...</span>
         </div>
       </div>
     );
@@ -173,91 +177,101 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // 2. Strict Authentication Guard (Required for Admin Panel)
   if (!user || user.role !== 'ADMIN') {
     return (
-      <div className="min-h-screen flex flex-col bg-brand-dark/95 text-white items-center justify-center p-6 relative overflow-hidden font-sans">
+      <div className="min-h-screen flex flex-col bg-zinc-950 text-white items-center justify-center p-6 relative overflow-hidden font-sans">
         {/* Decorative background glow */}
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-brand-gold/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-brand-gold/10 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-brand-gold/15 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-brand-gold/15 rounded-full blur-3xl" />
 
-        <div className="relative w-full max-w-md bg-white text-brand-dark p-8 md:p-10 rounded-xl shadow-2xl border border-white/20 space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-12 h-12 bg-brand-dark text-white rounded-full flex items-center justify-center mx-auto shadow-md">
+        <Card className="relative w-full max-w-md bg-background text-foreground shadow-2xl border-border/80">
+          <CardHeader className="text-center space-y-2 pb-4">
+            <div className="w-12 h-12 bg-primary text-primary-foreground rounded-full flex items-center justify-center mx-auto shadow-md">
               <Shield size={24} className="text-brand-gold" />
             </div>
-            <span className="text-[10px] uppercase tracking-ultra font-bold text-brand-gold block pt-2">RESTRICTED CONTROL CENTER</span>
-            <h1 className="font-serif-title text-2xl font-bold text-brand-dark uppercase tracking-wider">ADMIN AUTHENTICATION</h1>
-            <p className="text-xs text-brand-muted">The Admin Panel requires administrator login credentials to proceed.</p>
-          </div>
+            <div className="flex justify-center">
+              <Badge variant="gold" className="text-[9px] uppercase tracking-ultra font-bold px-2 py-0.5">
+                RESTRICTED CONTROL CENTER
+              </Badge>
+            </div>
+            <CardTitle className="text-2xl font-bold uppercase tracking-wider text-foreground">
+              ADMIN AUTHENTICATION
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              The DaisyHub Admin Panel requires administrator credentials to proceed.
+            </CardDescription>
+          </CardHeader>
 
-          {user && user.role !== 'ADMIN' && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800 space-y-1">
-              <div className="flex items-center gap-1.5 font-bold">
-                <AlertCircle size={14} className="shrink-0 text-amber-600" />
-                <span>Customer Session Active</span>
+          <CardContent className="space-y-4">
+            {user && user.role !== 'ADMIN' && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-md text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <AlertCircle size={14} className="shrink-0 text-amber-600" />
+                  <span>Customer Session Active</span>
+                </div>
+                <p className="text-[11px] leading-tight">
+                  You are currently logged in as <strong className="font-mono">{user.email}</strong> (Customer). Please authenticate with Admin credentials below.
+                </p>
               </div>
-              <p className="text-[11px] leading-tight">
-                You are currently logged in as <strong className="font-mono">{user.email}</strong> (Customer). Please authenticate with Admin credentials below.
-              </p>
-            </div>
-          )}
+            )}
 
-          {loginError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded font-medium flex items-center gap-2">
-              <AlertCircle size={14} className="shrink-0 text-rose-600" />
-              <span>{loginError}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleAdminAuthSubmit} className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-brand-dark block mb-1">ADMIN USERNAME OR EMAIL</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  value={adminInputUser}
-                  onChange={(e) => setAdminInputUser(e.target.value)}
-                  placeholder="Enter username or email"
-                  className="w-full p-3 pl-9 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark font-mono"
-                />
-                <UserIcon size={16} className="absolute left-3 top-3.5 text-brand-muted" />
+            {loginError && (
+              <div className="p-3 bg-destructive/10 border border-destructive/30 text-destructive text-xs rounded-md font-medium flex items-center gap-2">
+                <AlertCircle size={14} className="shrink-0" />
+                <span>{loginError}</span>
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="text-xs font-semibold text-brand-dark block mb-1">ADMIN PASSWORD</label>
-              <div className="relative">
-                <input
-                  type="password"
-                  required
-                  value={adminInputPass}
-                  onChange={(e) => setAdminInputPass(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full p-3 pl-9 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark font-mono"
-                />
-                <Lock size={16} className="absolute left-3 top-3.5 text-brand-muted" />
+            <form onSubmit={handleAdminAuthSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1.5">ADMIN USERNAME OR EMAIL</label>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    required
+                    value={adminInputUser}
+                    onChange={(e) => setAdminInputUser(e.target.value)}
+                    placeholder="Enter username or email"
+                    className="pl-9 font-mono text-xs"
+                  />
+                  <UserIcon size={15} className="absolute left-3 top-3 text-muted-foreground" />
+                </div>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3.5 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 transition-all flex items-center justify-center gap-2 shadow-md"
-            >
-              <span>{isSubmitting ? 'VERIFYING...' : 'LOGIN TO ADMIN PANEL'}</span>
-              <ArrowRight size={14} />
-            </button>
-          </form>
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1.5">ADMIN PASSWORD</label>
+                <div className="relative">
+                  <Input
+                    type="password"
+                    required
+                    value={adminInputPass}
+                    onChange={(e) => setAdminInputPass(e.target.value)}
+                    placeholder="••••••••"
+                    className="pl-9 font-mono text-xs"
+                  />
+                  <Lock size={15} className="absolute left-3 top-3 text-muted-foreground" />
+                </div>
+              </div>
 
-          <div className="pt-2 text-center border-t border-brand-border">
-            <Link
-              href="/"
-              className="text-xs text-brand-muted hover:text-brand-dark font-semibold flex items-center justify-center gap-1.5"
-            >
-              <ArrowLeft size={14} />
-              <span>Return to Storefront</span>
-            </Link>
-          </div>
-        </div>
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                variant="luxury"
+                className="w-full tracking-widest text-xs h-11 shadow-md"
+              >
+                <span>{isSubmitting ? 'VERIFYING...' : 'LOGIN TO CONTROL CENTER'}</span>
+                <ArrowRight size={14} className="ml-1.5" />
+              </Button>
+            </form>
+          </CardContent>
+
+          <CardFooter className="pt-2 text-center border-t border-border flex justify-center">
+            <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground text-xs font-semibold">
+              <Link href="/" className="flex items-center gap-1.5">
+                <ArrowLeft size={14} />
+                <span>Return to Storefront</span>
+              </Link>
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     );
   }
@@ -269,23 +283,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // 3. Authenticated Admin Interface
   return (
-    <div className="min-h-screen flex bg-brand-cream/40 font-sans">
+    <div className="min-h-screen flex bg-background font-sans text-foreground">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-brand-dark text-white flex flex-col justify-between transition-transform duration-300 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-zinc-950 text-white flex flex-col justify-between transition-transform duration-300 border-r border-zinc-800 ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         <div>
           {/* Header Branding */}
-          <div className="p-6 border-b border-white/10 flex items-center justify-between">
+          <div className="p-6 border-b border-zinc-800/80 flex items-center justify-between">
             <div>
               <span className="text-[10px] text-brand-gold uppercase tracking-ultra font-bold block">SaaS CONTROL CENTER</span>
               <span className="font-serif-title text-xl font-bold tracking-wider text-white">DAISY HUB</span>
             </div>
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden text-white/70 hover:text-white"
+              className="lg:hidden text-zinc-400 hover:text-white"
             >
               <X size={20} />
             </button>
@@ -300,13 +314,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded transition-all ${
+                  onClick={() => {
+                    if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                  }}
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-md transition-all ${
                     isActive
-                      ? 'bg-white text-brand-dark font-bold shadow-md'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      ? 'bg-zinc-800 text-white font-bold border-l-4 border-brand-gold shadow-xs'
+                      : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
                   }`}
                 >
-                  <Icon size={18} />
+                  <Icon size={16} className={isActive ? 'text-brand-gold' : 'text-zinc-400'} />
                   <span>{item.label}</span>
                 </Link>
               );
@@ -314,195 +331,189 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </nav>
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-white/10 space-y-2">
-          <Link
-            href="/"
-            className="flex items-center gap-2 px-4 py-2.5 text-xs text-brand-gold hover:text-white transition-colors font-bold uppercase tracking-wider bg-white/5 rounded hover:bg-white/10"
-          >
-            <Globe size={16} />
-            <span>View Live Website ↗</span>
-          </Link>
+        {/* Bottom User Section */}
+        <div className="p-4 border-t border-zinc-800/80 space-y-3">
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-8 h-8 rounded-full bg-brand-gold text-white flex items-center justify-center font-bold text-xs shadow-xs">
+              {user.name.slice(0, 2).toUpperCase()}
+            </div>
+            <div className="overflow-hidden">
+              <span className="text-xs font-bold block text-white truncate">{user.name}</span>
+              <Badge variant="gold" className="text-[9px] px-1.5 py-0 uppercase">
+                {user.role}
+              </Badge>
+            </div>
+          </div>
 
-          <Link
-            href="/track-order"
-            className="flex items-center gap-2 px-4 py-2.5 text-xs text-white/70 hover:text-white transition-colors"
-          >
-            <Truck size={16} />
-            <span>Order Tracking View</span>
-          </Link>
-
-          <button
+          <Button
             onClick={handleAdminLogout}
-            className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-rose-300 hover:text-white bg-rose-950/60 hover:bg-rose-900/80 rounded border border-rose-800/50 transition-all cursor-pointer"
+            variant="ghost"
+            size="sm"
+            className="w-full text-zinc-400 hover:text-rose-400 hover:bg-zinc-900 justify-start gap-2"
           >
-            <LogOut size={16} />
-            <span className="font-bold uppercase tracking-wider">LOGOUT ADMIN</span>
-          </button>
+            <LogOut size={14} />
+            <span>LOGOUT</span>
+          </Button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
         {/* Top Navbar */}
-        <header className="bg-white border-b border-brand-border px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-subtle">
+        <header className="sticky top-0 z-30 h-16 bg-background/95 backdrop-blur-md border-b border-border flex items-center justify-between px-6">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="lg:hidden text-brand-dark"
+            className="lg:hidden text-foreground hover:text-brand-gold"
           >
             <Menu size={22} />
           </button>
 
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold text-brand-dark">Administrator Portal</span>
-            <span className="bg-brand-dark text-white text-[10px] font-bold font-mono px-2 py-0.5 rounded">
+            <span className="text-xs font-semibold text-foreground">Administrator Portal</span>
+            <Badge variant="success" className="text-[10px] font-mono">
               AUTH VERIFIED
-            </span>
+            </Badge>
           </div>
 
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-xs">
             {/* View Storefront Quick Button */}
-            <Link
-              href="/"
-              target="_blank"
-              className="px-3 py-1.5 bg-brand-cream hover:bg-brand-dark hover:text-white text-brand-dark text-[11px] font-bold uppercase tracking-wider rounded border border-brand-border transition-all flex items-center gap-1.5 shadow-xs"
-              title="Open storefront in new tab"
-            >
-              <Globe size={14} className="text-brand-gold" />
-              <span className="hidden sm:inline">View Store Front</span>
-              <ExternalLink size={12} />
-            </Link>
+            <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex gap-1.5 text-[11px] font-bold tracking-wider">
+              <Link href="/" target="_blank" title="Open storefront in new tab">
+                <Globe size={13} className="text-brand-gold" />
+                <span>Storefront</span>
+                <ExternalLink size={11} />
+              </Link>
+            </Button>
 
             {/* Change Password Button */}
-            <button
+            <Button
               onClick={handleOpenChangePassModal}
-              className="px-3 py-1.5 bg-white hover:bg-brand-dark hover:text-white text-brand-dark text-[11px] font-bold uppercase tracking-wider rounded border border-brand-border transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-[11px] font-bold tracking-wider"
               title="Change Admin Username & Password"
             >
-              <Lock size={14} className="text-brand-gold" />
-              <span>Change Password</span>
-            </button>
+              <Lock size={13} className="text-brand-gold" />
+              <span className="hidden sm:inline">Change Password</span>
+            </Button>
 
             {/* Admin Logout Button */}
-            <button
+            <Button
               onClick={handleAdminLogout}
-              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-700 text-[11px] font-bold uppercase tracking-wider rounded border border-rose-200 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+              variant="destructive"
+              size="sm"
+              className="gap-1.5 text-[11px] font-bold tracking-wider"
               title="Logout from Admin Panel"
             >
-              <LogOut size={14} />
-              <span>LOGOUT</span>
-            </button>
+              <LogOut size={13} />
+              <span className="hidden sm:inline">LOGOUT</span>
+            </Button>
 
-            <span className="font-bold text-brand-dark hidden sm:inline">{user.name}</span>
-            <div className="w-8 h-8 rounded-full bg-brand-dark text-white flex items-center justify-center font-bold text-xs shadow-xs">
+            <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xs shadow-xs ml-1">
               {user.name.slice(0, 2).toUpperCase()}
             </div>
           </div>
         </header>
 
         {/* Dynamic Page Container */}
-        <main className="p-6 md:p-8 flex-1">{children}</main>
+        <main className="p-6 md:p-8 flex-1 bg-secondary/20">{children}</main>
 
-        {/* Change Admin Password Modal */}
-        {isChangePassOpen && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white max-w-md w-full rounded-xl shadow-2xl border border-brand-border overflow-hidden animate-in fade-in zoom-in duration-200">
-              <div className="bg-brand-dark text-white p-5 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Shield size={18} className="text-brand-gold" />
-                  <h3 className="font-serif-title font-bold text-base tracking-wide">CHANGE ADMIN CREDENTIALS</h3>
+        {/* Change Admin Password Dialog */}
+        <Dialog open={isChangePassOpen} onOpenChange={setIsChangePassOpen}>
+          <DialogContent className="max-w-md p-0 overflow-hidden">
+            <div className="bg-primary text-primary-foreground p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield size={18} className="text-brand-gold" />
+                <h3 className="font-serif-title font-bold text-base tracking-wide">CHANGE ADMIN CREDENTIALS</h3>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveNewAdminCredentials} className="p-6 space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Update your Admin Panel login username and password. Changes take effect immediately.
+              </p>
+
+              {passChangeSuccess && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs rounded-md font-medium flex items-center gap-1.5">
+                  <CheckCircle2 size={14} />
+                  <span>{passChangeSuccess}</span>
                 </div>
-                <button
-                  onClick={() => setIsChangePassOpen(false)}
-                  className="text-white/70 hover:text-white transition-colors"
-                >
-                  <X size={18} />
-                </button>
+              )}
+
+              {passChangeError && (
+                <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-xs rounded-md font-medium flex items-center gap-1.5">
+                  <AlertCircle size={14} />
+                  <span>{passChangeError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">ADMIN USERNAME</label>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    required
+                    value={newUsernameInput}
+                    onChange={(e) => setNewUsernameInput(e.target.value)}
+                    placeholder="Enter new admin username"
+                    className="pl-9 font-mono text-xs"
+                  />
+                  <UserIcon size={14} className="absolute left-3 top-3 text-muted-foreground" />
+                </div>
               </div>
 
-              <form onSubmit={handleSaveNewAdminCredentials} className="p-6 space-y-4">
-                <p className="text-xs text-brand-muted">
-                  Update your Admin Panel login username and password. Changes take effect immediately.
-                </p>
-
-                {passChangeSuccess && (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded font-medium">
-                    ✓ {passChangeSuccess}
-                  </div>
-                )}
-
-                {passChangeError && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded font-medium">
-                    ⚠ {passChangeError}
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-xs font-semibold text-brand-dark block mb-1">ADMIN USERNAME</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      value={newUsernameInput}
-                      onChange={(e) => setNewUsernameInput(e.target.value)}
-                      placeholder="Enter new admin username"
-                      className="w-full p-2.5 pl-9 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark font-mono"
-                    />
-                    <UserIcon size={15} className="absolute left-3 top-3 text-brand-muted" />
-                  </div>
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">NEW PASSWORD</label>
+                <div className="relative">
+                  <Input
+                    type="password"
+                    required
+                    value={newPasswordInput}
+                    onChange={(e) => setNewPasswordInput(e.target.value)}
+                    placeholder="Enter new password"
+                    className="pl-9 font-mono text-xs"
+                  />
+                  <Lock size={14} className="absolute left-3 top-3 text-muted-foreground" />
                 </div>
+              </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-brand-dark block mb-1">NEW PASSWORD</label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      required
-                      value={newPasswordInput}
-                      onChange={(e) => setNewPasswordInput(e.target.value)}
-                      placeholder="Enter new password"
-                      className="w-full p-2.5 pl-9 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark font-mono"
-                    />
-                    <Lock size={15} className="absolute left-3 top-3 text-brand-muted" />
-                  </div>
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">CONFIRM NEW PASSWORD</label>
+                <div className="relative">
+                  <Input
+                    type="password"
+                    required
+                    value={confirmPasswordInput}
+                    onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                    placeholder="Re-enter new password"
+                    className="pl-9 font-mono text-xs"
+                  />
+                  <Lock size={14} className="absolute left-3 top-3 text-muted-foreground" />
                 </div>
+              </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-brand-dark block mb-1">CONFIRM NEW PASSWORD</label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      required
-                      value={confirmPasswordInput}
-                      onChange={(e) => setConfirmPasswordInput(e.target.value)}
-                      placeholder="Re-enter new password"
-                      className="w-full p-2.5 pl-9 border border-brand-border rounded text-xs focus:outline-none focus:border-brand-dark font-mono"
-                    />
-                    <Lock size={15} className="absolute left-3 top-3 text-brand-muted" />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-brand-border">
-                  <button
-                    type="button"
-                    onClick={() => setIsChangePassOpen(false)}
-                    className="px-4 py-2 text-xs font-bold text-brand-muted hover:text-brand-dark"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-brand-dark text-white text-xs font-bold uppercase tracking-wider rounded hover:bg-brand-dark/90 shadow-sm"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsChangePassOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="luxury"
+                  size="sm"
+                  className="tracking-wider font-bold"
+                >
+                  Save Changes
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
 }
-

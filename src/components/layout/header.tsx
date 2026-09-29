@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Search, ShoppingBag, Heart, Truck, Menu } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { Badge } from '@/components/ui/badge';
 import { MegaMenu } from './mega-menu';
 import { MobileDrawer } from './mobile-drawer';
 
@@ -32,30 +33,30 @@ export const Header: React.FC = () => {
   return (
     <>
       <header
-        className={`sticky top-0 z-40 bg-white transition-all duration-300 border-b border-brand-border ${
-          isScrolled ? 'py-3 shadow-subtle' : 'py-5'
+        className={`sticky top-0 z-40 bg-background/95 backdrop-blur-md transition-all duration-300 border-b border-border ${
+          isScrolled ? 'py-3 shadow-subtle' : 'py-4 md:py-5'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 md:px-8 flex items-center justify-between relative">
           {/* Mobile Hamburger & Desktop Left Logo */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setIsMobileDrawerOpen(true)}
-              className="md:hidden p-1 text-brand-dark hover:opacity-75 focus:outline-none"
+              className="md:hidden p-1.5 text-foreground hover:text-accent focus:outline-none transition-colors"
               aria-label="Open Navigation Drawer"
             >
-              <Menu size={24} />
+              <Menu size={22} />
             </button>
 
             <Link href="/" className="flex items-center gap-2 group">
-              <span className="font-serif-title font-bold text-2xl md:text-3xl tracking-widest text-yellow-500 group-hover:opacity-90 transition-opacity">
-                DAISY HUB
+              <span className="font-serif-title font-bold text-2xl md:text-3xl tracking-widest text-foreground group-hover:text-brand-gold transition-colors">
+                DAISY<span className="text-brand-gold ml-1.5">HUB</span>
               </span>
             </Link>
           </div>
 
           {/* Desktop Center Navigation */}
-          <nav className="hidden md:flex items-center space-x-7 text-xs font-semibold uppercase tracking-ultra text-brand-dark">
+          <nav className="hidden md:flex items-center space-x-7 text-xs font-semibold uppercase tracking-widest text-foreground/90">
             <Link
               href="/category/new-arrivals"
               className="hover:text-brand-gold transition-colors py-2 relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[1.5px] after:bg-brand-gold hover:after:w-full after:transition-all"
@@ -95,53 +96,58 @@ export const Header: React.FC = () => {
           </nav>
 
           {/* Right Action Icons */}
-          <div className="flex items-center space-x-3 md:space-x-5 text-brand-dark">
-
+          <div className="flex items-center space-x-2 sm:space-x-4 text-foreground">
             <button
               onClick={openSearch}
-              className="p-1.5 hover:text-brand-gold transition-colors focus:outline-none"
+              className="p-2 rounded-full hover:bg-muted text-foreground hover:text-brand-gold transition-colors focus:outline-none"
               aria-label="Search"
               title="Search"
             >
-              <Search size={20} />
+              <Search size={19} />
             </button>
 
             {/* Track Order Direct Link */}
             <Link
               href="/track-order"
-              className="p-1.5 flex items-center gap-1 hover:text-brand-gold transition-colors text-xs font-semibold uppercase tracking-wider"
+              className="p-2 rounded-full hover:bg-muted flex items-center gap-1.5 text-foreground hover:text-brand-gold transition-colors text-xs font-semibold uppercase tracking-wider"
               aria-label="Track Order"
               title="Track Order"
             >
-              <Truck size={20} />
-              <span className="hidden lg:inline text-[11px] font-sans">Track Order</span>
+              <Truck size={19} />
+              <span className="hidden lg:inline text-[11px] font-sans font-medium">Track Order</span>
             </Link>
 
             <Link
               href="/wishlist"
-              className="hidden md:block relative p-1.5 hover:text-brand-gold transition-colors"
+              className="hidden md:flex relative p-2 rounded-full hover:bg-muted text-foreground hover:text-brand-gold transition-colors"
               aria-label="Wishlist"
               title="Wishlist"
             >
-              <Heart size={20} />
+              <Heart size={19} />
               {isMounted && wishlist.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-brand-dark text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                <Badge
+                  variant="gold"
+                  className="absolute -top-1 -right-1 h-4 min-w-[1rem] px-1 text-[9px] font-bold flex items-center justify-center rounded-full leading-none"
+                >
                   {wishlist.length}
-                </span>
+                </Badge>
               )}
             </Link>
 
             <button
               onClick={toggleMiniCart}
-              className="relative p-1.5 hover:text-brand-gold transition-colors focus:outline-none"
+              className="relative p-2 rounded-full hover:bg-muted text-foreground hover:text-brand-gold transition-colors focus:outline-none"
               aria-label="Shopping Cart"
               title="Bag"
             >
-              <ShoppingBag size={20} />
+              <ShoppingBag size={19} />
               {isMounted && cartCount > 0 && (
-                <span className="absolute -top-1 -right-1.5 bg-brand-dark text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold animate-soft-pulse">
+                <Badge
+                  variant="default"
+                  className="absolute -top-1 -right-1 h-4 min-w-[1rem] px-1 text-[9px] font-bold flex items-center justify-center rounded-full leading-none animate-soft-pulse"
+                >
                   {cartCount}
-                </span>
+                </Badge>
               )}
             </button>
           </div>

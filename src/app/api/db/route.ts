@@ -49,6 +49,9 @@ function mapProduct(r: any): Product {
     insideValleyFee: r.insideValleyFee !== null && r.insideValleyFee !== undefined ? Number(r.insideValleyFee) : undefined,
     outsideValleyFee: r.outsideValleyFee !== null && r.outsideValleyFee !== undefined ? Number(r.outsideValleyFee) : undefined,
     isFreeDelivery: Boolean(r.isFreeDelivery),
+    images: Array.isArray(r.images) && r.images.length > 0
+      ? r.images
+      : (rawColors.flatMap((c: any) => Array.isArray(c.images) ? c.images : [])),
     colors: rawColors,
     sizes,
     reviews: Array.isArray(r.reviews) ? (r.reviews as any) : [],
@@ -213,6 +216,11 @@ export async function POST(request: Request) {
                 : (sanitized.colors && sanitized.colors.length > 0
                     ? sanitized.colors.reduce((sum: number, c: any) => sum + (typeof c.stock === 'number' ? c.stock : 0), 0)
                     : (sanitized.sizes ? sanitized.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0)),
+              images: (Array.isArray(sanitized.images) && sanitized.images.length > 0
+                ? sanitized.images
+                : (sanitized.colors && Array.isArray(sanitized.colors)
+                    ? sanitized.colors.flatMap((c: any) => Array.isArray(c.images) ? c.images : [])
+                    : [])) as any,
               colors: (sanitized.colors || []) as any,
               sizes: (sanitized.sizes || []) as any,
               sku: sanitized.sku,
@@ -232,7 +240,6 @@ export async function POST(request: Request) {
         const { id } = body;
         if (id) {
           await prisma.product.deleteMany({ where: { id } });
-          await prisma.photoGallery.deleteMany({ where: { productId: id } });
         }
         break;
       }

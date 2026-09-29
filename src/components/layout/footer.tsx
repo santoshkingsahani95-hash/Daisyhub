@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Instagram, Facebook, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { db } from '@/lib/db';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 export const Footer: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -24,34 +26,36 @@ export const Footer: React.FC = () => {
   };
 
   return (
-    <footer className="bg-brand-dark text-white pt-16 pb-12 border-t border-brand-dark">
+    <footer className="bg-zinc-950 text-white pt-16 pb-12 border-t border-zinc-800">
       <div className="max-w-7xl mx-auto px-6 md:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-16 border-b border-white/10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-16 border-b border-zinc-800/80">
           {/* Column 1: Brand */}
           <div className="lg:col-span-2 space-y-4">
-            <Link href="/" className="font-serif-title text-2xl md:text-3xl font-bold tracking-widest block text-white">
-              DAISY HUB
+            <Link href="/" className="font-serif-title text-2xl md:text-3xl font-bold tracking-widest block text-white group">
+              DAISY<span className="text-brand-gold ml-1">HUB</span>
             </Link>
-            <p className="text-xs text-white/70 max-w-sm leading-relaxed font-sans">
-              Modern women’s fashion made for your everyday confidence. Clean silhouettes, luxury fabrics, and understated elegance.
+            <p className="text-xs text-zinc-400 max-w-sm leading-relaxed font-sans">
+              Modern women’s fashion made for your everyday confidence. Clean silhouettes, luxury fabrics, and understated elegance delivered across Nepal.
             </p>
 
             <div className="pt-4">
-              <span className="text-[11px] uppercase tracking-widest text-white/50 block mb-2 font-semibold">JOIN THE DAISY HUB CLUB</span>
+              <span className="text-[11px] uppercase tracking-widest text-zinc-400 block mb-2 font-semibold">JOIN THE DAISY HUB VIP CLUB</span>
               <form onSubmit={handleSubscribe} className="flex max-w-sm">
-                <input
+                <Input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="bg-white/10 text-white placeholder:text-white/40 text-xs px-4 py-3 focus:outline-none flex-1 border border-white/20 border-r-0 rounded-l"
+                  className="bg-zinc-900 text-white placeholder:text-zinc-500 text-xs rounded-r-none border-zinc-800 focus-visible:ring-brand-gold"
                 />
-                <button
+                <Button
                   type="submit"
-                  className="bg-white text-brand-dark hover:bg-brand-cream text-xs font-semibold px-5 py-3 rounded-r uppercase tracking-wider transition-colors flex items-center justify-center"
+                  variant="gold"
+                  size="default"
+                  className="rounded-l-none px-4"
                 >
-                  <ArrowRight size={16} />
-                </button>
+                  <ArrowRight size={15} />
+                </Button>
               </form>
               {status.type === 'success' && (
                 <p className="text-[11px] text-emerald-400 mt-2 flex items-center gap-1">
@@ -69,7 +73,7 @@ export const Footer: React.FC = () => {
             <h4 className="font-serif-title text-sm font-semibold tracking-wider text-white uppercase mb-4">
               SHOP
             </h4>
-            <ul className="space-y-2.5 text-xs text-white/70 font-sans">
+            <ul className="space-y-2.5 text-xs text-zinc-400 font-sans">
               <li>
                 <Link href="/category/new-arrivals" className="hover:text-white transition-colors">
                   New Arrivals
@@ -106,32 +110,27 @@ export const Footer: React.FC = () => {
           {/* Column 3: HELP */}
           <div>
             <h4 className="font-serif-title text-sm font-semibold tracking-wider text-white uppercase mb-4">
-              HELP
+              HELP & SUPPORT
             </h4>
-            <ul className="space-y-2.5 text-xs text-white/70 font-sans">
+            <ul className="space-y-2.5 text-xs text-zinc-400 font-sans">
               <li>
                 <Link href="/contact" className="hover:text-white transition-colors">
                   Contact Us
                 </Link>
               </li>
               <li>
-                <Link href="/shipping" className="hover:text-white transition-colors">
-                  Shipping & Delivery
-                </Link>
-              </li>
-              <li>
-                <Link href="/returns" className="hover:text-white transition-colors">
-                  Returns & Exchanges
+                <Link href="/track-order" className="hover:text-white transition-colors">
+                  Track Your Order
                 </Link>
               </li>
               <li>
                 <Link href="/faq" className="hover:text-white transition-colors">
-                  FAQ
+                  FAQ & Shipping
                 </Link>
               </li>
               <li>
-                <Link href="/size-guide" className="hover:text-white transition-colors">
-                  Size Guide
+                <Link href="/admin" className="text-brand-gold hover:underline transition-colors font-mono text-[11px]">
+                  Admin Control Center
                 </Link>
               </li>
             </ul>
@@ -142,53 +141,48 @@ export const Footer: React.FC = () => {
             <h4 className="font-serif-title text-sm font-semibold tracking-wider text-white uppercase mb-4">
               COMPANY
             </h4>
-            <ul className="space-y-2.5 text-xs text-white/70 font-sans mb-6">
+            <ul className="space-y-2.5 text-xs text-zinc-400 font-sans mb-6">
               <li>
                 <Link href="/about" className="hover:text-white transition-colors">
                   About Daisy Hub
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="hover:text-white transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className="hover:text-white transition-colors">
-                  Terms of Service
+                <Link href="/shop" className="hover:text-white transition-colors">
+                  All Products
                 </Link>
               </li>
             </ul>
 
-            <span className="text-[11px] uppercase tracking-widest text-white/50 block mb-3 font-semibold">FOLLOW US</span>
-            <div className="flex gap-3 text-white/70">
+            <span className="text-[11px] uppercase tracking-widest text-zinc-400 block mb-3 font-semibold">FOLLOW OUR LOOKBOOK</span>
+            <div className="flex gap-2.5 text-zinc-400">
               <a
                 href="https://www.instagram.com/daisy_hubnp?stkn=MTh4dTQzeGxoMXpnYg=="
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 bg-white/10 rounded-full hover:bg-white hover:text-brand-dark transition-all"
+                className="p-2 bg-zinc-900 border border-zinc-800 rounded-full hover:bg-brand-gold hover:text-white transition-all shadow-xs"
                 aria-label="Instagram"
               >
-                <Instagram size={16} />
+                <Instagram size={15} />
               </a>
               <a
                 href="https://facebook.com"
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 bg-white/10 rounded-full hover:bg-white hover:text-brand-dark transition-all"
+                className="p-2 bg-zinc-900 border border-zinc-800 rounded-full hover:bg-brand-gold hover:text-white transition-all shadow-xs"
                 aria-label="Facebook"
               >
-                <Facebook size={16} />
+                <Facebook size={15} />
               </a>
             </div>
           </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 flex flex-col md:flex-row items-center justify-between text-xs text-white/50 gap-4 font-sans border-t border-white/5">
-          <p>© 2026 DAISY HUB. All Rights Reserved. Designed for modern women.</p>
-          <div className="flex items-center gap-4 text-[11px]">
-            <span>Secured Payments: eSewa • Khalti • Fonepay • COD</span>
+        <div className="pt-8 flex flex-col md:flex-row items-center justify-between text-xs text-zinc-500 gap-4 font-sans">
+          <p>© 2026 DAISY HUB. All Rights Reserved. Curated for modern women across Nepal.</p>
+          <div className="flex items-center gap-3 text-[11px]">
+            <span>Supported: Fonepay QR • eSewa • Khalti • Cash on Delivery</span>
           </div>
         </div>
       </div>

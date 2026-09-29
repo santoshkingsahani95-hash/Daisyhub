@@ -1,64 +1,150 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 17, 17, 17;
-  --background-rgb: 255, 255, 255;
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 7%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 7%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 7%;
+
+    --primary: 0 0% 7%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 40 18% 97%;
+    --secondary-foreground: 0 0% 7%;
+
+    --muted: 40 14% 95%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 40 48% 56%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 359 58% 39%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 40 48% 56%;
+
+    --radius: 0.5rem;
+
+    /* Editorial Theme Color System */
+    --brand-dark: #111111;
+    --brand-cream: #F9F8F6;
+    --brand-sand: #F2EFE9;
+    --brand-border: #E5E5E5;
+    --brand-muted: #777777;
+    --brand-gold: #C5A059;
+    --brand-sale: #9E2A2B;
+  }
+
+  .dark {
+    --background: 0 0% 6%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 64%;
+
+    --accent: 40 48% 56%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 359 58% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 40 48% 56%;
+
+    --brand-dark: #FFFFFF;
+    --brand-cream: #141414;
+    --brand-sand: #1C1C1C;
+    --brand-border: #2A2A2A;
+    --brand-muted: #A3A3A3;
+    --brand-gold: #D8B46E;
+    --brand-sale: #E05255;
+  }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: #ffffff;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, .font-serif-title {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
 }
 
-h1, h2, h3, .font-serif-title {
-  font-family: 'Playfair Display', Georgia, serif;
-}
-
-/* Custom Scrollbar */
+/* Custom Luxury Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: hsl(var(--muted));
 }
 ::-webkit-scrollbar-thumb {
-  background: #111111;
-  border-radius: 3px;
+  background: hsl(var(--primary) / 0.5);
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #444444;
+  background: hsl(var(--primary));
 }
 
 /* Editorial Glassmorphism */
 .glass-nav {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.dark .glass-nav {
+  background: rgba(15, 15, 15, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .dark-glass {
   background: rgba(17, 17, 17, 0.85);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
 }
 
-/* Product Card Image Zoom */
+/* Product Card Image Zoom & Transitions */
 .img-zoom-container {
   overflow: hidden;
 }
 .img-zoom-container img {
-  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: transform 0.7s cubic-bezier(0.25, 1, 0.5, 1);
 }
 .img-zoom-container:hover img {
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
 /* Accordion Animation */
@@ -76,7 +162,7 @@ h1, h2, h3, .font-serif-title {
   animation: softPulse 2.5s infinite ease-in-out;
 }
 
-/* 0.2s Shake Animation for Stock Limit Reached */
+/* Shake Animation */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-6px); }

@@ -27,6 +27,7 @@ model Product {
   isSale             Boolean  @default(false) @map("is_sale")
   isOutOfStock       Boolean  @default(false) @map("is_out_of_stock")
   stockQuantity      Int      @default(0) @map("stock_quantity")
+  images             Json?
   colors             Json?
   sizes              Json?
   sku                String   @db.VarChar(100)
@@ -122,18 +123,5 @@ model DeliveryRate {
   @@map("delivery_rates")
 }
 
-model PhotoGallery {
-  id         String   @id @db.VarChar(100)
-  productId  String   @map("product_id") @db.VarChar(100)
-  colorName  String?  @map("color_name") @db.VarChar(100)
-  colorCode  String?  @map("color_code") @db.VarChar(50)
-  imageUrl   String   @map("image_url") @db.LongText
-  isMain     Boolean  @default(false) @map("is_main")
-  sortOrder  Int      @default(0) @map("sort_order")
-  createdAt  DateTime @default(now()) @map("created_at")
 
-  @@index([productId])
-  @@index([colorName])
-  @@map("photo_gallery")
-}
 
