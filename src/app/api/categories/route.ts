@@ -90,20 +90,35 @@ async function queryCategoryById(id: string): Promise<Category | null> {
 async function saveCategoryToDb(rawCategory: Category): Promise<Category> {
   const category = await sanitizeObjectImages(rawCategory);
   try {
-    await prisma.category.deleteMany({
+    const existing = await prisma.category.findFirst({
       where: { OR: [{ id: category.id }, { slug: category.slug }] },
     });
-    await prisma.category.create({
-      data: {
-        id: category.id,
-        slug: category.slug,
-        name: category.name,
-        description: category.description || '',
-        image: category.image || '',
-        subcategories: (category.subcategories || []) as any,
-        seo: (category.seo ?? null) as any,
-      },
-    });
+
+    if (existing) {
+      await prisma.category.update({
+        where: { id: existing.id },
+        data: {
+          slug: category.slug,
+          name: category.name,
+          description: category.description || '',
+          image: category.image || '',
+          subcategories: (category.subcategories || []) as any,
+          seo: (category.seo ?? null) as any,
+        },
+      });
+    } else {
+      await prisma.category.create({
+        data: {
+          id: category.id,
+          slug: category.slug,
+          name: category.name,
+          description: category.description || '',
+          image: category.image || '',
+          subcategories: (category.subcategories || []) as any,
+          seo: (category.seo ?? null) as any,
+        },
+      });
+    }
   } catch (error) {
     console.error('[saveCategoryToDb Error]', error);
   }

@@ -157,7 +157,10 @@ export default function CheckoutPage() {
     };
   }, [wsSocket]);
 
+  const [isSuccessRedirecting, setIsSuccessRedirecting] = useState(false);
+
   const finalizeOrderSuccess = (order: Order) => {
+    setIsSuccessRedirecting(true);
     const allProds = db.getProducts();
     order.items.forEach((c) => {
       const prod = allProds.find((p) => p.id === c.productId || p.name === c.productName);
@@ -174,7 +177,6 @@ export default function CheckoutPage() {
     } else {
       clearCart();
     }
-    setIsProcessing(false);
     setShowFonepayModal(false);
     if (wsSocket) wsSocket.close();
     router.push(`/order-confirmation/${order.id}`);
@@ -384,6 +386,30 @@ export default function CheckoutPage() {
       }, 1000);
     }
   };
+
+  if (isProcessing || isSuccessRedirecting) {
+    return (
+      <div className="min-h-screen flex flex-col bg-brand-cream/40">
+        <AnnouncementBar />
+        <Header />
+        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-5">
+          <div className="relative w-16 h-16 flex items-center justify-center">
+            <div className="absolute inset-0 border-4 border-brand-gold/20 rounded-full" />
+            <div className="absolute inset-0 border-4 border-brand-gold border-t-transparent rounded-full animate-spin" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="font-serif-title text-2xl md:text-3xl font-bold text-brand-dark uppercase tracking-wider">
+              PLACING YOUR ORDER...
+            </h2>
+            <p className="text-xs font-semibold text-brand-muted max-w-md mx-auto">
+              Please wait a moment while we secure your items, process inventory, and generate your order confirmation.
+            </p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   if (checkoutItems.length === 0) {
     return (

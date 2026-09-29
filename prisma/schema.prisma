@@ -7,49 +7,57 @@ datasource db {
 }
 
 model Product {
-  id                 String   @id @db.VarChar(100)
-  slug               String   @unique @db.VarChar(255)
-  name               String   @db.VarChar(255)
-  description        String?  @db.Text
+  id                 String    @id @db.VarChar(100)
+  slug               String    @unique @db.VarChar(255)
+  name               String    @db.VarChar(255)
+  description        String?   @db.Text
   details            Json?
-  fabricCare         String?  @map("fabric_care") @db.Text
-  category           String   @db.VarChar(100)
-  subcategory        String?  @db.VarChar(100)
+  fabricCare         String?   @map("fabric_care") @db.Text
+  
+  categoryId         String?   @map("category_id") @db.VarChar(100)
+  categoryRel        Category? @relation("CategoryProducts", fields: [categoryId], references: [id], onDelete: SetNull)
+  category           String    @db.VarChar(100)
+  subcategory        String?   @db.VarChar(100)
+
   collections        Json?
-  price              Decimal  @db.Decimal(10, 2)
-  salePrice          Decimal? @map("sale_price") @db.Decimal(10, 2)
-  discountPercentage Int?     @map("discount_percentage")
-  rating             Decimal  @default(4.8) @db.Decimal(3, 1)
-  reviewCount        Int      @default(0) @map("review_count")
-  isTrending         Boolean  @default(false) @map("is_trending")
-  isNewArrival       Boolean  @default(false) @map("is_new_arrival")
-  isBestSeller       Boolean  @default(false) @map("is_best_seller")
-  isSale             Boolean  @default(false) @map("is_sale")
-  isOutOfStock       Boolean  @default(false) @map("is_out_of_stock")
-  stockQuantity      Int      @default(0) @map("stock_quantity")
+  price              Decimal   @db.Decimal(10, 2)
+  salePrice          Decimal?  @map("sale_price") @db.Decimal(10, 2)
+  discountPercentage Int?      @map("discount_percentage")
+  rating             Decimal   @default(4.8) @db.Decimal(3, 1)
+  reviewCount        Int       @default(0) @map("review_count")
+  isTrending         Boolean   @default(false) @map("is_trending")
+  isNewArrival       Boolean   @default(false) @map("is_new_arrival")
+  isBestSeller       Boolean   @default(false) @map("is_best_seller")
+  isSale             Boolean   @default(false) @map("is_sale")
+  isOutOfStock       Boolean   @default(false) @map("is_out_of_stock")
+  stockQuantity      Int       @default(0) @map("stock_quantity")
   images             Json?
   colors             Json?
   sizes              Json?
-  sku                String   @db.VarChar(100)
+  sku                String?   @db.VarChar(100)
   reviews            Json?
-  isFreeDelivery     Boolean  @default(false) @map("is_free_delivery")
+  isFreeDelivery     Boolean   @default(false) @map("is_free_delivery")
   seo                Json?
-  createdAt          String?  @map("created_at") @db.VarChar(100)
-  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
 
   @@index([category])
+  @@index([categoryId])
   @@map("products")
 }
 
 model Category {
-  id             String   @id @db.VarChar(100)
-  slug           String   @unique @db.VarChar(255)
-  name           String   @db.VarChar(255)
-  description    String?  @db.Text
-  image          String?  @db.VarChar(500)
+  id             String    @id @db.VarChar(100)
+  slug           String    @unique @db.VarChar(255)
+  name           String    @db.VarChar(255)
+  description    String?   @db.Text
+  image          String?   @db.VarChar(500)
   subcategories  Json?
   seo            Json?
-  createdAt      DateTime @default(now()) @map("created_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  products       Product[] @relation("CategoryProducts")
 
   @@map("categories")
 }
@@ -69,7 +77,6 @@ model Collection {
 model Order {
   id                 String   @id @db.VarChar(100)
   orderNumber        String   @unique @map("order_number") @db.VarChar(100)
-  createdAt          String?  @map("created_at") @db.VarChar(100)
   items              Json
   subtotal           Decimal  @db.Decimal(10, 2)
   discount           Decimal  @default(0.00) @db.Decimal(10, 2)
@@ -84,12 +91,13 @@ model Order {
   shippingAddress    Json?    @map("shipping_address")
   estimatedDelivery  String?  @map("estimated_delivery") @db.VarChar(100)
   trackingNumber     String?  @map("tracking_number") @db.VarChar(100)
+  createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@index([customerEmail])
+  @@index([orderStatus])
   @@map("orders")
 }
-
 
 model Cms {
   key              String   @id @db.VarChar(50)
@@ -104,4 +112,5 @@ model Cms {
 
   @@map("cms")
 }
+
 

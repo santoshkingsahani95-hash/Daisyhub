@@ -67,10 +67,12 @@ export default function OrderConfirmationPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-brand-cream/30">
-      <AnnouncementBar />
-      <Header />
+      <div className="print:hidden">
+        <AnnouncementBar />
+        <Header />
+      </div>
 
-      <main className="flex-1 max-w-4xl mx-auto px-6 py-12 w-full">
+      <main className="flex-1 max-w-4xl mx-auto px-6 py-12 w-full print:p-0 print:m-0 print:max-w-none">
         {/* Success Header */}
         <div className="bg-white p-8 md:p-10 rounded-lg border border-brand-border shadow-sm text-center space-y-4 mb-8">
           <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
@@ -171,10 +173,19 @@ export default function OrderConfirmationPage() {
             </div>
           </div>
 
-          <div className="pt-6 flex flex-col sm:flex-row gap-4">
+          <div className="pt-6 flex flex-col sm:flex-row gap-4 print:hidden">
+            <button
+              onClick={() => window.print()}
+              className="flex-1 py-3.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-widest text-center flex items-center justify-center gap-2 rounded shadow-xs transition-colors cursor-pointer"
+              title="Download or Print PDF Receipt"
+            >
+              <Printer size={16} />
+              <span>DOWNLOAD RECEIPT (PDF)</span>
+            </button>
+
             <Link
               href={`/track-order?orderId=${order.orderNumber}`}
-              className="flex-1 py-3.5 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest text-center hover:bg-brand-dark/90 flex items-center justify-center gap-2"
+              className="flex-1 py-3.5 bg-brand-dark text-white text-xs font-bold uppercase tracking-widest text-center hover:bg-brand-dark/90 flex items-center justify-center gap-2 rounded shadow-xs"
             >
               <span>TRACK ORDER STATUS</span>
               <ArrowRight size={14} />
@@ -182,7 +193,7 @@ export default function OrderConfirmationPage() {
 
             <Link
               href="/shop"
-              className="flex-1 py-3.5 border border-brand-dark text-brand-dark text-xs font-bold uppercase tracking-widest text-center hover:bg-brand-cream"
+              className="flex-1 py-3.5 border border-brand-dark text-brand-dark text-xs font-bold uppercase tracking-widest text-center hover:bg-brand-cream rounded shadow-xs"
             >
               CONTINUE SHOPPING
             </Link>
@@ -190,7 +201,9 @@ export default function OrderConfirmationPage() {
         </div>
       </main>
 
-      <Footer />
+      <div className="print:hidden">
+        <Footer />
+      </div>
     </div>
   );
 }

@@ -563,6 +563,7 @@ export default function AdminProductsPage() {
                     />
                     <span className="text-xs font-bold text-emerald-700 uppercase">OFFER FREE DELIVERY</span>
                   </label>
+                </div>
               </div>
 
               {/* DYNAMIC CLICKABLE PHOTO & COLOR/SIZE VARIANT INSPECTOR */}

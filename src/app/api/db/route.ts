@@ -46,8 +46,6 @@ function mapProduct(r: any): Product {
     isOutOfStock: Boolean(r.isOutOfStock),
     stockQuantity: r.stockQuantity !== null && r.stockQuantity !== undefined ? Number(r.stockQuantity) : 0,
     totalStock: r.stockQuantity !== null && r.stockQuantity !== undefined ? Number(r.stockQuantity) : 0,
-    insideValleyFee: r.insideValleyFee !== null && r.insideValleyFee !== undefined ? Number(r.insideValleyFee) : undefined,
-    outsideValleyFee: r.outsideValleyFee !== null && r.outsideValleyFee !== undefined ? Number(r.outsideValleyFee) : undefined,
     isFreeDelivery: Boolean(r.isFreeDelivery),
     images: Array.isArray(r.images) && r.images.length > 0
       ? r.images
@@ -56,7 +54,7 @@ function mapProduct(r: any): Product {
     sizes,
     reviews: Array.isArray(r.reviews) ? (r.reviews as any) : [],
     sku: r.sku || undefined,
-    createdAt: r.createdAt ? r.createdAt : undefined,
+    createdAt: r.createdAt ? (typeof r.createdAt === 'string' ? r.createdAt : r.createdAt.toISOString()) : new Date().toISOString(),
   };
 }
 
@@ -101,7 +99,7 @@ async function fetchAllData() {
   const orders: Order[] = orderRows.map((r) => ({
     id: r.id,
     orderNumber: r.orderNumber,
-    createdAt: r.createdAt || new Date().toISOString(),
+    createdAt: r.createdAt ? (typeof r.createdAt === 'string' ? r.createdAt : r.createdAt.toISOString()) : new Date().toISOString(),
     items: Array.isArray(r.items) ? (r.items as any) : [],
     subtotal: Number(r.subtotal || 0),
     discount: Number(r.discount || 0),
@@ -217,8 +215,6 @@ export async function POST(request: Request) {
               sizes: (sanitized.sizes || []) as any,
               sku: sanitized.sku,
               reviews: (sanitized.reviews || []) as any,
-              insideValleyFee: sanitized.insideValleyFee || 100,
-              outsideValleyFee: sanitized.outsideValleyFee || 200,
               isFreeDelivery: !!sanitized.isFreeDelivery,
               seo: (sanitized.seo ?? null) as any,
               createdAt: sanitized.createdAt || new Date().toISOString(),

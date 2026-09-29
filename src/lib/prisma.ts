@@ -3,7 +3,8 @@ import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-const adapter = new PrismaMariaDb(process.env.DATABASE_URL as string);
+const connectionString = (process.env.DATABASE_URL || 'mysql://root@localhost:3306/daisyhub').replace(/^mysql:\/\//i, 'mariadb://');
+const adapter = new PrismaMariaDb(connectionString);
 
 export const prisma = globalForPrisma.prisma || new PrismaClient({ adapter });
 

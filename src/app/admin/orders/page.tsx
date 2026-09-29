@@ -50,8 +50,24 @@ export default function AdminOrdersPage() {
   // Script copy feedback
   const [copiedScript, setCopiedScript] = useState(false);
 
-  const loadOrders = () => {
-    setOrders(db.getOrders());
+  const isLoadingRef = React.useRef(false);
+
+  const loadOrders = async () => {
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
+    try {
+      const res = await fetch('/api/orders', { cache: 'no-store' });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.orders) && json.orders.length > 0) {
+        setOrders(json.orders);
+        isLoadingRef.current = false;
+        return;
+      }
+    } catch { }
+
+    const fallback = db.getOrders();
+    setOrders(fallback);
+    isLoadingRef.current = false;
   };
 
   useEffect(() => {
@@ -62,14 +78,20 @@ export default function AdminOrdersPage() {
     const storedWebhook = localStorage.getItem('ace_google_sheet_webhook');
     if (storedWebhook) setWebhookUrl(storedWebhook);
 
-    const handleDbUpdate = () => loadOrders();
+    const handleDbUpdate = (e: Event) => {
+      const customEv = e as CustomEvent;
+      const key = customEv?.detail?.key;
+      // Only reload if event detail is specifically orders or all
+      if (!key || key === 'all' || key === 'orders' || key === 'ace_db_orders') {
+        loadOrders();
+      }
+    };
+
     window.addEventListener('ace-db-updated', handleDbUpdate);
     window.addEventListener('storage', handleDbUpdate);
-    const interval = setInterval(loadOrders, 3000);
     return () => {
       window.removeEventListener('ace-db-updated', handleDbUpdate);
       window.removeEventListener('storage', handleDbUpdate);
-      clearInterval(interval);
     };
   }, []);
 
@@ -81,19 +103,35 @@ export default function AdminOrdersPage() {
     setTimeout(() => setMsg(''), 3500);
   };
 
-  const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
-    const updated = db.updateOrderStatus(orderId, newStatus);
-    if (updated) {
-      loadOrders();
-      if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder({
-          ...selectedOrder,
-          orderStatus: newStatus,
-        });
-      }
-      setMsg(`Order status successfully updated to "${newStatus}"!`);
-      setTimeout(() => setMsg(''), 3500);
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    const currentOrder = orders.find((o) => o.id === orderId || o.orderNumber === orderId);
+    if (currentOrder && currentOrder.orderStatus === 'Completed') {
+      setMsg('🔒 Order is marked as COMPLETED and cannot be changed.');
+      setTimeout(() => setMsg(''), 4000);
+      return;
     }
+
+    try {
+      db.updateOrderStatus(orderId, newStatus);
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status: newStatus }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await loadOrders();
+        if (selectedOrder && (selectedOrder.id === orderId || selectedOrder.orderNumber === orderId)) {
+          setSelectedOrder(json.order || { ...selectedOrder, orderStatus: newStatus });
+        }
+        setMsg(`Order status updated to "${newStatus}"!`);
+      } else {
+        setMsg(`Failed to update status: ${json.error || 'Server error'}`);
+      }
+    } catch (err: any) {
+      setMsg(`Error updating order status`);
+    }
+    setTimeout(() => setMsg(''), 4000);
   };
 
   // Date Filtering Logic
@@ -146,8 +184,11 @@ export default function AdminOrdersPage() {
   // Status priority sorting: Pending at TOP; Out for Delivery & Cancelled at BOTTOM
   const statusPriority: Record<string, number> = {
     Pending: 0,
-    'Out for Delivery': 1,
-    Cancelled: 2,
+    Processing: 1,
+    Shipped: 2,
+    'Out for Delivery': 3,
+    Completed: 4,
+    Cancelled: 5,
   };
 
   const sortedOrders = [...filteredOrders].sort((a, b) => {
@@ -427,10 +468,17 @@ export default function AdminOrdersPage() {
           </span>
         </div>
 
-        <div className="bg-purple-50/80 p-4 rounded-lg border border-purple-200 shadow-2xs space-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-800 block">🚚 OUT FOR DELIVERY</span>
-          <span className="font-serif-title text-2xl font-bold text-purple-900">
-            {orders.filter((o) => o.orderStatus === 'Out for Delivery').length}
+        <div className="bg-blue-50/80 p-4 rounded-lg border border-blue-200 shadow-2xs space-y-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-800 block">⚙️ PROCESSING</span>
+          <span className="font-serif-title text-2xl font-bold text-blue-900">
+            {orders.filter((o) => o.orderStatus === 'Processing').length}
+          </span>
+        </div>
+
+        <div className="bg-emerald-50/80 p-4 rounded-lg border border-emerald-200 shadow-2xs space-y-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">✅ COMPLETED</span>
+          <span className="font-serif-title text-2xl font-bold text-emerald-900">
+            {orders.filter((o) => o.orderStatus === 'Completed').length}
           </span>
         </div>
 
@@ -630,17 +678,28 @@ export default function AdminOrdersPage() {
                   <td className="p-3">
                     <select
                       value={ord.orderStatus || 'Pending'}
+                      disabled={ord.orderStatus === 'Completed'}
                       onChange={(e) => handleStatusChange(ord.id, e.target.value as OrderStatus)}
-                      className={`px-2 py-1 rounded text-xs font-bold font-mono border focus:outline-none cursor-pointer transition-all shadow-xs ${
-                        ord.orderStatus === 'Out for Delivery'
-                          ? 'bg-purple-100 text-purple-900 border-purple-300 hover:bg-purple-200'
+                      title={ord.orderStatus === 'Completed' ? 'Completed orders are locked and cannot be changed' : 'Change order status'}
+                      className={`px-2 py-1 rounded text-xs font-bold font-mono border focus:outline-none transition-all shadow-xs ${
+                        ord.orderStatus === 'Completed'
+                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300 opacity-85 cursor-not-allowed'
+                          : ord.orderStatus === 'Processing'
+                          ? 'bg-blue-100 text-blue-900 border-blue-300 hover:bg-blue-200 cursor-pointer'
+                          : ord.orderStatus === 'Shipped'
+                          ? 'bg-indigo-100 text-indigo-900 border-indigo-300 hover:bg-indigo-200 cursor-pointer'
+                          : ord.orderStatus === 'Out for Delivery'
+                          ? 'bg-purple-100 text-purple-900 border-purple-300 hover:bg-purple-200 cursor-pointer'
                           : ord.orderStatus === 'Cancelled'
-                          ? 'bg-rose-100 text-rose-900 border-rose-300 hover:bg-rose-200'
-                          : 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                          ? 'bg-rose-100 text-rose-900 border-rose-300 hover:bg-rose-200 cursor-pointer'
+                          : 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 cursor-pointer'
                       }`}
                     >
                       <option value="Pending">⏳ Pending</option>
+                      <option value="Processing">⚙️ Processing</option>
+                      <option value="Shipped">📦 Shipped</option>
                       <option value="Out for Delivery">🚚 Out for Delivery</option>
+                      <option value="Completed">✅ Completed</option>
                       <option value="Cancelled">❌ Cancelled</option>
                     </select>
                   </td>
@@ -794,17 +853,28 @@ export default function AdminOrdersPage() {
                 <span className="font-bold text-brand-dark uppercase tracking-wider text-[11px]">UPDATE ORDER STATUS:</span>
                 <select
                   value={selectedOrder.orderStatus || 'Pending'}
+                  disabled={selectedOrder.orderStatus === 'Completed'}
                   onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value as OrderStatus)}
-                  className={`px-3 py-1.5 rounded text-xs font-bold font-mono border focus:outline-none cursor-pointer transition-all shadow-xs ${
-                    selectedOrder.orderStatus === 'Out for Delivery'
-                      ? 'bg-purple-100 text-purple-900 border-purple-300'
+                  title={selectedOrder.orderStatus === 'Completed' ? 'Completed orders are locked and cannot be changed' : 'Change order status'}
+                  className={`px-3 py-1.5 rounded text-xs font-bold font-mono border focus:outline-none transition-all shadow-xs ${
+                    selectedOrder.orderStatus === 'Completed'
+                      ? 'bg-emerald-100 text-emerald-900 border-emerald-300 opacity-85 cursor-not-allowed'
+                      : selectedOrder.orderStatus === 'Processing'
+                      ? 'bg-blue-100 text-blue-900 border-blue-300 hover:bg-blue-200 cursor-pointer'
+                      : selectedOrder.orderStatus === 'Shipped'
+                      ? 'bg-indigo-100 text-indigo-900 border-indigo-300 hover:bg-indigo-200 cursor-pointer'
+                      : selectedOrder.orderStatus === 'Out for Delivery'
+                      ? 'bg-purple-100 text-purple-900 border-purple-300 hover:bg-purple-200 cursor-pointer'
                       : selectedOrder.orderStatus === 'Cancelled'
-                      ? 'bg-rose-100 text-rose-900 border-rose-300'
-                      : 'bg-amber-100 text-amber-900 border-amber-300'
+                      ? 'bg-rose-100 text-rose-900 border-rose-300 hover:bg-rose-200 cursor-pointer'
+                      : 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 cursor-pointer'
                   }`}
                 >
                   <option value="Pending">⏳ Pending</option>
+                  <option value="Processing">⚙️ Processing</option>
+                  <option value="Shipped">📦 Shipped</option>
                   <option value="Out for Delivery">🚚 Out for Delivery</option>
+                  <option value="Completed">✅ Completed</option>
                   <option value="Cancelled">❌ Cancelled</option>
                 </select>
               </div>

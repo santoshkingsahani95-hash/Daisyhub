@@ -105,9 +105,21 @@ async function queryProductBySlug(slug: string): Promise<Product | null> {
 async function saveProductToDb(rawProduct: Product): Promise<Product> {
   const product = await sanitizeObjectImages(rawProduct);
   try {
-    await prisma.product.deleteMany({
-      where: { OR: [{ id: product.id }, { slug: product.slug }] },
-    });
+    // Resolve matching categoryId
+    let categoryId: string | null = null;
+    if (product.category) {
+      const catRow = await prisma.category.findFirst({
+        where: {
+          OR: [
+            { slug: product.category.toLowerCase().trim() },
+            { name: { equals: product.category.trim() } },
+          ],
+        },
+      });
+      if (catRow) {
+        categoryId = catRow.id;
+      }
+    }
 
     const totalStock = typeof product.stockQuantity === 'number'
       ? product.stockQuantity
@@ -115,42 +127,59 @@ async function saveProductToDb(rawProduct: Product): Promise<Product> {
           ? product.colors.reduce((sum: number, c: any) => sum + (typeof c.stock === 'number' ? c.stock : 0), 0)
           : (product.sizes ? product.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0));
 
-    await prisma.product.create({
-      data: {
-        id: product.id,
-        slug: product.slug,
-        name: product.name,
-        description: product.description || '',
-        details: (product.details || []) as any,
-        fabricCare: product.fabricCare || '',
-        category: product.category,
-        subcategory: product.subcategory || null,
-        collections: (product.collections || []) as any,
-        price: product.price,
-        salePrice: product.salePrice ?? null,
-        discountPercentage: product.discountPercentage ?? null,
-        rating: product.rating || 4.8,
-        reviewCount: product.reviewCount || 0,
-        isTrending: !!product.isTrending,
-        isNewArrival: !!product.isNewArrival,
-        isBestSeller: !!product.isBestSeller,
-        isSale: !!product.isSale,
-        isOutOfStock: product.isOutOfStock !== undefined ? !!product.isOutOfStock : totalStock <= 0,
-        stockQuantity: totalStock,
-        images: (Array.isArray(product.images) && product.images.length > 0
-          ? product.images
-          : (product.colors && Array.isArray(product.colors)
-              ? product.colors.flatMap((c: any) => Array.isArray(c.images) ? c.images : [])
-              : [])) as any,
-        colors: (product.colors || []) as any,
-        sizes: (product.sizes || []) as any,
-        sku: product.sku,
-        reviews: (product.reviews || []) as any,
-        isFreeDelivery: !!product.isFreeDelivery,
-        seo: (product.seo ?? null) as any,
-        createdAt: product.createdAt || new Date().toISOString(),
-      },
+    const isOutOfStock = totalStock <= 0;
+
+    const existing = await prisma.product.findFirst({
+      where: { OR: [{ id: product.id }, { slug: product.slug }] },
     });
+
+    const productData = {
+      slug: product.slug,
+      name: product.name,
+      description: product.description || '',
+      details: (product.details || []) as any,
+      fabricCare: product.fabricCare || '',
+      categoryId,
+      category: product.category,
+      subcategory: product.subcategory || null,
+      collections: (product.collections || []) as any,
+      price: product.price,
+      salePrice: product.salePrice ?? null,
+      discountPercentage: product.discountPercentage ?? null,
+      rating: product.rating || 4.8,
+      reviewCount: product.reviewCount || 0,
+      isTrending: !!product.isTrending,
+      isNewArrival: !!product.isNewArrival,
+      isBestSeller: !!product.isBestSeller,
+      isSale: !!product.isSale,
+      isOutOfStock,
+      stockQuantity: totalStock,
+      images: (Array.isArray(product.images) && product.images.length > 0
+        ? product.images
+        : (product.colors && Array.isArray(product.colors)
+            ? product.colors.flatMap((c: any) => Array.isArray(c.images) ? c.images : [])
+            : [])) as any,
+      colors: (product.colors || []) as any,
+      sizes: (product.sizes || []) as any,
+      sku: product.sku || null,
+      reviews: (product.reviews || []) as any,
+      isFreeDelivery: !!product.isFreeDelivery,
+      seo: (product.seo ?? null) as any,
+    };
+
+    if (existing) {
+      await prisma.product.update({
+        where: { id: existing.id },
+        data: productData,
+      });
+    } else {
+      await prisma.product.create({
+        data: {
+          id: product.id,
+          ...productData,
+        },
+      });
+    }
   } catch (error) {
     console.error('[saveProductToDb Error]', error);
     throw error;

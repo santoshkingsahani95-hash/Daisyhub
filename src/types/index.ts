@@ -141,7 +141,7 @@ export interface OrderItem {
   image: string;
 }
 
-export type OrderStatus = 'Pending' | 'Out for Delivery' | 'Cancelled';
+export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Completed' | 'Out for Delivery' | 'Cancelled';
 
 export interface Order {
   id: string;

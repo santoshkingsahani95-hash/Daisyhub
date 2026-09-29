@@ -84,6 +84,15 @@ async function postApiAction(action: string, payload: Record<string, any> = {}) 
       });
       return;
     }
+    if (action === 'updateOrderStatus' && payload.orderId && payload.status) {
+      await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: payload.orderId, status: payload.status }),
+        cache: 'no-store',
+      });
+      return;
+    }
 
     if (action === 'saveCollection' && payload.collection) {
       await fetch('/api/collections', {
@@ -641,7 +650,7 @@ class DataStore {
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) {
+          if (Array.isArray(parsed) && (parsed.length > 0 || this.orders.length === 0)) {
             this.orders = parsed;
           }
         } catch (e) { }
@@ -705,6 +714,11 @@ class DataStore {
     }
 
     return order;
+  }
+
+  setOrders(orders: Order[]) {
+    this.orders = orders;
+    this.saveAndBroadcast('ace_db_orders', this.orders);
   }
 
   updateOrderStatus(orderId: string, status: Order['orderStatus']): Order | undefined {

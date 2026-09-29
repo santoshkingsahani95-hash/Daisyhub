@@ -121,12 +121,8 @@ export async function PUT(
         colors: (product.colors || []) as any,
         sizes: (product.sizes || []) as any,
         sku: product.sku,
-        reviews: (product.reviews || []) as any,
-        insideValleyFee: product.insideValleyFee || 100,
-        outsideValleyFee: product.outsideValleyFee || 200,
         isFreeDelivery: !!product.isFreeDelivery,
         seo: (product.seo ?? null) as any,
-        createdAt: product.createdAt || new Date().toISOString(),
       },
     });
 
