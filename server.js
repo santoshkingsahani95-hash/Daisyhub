@@ -1,9 +1,10 @@
+require('dotenv').config();
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 
-const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+const dev = false; // Always run in production mode on Phusion Passenger
+const hostname = '0.0.0.0';
 const port = process.env.PORT || 3000;
 
 const app = next({ dev, hostname, port });
