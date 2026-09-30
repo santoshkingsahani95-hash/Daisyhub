@@ -1,4 +1,8 @@
-require('dotenv').config();
+try {
+  require('dotenv').config();
+} catch (e) {
+  // Next.js automatically loads .env files when booting
+}
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
