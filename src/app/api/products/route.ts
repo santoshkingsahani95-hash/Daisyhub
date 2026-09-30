@@ -267,10 +267,14 @@ export async function POST(request: Request) {
     const saved = await saveProductToDb(product);
     const products = await queryProducts();
 
-    revalidatePath('/');
-    revalidatePath('/shop');
-    revalidatePath('/category/[slug]', 'page');
-    revalidatePath('/product/[slug]', 'page');
+    try {
+      revalidatePath('/');
+      revalidatePath('/shop');
+      revalidatePath('/category/[slug]', 'page');
+      revalidatePath('/product/[slug]', 'page');
+    } catch (e) {
+      // Ignore revalidate error in dynamic runtime
+    }
 
     return NextResponse.json(
       { success: true, product: saved, products, data: saved },
@@ -307,9 +311,13 @@ export async function DELETE(request: Request) {
 
     const success = await deleteProductFromDb(id);
 
-    revalidatePath('/');
-    revalidatePath('/shop');
-    revalidatePath('/category/[slug]', 'page');
+    try {
+      revalidatePath('/');
+      revalidatePath('/shop');
+      revalidatePath('/category/[slug]', 'page');
+    } catch (e) {
+      // Ignore revalidate error in dynamic runtime
+    }
 
     return NextResponse.json(
       { success, message: success ? `Product ${id} deleted` : `Failed to delete product ${id}` },

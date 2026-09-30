@@ -105,8 +105,12 @@ export async function POST(request: Request) {
 
     const updated = await saveCMSToDb(cms);
 
-    revalidatePath('/', 'layout');
-    revalidatePath('/shop');
+    try {
+      revalidatePath('/', 'layout');
+      revalidatePath('/shop');
+    } catch (e) {
+      // Ignore revalidate error in dynamic runtime
+    }
 
     return NextResponse.json({ success: true, cms: updated, data: updated }, { headers: NO_CACHE_HEADERS });
   } catch (error: any) {
