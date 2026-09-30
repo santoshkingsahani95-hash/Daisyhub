@@ -213,9 +213,13 @@ export async function POST(request: Request) {
     const saved = await saveCategoryToDb(categoryToSave);
     const categories = await queryCategories();
 
-    revalidatePath('/');
-    revalidatePath('/shop');
-    revalidatePath('/category/[slug]', 'page');
+    try {
+      revalidatePath('/');
+      revalidatePath('/shop');
+      revalidatePath('/category/[slug]', 'page');
+    } catch (e) {
+      // Ignore revalidate errors in dynamic runtime
+    }
 
     return NextResponse.json(
       { success: true, category: saved, categories, data: saved },
@@ -253,9 +257,13 @@ export async function DELETE(request: Request) {
     const success = await deleteCategoryFromDb(id);
     const categories = await queryCategories();
 
-    revalidatePath('/');
-    revalidatePath('/shop');
-    revalidatePath('/category/[slug]', 'page');
+    try {
+      revalidatePath('/');
+      revalidatePath('/shop');
+      revalidatePath('/category/[slug]', 'page');
+    } catch (e) {
+      // Ignore revalidate errors in dynamic runtime
+    }
 
     return NextResponse.json(
       { success, message: success ? `Category ${id} deleted` : `Failed to delete category ${id}`, categories },

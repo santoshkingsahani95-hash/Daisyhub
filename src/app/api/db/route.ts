@@ -172,7 +172,11 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { action } = body;
-    revalidatePath('/', 'layout');
+    try {
+      revalidatePath('/', 'layout');
+    } catch (e) {
+      // Ignore revalidate error in dynamic runtime
+    }
 
     switch (action) {
       case 'saveProduct': {
