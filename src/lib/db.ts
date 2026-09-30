@@ -201,21 +201,8 @@ class DataStore {
   constructor() {
     this.loadFromLocalStorage();
     if (typeof window !== 'undefined') {
-      // Perform immediate sync with server API
-      this.syncWithServer();
-
-      // Poll server every 30 seconds for real-time multi-device database sync
-      setInterval(() => {
-        if (!document.hidden) {
-          this.syncWithServer();
-        }
-      }, 30000);
-
-      // Also sync when tab regains focus or becomes visible
-      window.addEventListener('focus', () => this.syncWithServer());
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) this.syncWithServer();
-      });
+      // Perform initial sync once on app load
+      this.syncWithServer(true);
     }
   }
 
