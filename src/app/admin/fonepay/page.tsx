@@ -91,18 +91,8 @@ export default function AdminFonepayPage() {
   const saveSettingsToDb = async (newSettings: FonepaySettings) => {
     const updatedCms = db.updateCMS({ fonepaySettings: newSettings });
     setCms(updatedCms);
-    try {
-      await fetch('/api/db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'updateCMS', cms: updatedCms }),
-      });
-    } catch (e) {
-      console.error('[Fonepay Page] Error saving to MySQL:', e);
-    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('ace_db_fonepay_settings', JSON.stringify(newSettings));
-      window.dispatchEvent(new Event('ace-db-updated'));
     }
   };
 

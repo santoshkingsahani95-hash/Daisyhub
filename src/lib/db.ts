@@ -119,6 +119,15 @@ async function postApiAction(action: string, payload: Record<string, any> = {}) 
       });
       return;
     }
+    if (action === 'updateDeliveryRates' && payload.rates) {
+      await fetch('/api/cms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateDeliveryRates', deliveryRates: payload.rates }),
+        cache: 'no-store',
+      });
+      return;
+    }
 
     if (action === 'updateInventory') {
       await fetch('/api/inventory', {
@@ -187,6 +196,7 @@ class DataStore {
   ];
 
   private isSyncing = false;
+  private lastSyncTime = 0;
 
   constructor() {
     this.loadFromLocalStorage();
@@ -194,12 +204,12 @@ class DataStore {
       // Perform immediate sync with server API
       this.syncWithServer();
 
-      // Poll server every 5 seconds for real-time multi-device database sync
+      // Poll server every 30 seconds for real-time multi-device database sync
       setInterval(() => {
         if (!document.hidden) {
           this.syncWithServer();
         }
-      }, 5000);
+      }, 30000);
 
       // Also sync when tab regains focus or becomes visible
       window.addEventListener('focus', () => this.syncWithServer());
@@ -209,10 +219,16 @@ class DataStore {
     }
   }
 
-  public async syncWithServer() {
+  public async syncWithServer(force = false) {
     if (typeof window === 'undefined' || this.isSyncing) return;
+    const now = Date.now();
+    if (!force && now - this.lastSyncTime < 10000) {
+      // Throttle: Skip sync if synced within the last 10 seconds
+      return;
+    }
     try {
       this.isSyncing = true;
+      this.lastSyncTime = now;
       const res = await fetch('/api/db', { cache: 'no-store' });
       if (!res.ok) return;
       const result = await res.json();
